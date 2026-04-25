@@ -1,18 +1,21 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Line, Bar } from 'react-chartjs-2';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  DollarSign, 
-  ArrowUpRight, 
+import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Line } from 'react-chartjs-2';
+import {
+  DollarSign,
+  ArrowUpRight,
   ArrowDownRight,
-  Plus
+  X
 } from 'lucide-react';
 import { usePrivacy } from '../context/PrivacyContext';
 
 const Expenses = () => {
   const { formatCurrency, isPrivacyOn } = usePrivacy();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [expenseForm, setExpenseForm] = useState({ category: '', amount: '', note: '' });
+  const [errors, setErrors] = useState({});
+  const [notice, setNotice] = useState('');
+  const isFormOpen = searchParams.get('add') === '1';
 
   const cashFlowData = {
     labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
@@ -42,22 +45,77 @@ const Expenses = () => {
     { label: 'Net Profit', value: 118000, icon: DollarSign, color: 'primary' },
   ];
 
+  const updateExpenseForm = (field, value) => {
+    setExpenseForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: '' }));
+  };
+
+  const submitExpense = (event) => {
+    event.preventDefault();
+    const nextErrors = {};
+    if (!expenseForm.category.trim()) nextErrors.category = 'Category is required.';
+    if (!Number(expenseForm.amount) || Number(expenseForm.amount) <= 0) nextErrors.amount = 'Amount must be greater than zero.';
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    setNotice(`${expenseForm.category} expense captured for ${formatCurrency(Number(expenseForm.amount))}.`);
+    setExpenseForm({ category: '', amount: '', note: '' });
+    closeExpenseForm();
+  };
+
+  const closeExpenseForm = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('add');
+    setSearchParams(nextParams);
+  };
+
   return (
     <div className="expenses-page">
-      <header className="page-header">
-        <div>
-          <h1>Expenses & Cash Flow</h1>
-          <p>Monitor your revenue and overheads.</p>
+      {notice && (
+        <div className="success-banner" role="status">
+          <span>{notice}</span>
+          <button className="icon-btn" onClick={() => setNotice('')} aria-label="Dismiss expense message">
+            <X size={16} />
+          </button>
         </div>
-        <button className="btn btn-primary">
-          <Plus size={18} />
-          <span>Add Expense</span>
-        </button>
-      </header>
+      )}
+
+      {isFormOpen && (
+        <div className="card billing-section">
+          <div className="section-header">
+            <h3>Add Expense</h3>
+            <button className="icon-btn" onClick={closeExpenseForm} aria-label="Close expense form">
+              <X size={16} />
+            </button>
+          </div>
+          <form className="form-grid" onSubmit={submitExpense}>
+            <div className="form-group">
+              <label htmlFor="expense-category">Category</label>
+              <input id="expense-category" type="text" value={expenseForm.category} onChange={(event) => updateExpenseForm('category', event.target.value)} aria-invalid={Boolean(errors.category)} />
+              {errors.category && <span className="form-error">{errors.category}</span>}
+            </div>
+            <div className="form-group">
+              <label htmlFor="expense-amount">Amount</label>
+              <input id="expense-amount" type="number" min="1" value={expenseForm.amount} onChange={(event) => updateExpenseForm('amount', event.target.value)} aria-invalid={Boolean(errors.amount)} />
+              {errors.amount && <span className="form-error">{errors.amount}</span>}
+            </div>
+            <div className="form-group">
+              <label htmlFor="expense-note">Note</label>
+              <input id="expense-note" type="text" value={expenseForm.note} onChange={(event) => updateExpenseForm('note', event.target.value)} />
+            </div>
+            <div className="form-actions-span">
+              <button className="btn btn-primary" type="submit">Save Expense</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <div className="summary-grid">
-        {summary.map((item, i) => (
-          <div key={i} className="card summary-card">
+        {summary.map((item) => (
+          <div key={item.label} className="card summary-card">
             <div className={`summary-icon-container ${item.color}`}>
               <item.icon size={24} />
             </div>
@@ -71,20 +129,22 @@ const Expenses = () => {
 
       <div className="card chart-card">
         <div className="card-header">
-          <h3>Income vs Expense Graph</h3>
+          <div>
+            <h3>Income vs Expense Graph</h3>
+            <p>Six-month cash flow trend.</p>
+          </div>
         </div>
         <div className={`chart-container ${isPrivacyOn ? 'privacy-blur' : ''}`}>
-          <Line 
-            data={cashFlowData} 
-            options={{ 
-              responsive: true, 
+          <Line
+            data={cashFlowData}
+            options={{
+              responsive: true,
               maintainAspectRatio: false,
               plugins: { legend: { position: 'top' } }
-            }} 
+            }}
           />
         </div>
       </div>
-
     </div>
   );
 };

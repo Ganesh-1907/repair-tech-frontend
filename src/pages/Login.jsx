@@ -9,8 +9,8 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     await login(email, password);
     navigate('/');
   };
@@ -19,36 +19,38 @@ const Login = () => {
     <div className="login-page">
       <div className="login-card card">
         <div className="login-header">
-          <div className="logo-icon">V</div>
-          <h1>EnterpriseSaaS</h1>
+          <div className="logo-icon">R</div>
+          <h1>RepairTech</h1>
           <p>Sign in to your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">
-            <label>Email Address</label>
+            <label htmlFor="login-email">Email Address</label>
             <div className="input-with-icon">
               <Mail size={18} />
-              <input 
-                type="email" 
-                placeholder="admin@enterprise.com" 
+              <input
+                id="login-email"
+                type="email"
+                placeholder="admin@enterprise.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required 
+                onChange={(event) => setEmail(event.target.value)}
+                required
               />
             </div>
           </div>
 
           <div className="form-group">
-            <label>Password</label>
+            <label htmlFor="login-password">Password</label>
             <div className="input-with-icon">
               <Lock size={18} />
-              <input 
-                type="password" 
-                placeholder="••••••••" 
+              <input
+                id="login-password"
+                type="password"
+                placeholder="Enter password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
+                onChange={(event) => setPassword(event.target.value)}
+                required
               />
             </div>
           </div>
@@ -60,10 +62,9 @@ const Login = () => {
         </form>
 
         <div className="login-footer">
-          <p>Don't have an account? <span>Contact Admin</span></p>
+          <p>Do not have an account? <span>Contact Admin</span></p>
         </div>
       </div>
-
     </div>
   );
 };

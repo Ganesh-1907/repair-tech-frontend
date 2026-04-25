@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  CheckCircle2, 
-  Circle, 
-  ChevronRight, 
-  MessageSquare, 
-  FileText, 
-  Package, 
-  Clock, 
+import {
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+  Package,
+  Clock,
   Send,
   Star,
   User,
-  Ticket
+  Ticket,
+  X
 } from 'lucide-react';
 
 const steps = [
@@ -27,27 +25,31 @@ const steps = [
   { id: 10, label: 'Review Message', icon: Star },
 ];
 
-const JobItem = ({ job, activeStep, onUpdateStep }) => {
+const JobItem = ({ job, onUpdateStep }) => {
+  const isFirstStep = job.currentStep === 1;
+  const isFinalStep = job.currentStep === 10;
+  const nextStep = steps[job.currentStep];
+
   return (
     <div className="job-card card">
       <div className="job-header">
         <div className="job-info">
           <h3>{job.customerName}</h3>
-          <span className="job-meta">{job.mobileNumber} • Ticket #{job.ticketId}</span>
+          <span className="job-meta">{job.mobileNumber} - Ticket #{job.ticketId}</span>
         </div>
         <div className="job-status">
           Step {job.currentStep} of 10
         </div>
       </div>
 
-      <div className="workflow-stepper">
+      <div className="workflow-stepper" aria-label={`Workflow progress for ${job.customerName}`}>
         {steps.map((step) => {
           const isCompleted = step.id < job.currentStep;
           const isActive = step.id === job.currentStep;
-          
+
           return (
-            <div 
-              key={step.id} 
+            <div
+              key={step.id}
               className={`step-item ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''}`}
               title={step.label}
             >
@@ -61,17 +63,19 @@ const JobItem = ({ job, activeStep, onUpdateStep }) => {
       </div>
 
       <div className="job-actions">
-        <button 
+        <button
           className="btn btn-outline"
           onClick={() => onUpdateStep(job.id, Math.max(1, job.currentStep - 1))}
+          disabled={isFirstStep}
         >
           Previous
         </button>
-        <button 
+        <button
           className="btn btn-primary"
           onClick={() => onUpdateStep(job.id, Math.min(10, job.currentStep + 1))}
+          disabled={isFinalStep}
         >
-          {job.currentStep === 10 ? 'Finish' : steps[job.currentStep].label} 
+          {isFinalStep ? 'Complete' : nextStep.label}
           <ChevronRight size={16} />
         </button>
       </div>
@@ -80,6 +84,7 @@ const JobItem = ({ job, activeStep, onUpdateStep }) => {
 };
 
 const Workflow = () => {
+  const [notice, setNotice] = useState('');
   const [jobs, setJobs] = useState([
     { id: 1, customerName: 'Raj Kumar', mobileNumber: '9876543210', ticketId: 'SRV-1001', currentStep: 4 },
     { id: 2, customerName: 'Simran Jit', mobileNumber: '9988776655', ticketId: 'SRV-1002', currentStep: 6 },
@@ -87,21 +92,26 @@ const Workflow = () => {
   ]);
 
   const updateStep = (id, newStep) => {
-    setJobs(jobs.map(job => job.id === id ? { ...job, currentStep: newStep } : job));
-    // Here we would trigger backend message sends
+    setJobs((current) => current.map((job) => job.id === id ? { ...job, currentStep: newStep } : job));
+    const job = jobs.find((item) => item.id === id);
+    if (job && newStep !== job.currentStep) {
+      setNotice(`${job.customerName} moved to step ${newStep}.`);
+    }
   };
 
   return (
     <div className="workflow-page">
-      <header className="page-header">
-        <div>
-          <h1>Service Workflow</h1>
-          <p>Manage active service tickets and track progress.</p>
+      {notice && (
+        <div className="success-banner" role="status">
+          <span>{notice}</span>
+          <button className="icon-btn" onClick={() => setNotice('')} aria-label="Dismiss workflow message">
+            <X size={16} />
+          </button>
         </div>
-      </header>
+      )}
 
       <div className="active-jobs-list">
-        {jobs.map(job => (
+        {jobs.map((job) => (
           <JobItem key={job.id} job={job} onUpdateStep={updateStep} />
         ))}
       </div>

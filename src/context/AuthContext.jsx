@@ -1,36 +1,25 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { createContext, useContext, useState } from 'react';
 
 const AuthContext = createContext();
 
+const getMockUser = () => ({
+  id: '1',
+  name: 'Admin User',
+  role: 'admin',
+  email: 'admin@enterprise.com'
+});
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
+  const [user, setUser] = useState(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      // For now, we decode or fetch user profile
-      // Mocking user for development
-      setUser({ 
-        id: '1', 
-        name: 'Admin User', 
-        role: 'admin', 
-        email: 'admin@enterprise.com' 
-      });
-    }
-    setLoading(false);
-  }, []);
+    return token ? getMockUser() : null;
+  });
+  const loading = false;
 
-  const login = async (email, password) => {
+  const login = async (_email, _password) => {
     // Mock login for now
     localStorage.setItem('token', 'mock_token');
-    setUser({ 
-      id: '1', 
-      name: 'Admin User', 
-      role: 'admin', 
-      email: 'admin@enterprise.com' 
-    });
+    setUser(getMockUser());
     return { success: true };
   };
 
