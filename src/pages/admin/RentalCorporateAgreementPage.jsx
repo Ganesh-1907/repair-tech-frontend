@@ -1050,11 +1050,6 @@ const RentalCorporateAgreementPage = () => {
         title="Rental Corporate Agreement"
         description="Corporate agreement builder with editable customer-specific terms, templates, preview, and status tracking."
         breadcrumbs={['Admin', 'Rental Management', 'Agreements', 'Corporate']}
-        actions={[
-          { label: 'Save Draft', icon: Save, onClick: saveDraft },
-          { label: 'Generate', icon: FileText, onClick: handleGenerateAgreement },
-          { label: 'Print', variant: 'secondary', icon: Printer, onClick: () => window.print() },
-        ]}
       />
 
       {editingClause && (

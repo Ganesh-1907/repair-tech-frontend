@@ -48,6 +48,8 @@ const statusClass = {
   Sent: 'status-assigned',
   Approved: 'status-completed',
   Rejected: 'status-overdue',
+  Converted: 'status-completed',
+  Expired: 'status-overdue',
 };
 
 const RentalQuotationPage = () => {
@@ -113,6 +115,19 @@ const RentalQuotationPage = () => {
     }
     setQuotations(await rentalQuotationService.listQuotations());
     setNotice(`Quotation ${quotation.id} ${status === 'Sent' ? 'saved and sent' : 'saved as draft'}.`);
+  };
+
+  const runQuotationAction = async (quotationId, action) => {
+    try {
+      if (action === 'approve') await rentalQuotationService.markApproved(quotationId);
+      if (action === 'reject') await rentalQuotationService.markRejected(quotationId);
+      if (action === 'customer') await rentalQuotationService.convertToCustomer(quotationId);
+      if (action === 'contract') await rentalQuotationService.convertToContract(quotationId);
+      setQuotations(await rentalQuotationService.listQuotations());
+      setNotice(`Quotation ${quotationId} updated.`);
+    } catch (error) {
+      setNotice(error.message);
+    }
   };
 
   return (
@@ -306,9 +321,7 @@ const RentalQuotationPage = () => {
               <strong>{formatCurrency(totals.total)}</strong>
             </div>
             <div className="admin-chip-row">
-              <button className="btn btn-primary btn-full" onClick={() => saveQuotation('Sent')}><Send size={16} /> Send Quotation</button>
               <button className="btn btn-secondary btn-full" onClick={() => setNotice('Email quotation placeholder prepared.')}><Mail size={16} /> Email</button>
-              <button className="btn btn-secondary btn-full" onClick={() => window.print()}><Printer size={16} /> Print</button>
             </div>
           </div>
         </aside>
@@ -330,10 +343,9 @@ const RentalQuotationPage = () => {
               <th>Rental</th>
               <th>Deposit</th>
               <th>Min Period</th>
-              <th>Total</th>
-              <th>Payment Terms</th>
-              <th>SLA</th>
+              <th>Created</th>
               <th>Status</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -345,10 +357,15 @@ const RentalQuotationPage = () => {
                 <td>{formatCurrency(quotation.rentalPrice)} / {quotation.rentalFrequency === 'Monthly' ? 'month' : 'day'}</td>
                 <td>{formatCurrency(quotation.securityDeposit)}</td>
                 <td>{quotation.minimumPeriod}</td>
-                <td>{formatCurrency(quotation.total)}</td>
-                <td>{quotation.paymentTerms}</td>
-                <td>{quotation.sla}</td>
+                <td>{quotation.createdAt}</td>
                 <td><span className={`status-pill ${statusClass[quotation.status] || 'status-draft'}`}>{quotation.status}</span></td>
+                <td>
+                  <div className="action-btns">
+                    <button className="btn btn-sm btn-secondary" type="button" onClick={() => runQuotationAction(quotation.id, 'approve')}>Approve</button>
+                    <button className="btn btn-sm btn-secondary" type="button" onClick={() => runQuotationAction(quotation.id, 'customer')}>To Customer</button>
+                    <button className="btn btn-sm btn-secondary" type="button" onClick={() => runQuotationAction(quotation.id, 'contract')}>To Contract</button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

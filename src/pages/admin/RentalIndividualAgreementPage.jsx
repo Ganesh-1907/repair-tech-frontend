@@ -155,11 +155,6 @@ const RentalIndividualAgreementPage = () => {
         title="Rental Individual Agreement"
         description="Single page form with editable terms and popup preview."
         breadcrumbs={['Admin', 'Rental Management', 'Agreements', 'Individual']}
-        actions={[
-          { label: 'Preview', icon: Eye, variant: 'secondary', onClick: () => setShowPreview(true) },
-          { label: 'Save Draft', icon: Save, onClick: saveDraft },
-          { label: 'Generate', icon: FileText, onClick: handleGenerate },
-        ]}
       />
 
       <form className="card individual-form-card individual-agreement-form" onSubmit={handleSubmit}>
@@ -170,6 +165,7 @@ const RentalIndividualAgreementPage = () => {
           </div>
           <div className="agreement-inline-actions">
             <button type="button" className="btn btn-sm btn-secondary" onClick={() => setShowPreview(true)}><Eye size={14} /> Preview</button>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={handleGenerate}><FileText size={14} /> Generate</button>
             <button type="button" className="btn btn-sm btn-secondary" onClick={handleDownloadPdf}><Download size={14} /> PDF</button>
             <button type="button" className="btn btn-sm btn-secondary" onClick={() => window.print()}><Printer size={14} /> Print</button>
             <button type="button" className="btn btn-sm btn-secondary" onClick={handleSendWhatsApp}><Send size={14} /> WhatsApp</button>
@@ -311,9 +307,7 @@ const RentalIndividualAgreementPage = () => {
         </fieldset>
 
         <div className="individual-form-footer">
-          <button type="button" className="btn btn-secondary" onClick={() => setShowPreview(true)}><Eye size={14} /> Preview</button>
           <button type="submit" className="btn btn-primary"><Save size={14} /> Save Draft</button>
-          <button type="button" className="btn btn-primary" onClick={handleGenerate}><FileText size={14} /> Generate</button>
         </div>
       </form>
 

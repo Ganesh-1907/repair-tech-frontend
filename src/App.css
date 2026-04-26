@@ -5671,11 +5671,73 @@ a:focus-visible,
 /* Campaign module consolidation */
 .campaign-jobs-page,
 .campaign-job-detail-page,
+.campaign-workflow-page,
 .campaign-billing-page,
 .campaign-reports-page {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.sticky-job-summary {
+  position: sticky;
+  top: calc(var(--topbar-height) + 10px);
+  z-index: 40;
+}
+
+.campaign-workflow-summary {
+  padding: 12px;
+}
+
+.campaign-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.campaign-summary-grid > div {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.campaign-summary-grid small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.67rem;
+  font-weight: 800;
+}
+
+.campaign-summary-grid strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.campaign-qr-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.campaign-workflow-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) 360px;
+  gap: 12px;
+  align-items: start;
+}
+
+.campaign-workflow-main,
+.campaign-workflow-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.campaign-workflow-side .card {
+  padding: 12px;
 }
 
 .campaign-jobs-table {
@@ -5886,13 +5948,26 @@ a:focus-visible,
 }
 
 @media (max-width: 1100px) {
+  .campaign-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .campaign-workflow-layout,
   .campaign-detail-grid,
   .admin-split-grid {
     grid-template-columns: 1fr;
   }
+
+  .sticky-job-summary {
+    position: static;
+  }
 }
 
 @media (max-width: 720px) {
+  .campaign-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .detail-list > div,
   .campaign-timeline-item {
     grid-template-columns: 1fr;

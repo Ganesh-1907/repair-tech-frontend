@@ -101,28 +101,10 @@ const basePageMetadata = [
     searchPlaceholder: 'Search device id, serial number, customer branch...',
   },
   {
-    path: '/admin/campaign/dashboard',
-    title: 'Campaign Dashboard',
-    subtitle: 'Track leads, conversions, revenue, and collected devices.',
-    searchPlaceholder: 'Search campaigns...',
-  },
-  {
-    path: '/admin/campaign/leads',
-    title: 'Leads & Walk-ins',
-    subtitle: 'Fast entry for new leads and walk-ins.',
-    searchPlaceholder: 'Search name, phone, device...',
-  },
-  {
-    path: '/admin/campaign/jobs',
-    title: 'Jobs',
-    subtitle: 'Main workflow for job details, quotes, inventory, and status.',
+    path: '/admin/campaign/jobs/new',
+    title: 'Campaign Job Workflow',
+    subtitle: 'One-screen campaign workflow from quick entry to close job.',
     searchPlaceholder: 'Search job id, customer, status...',
-  },
-  {
-    path: '/admin/campaign/billing',
-    title: 'Billing Accounts',
-    subtitle: 'Accounts summary, invoices, and payments collection.',
-    searchPlaceholder: 'Search invoice id, customer, amount...',
   },
   {
     path: '/admin/campaign/reports',

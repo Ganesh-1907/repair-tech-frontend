@@ -1,45 +1,5 @@
-const sleep = (duration = 180) => new Promise((resolve) => setTimeout(resolve, duration));
-
-let quotations = [
-  {
-    id: 'RQ-260401',
-    customerName: 'Global Tech Solutions',
-    customerPhone: '9876543210',
-    productName: 'Laptop i5',
-    rentalFrequency: 'Monthly',
-    rentalPrice: 1500,
-    minimumPeriod: 3,
-    securityDeposit: 3000,
-    installationCharges: 500,
-    deliveryCharges: 300,
-    gstRate: 18,
-    paymentTerms: 'Advance',
-    sla: '4 business hours',
-    total: 8244,
-    status: 'Sent',
-    createdAt: '2026-04-20',
-  },
-  {
-    id: 'RQ-260402',
-    customerName: 'Spark Solutions',
-    customerPhone: '9988776655',
-    productName: 'Printer LaserJet',
-    rentalFrequency: 'Monthly',
-    rentalPrice: 2200,
-    minimumPeriod: 6,
-    securityDeposit: 5000,
-    installationCharges: 800,
-    deliveryCharges: 500,
-    gstRate: 18,
-    paymentTerms: 'Monthly',
-    sla: 'Next business day',
-    total: 23010,
-    status: 'Draft',
-    createdAt: '2026-04-24',
-  },
-];
-
-const makeQuotationId = () => `RQ-${Date.now().toString().slice(-6)}`;
+import { rentalStore } from './rentalDataStore';
+import { rentalAgreementService } from './rentalAgreementService';
 
 export const calculateRentalQuotation = ({
   rentalPrice,
@@ -60,29 +20,62 @@ export const calculateRentalQuotation = ({
 
 export const rentalQuotationService = {
   async listQuotations() {
-    await sleep();
-    return quotations;
+    await rentalStore.sleep();
+    return rentalStore.listQuotations();
   },
 
   async saveQuotation(payload) {
-    await sleep();
+    await rentalStore.sleep();
     const totals = calculateRentalQuotation(payload);
-    const quotation = {
-      id: makeQuotationId(),
-      status: 'Draft',
-      createdAt: new Date().toISOString().slice(0, 10),
+    return rentalStore.saveQuotation({
+      status: payload.status || 'Draft',
+      createdAt: payload.createdAt || rentalStore.todayDate(),
       ...payload,
       total: totals.total,
-    };
-    quotations = [quotation, ...quotations];
-    return quotation;
+    });
   },
 
   async markSent(quotationId) {
-    await sleep();
-    quotations = quotations.map((quotation) => (
-      quotation.id === quotationId ? { ...quotation, status: 'Sent' } : quotation
-    ));
-    return quotations.find((quotation) => quotation.id === quotationId);
+    await rentalStore.sleep();
+    return rentalStore.updateQuotation(quotationId, { status: 'Sent' });
+  },
+
+  async convertToCustomer(quotationId) {
+    await rentalStore.sleep();
+    const quotation = rentalStore.listQuotations().find((row) => row.id === quotationId);
+    if (!quotation) throw new Error('Quotation not found.');
+    const customer = rentalStore.ensureCustomerFromQuotation(quotation);
+    rentalStore.updateQuotation(quotationId, { status: 'Converted', customerId: customer.id });
+    return customer;
+  },
+
+  async convertToContract(quotationId) {
+    await rentalStore.sleep();
+    const quotation = rentalStore.listQuotations().find((row) => row.id === quotationId);
+    if (!quotation) throw new Error('Quotation not found.');
+    const customer = rentalStore.ensureCustomerFromQuotation(quotation);
+    const contract = await rentalAgreementService.saveContract({
+      customerId: customer.id,
+      customerName: customer.companyName || customer.customerName,
+      agreementType: customer.customerType === 'Individual' ? 'Individual' : 'Corporate',
+      startDate: rentalStore.todayDate(),
+      endDate: rentalStore.plusDays(Math.max(Number(quotation.minimumPeriod || 1) * 30, 30)),
+      monthlyRent: Number(quotation.rentalPrice || 0),
+      status: 'Draft',
+      noticePeriod: 30,
+      sourceQuotationId: quotationId,
+    });
+    rentalStore.updateQuotation(quotationId, { status: 'Converted' });
+    return contract;
+  },
+
+  async markApproved(quotationId) {
+    await rentalStore.sleep();
+    return rentalStore.updateQuotation(quotationId, { status: 'Approved' });
+  },
+
+  async markRejected(quotationId) {
+    await rentalStore.sleep();
+    return rentalStore.updateQuotation(quotationId, { status: 'Rejected' });
   },
 };
