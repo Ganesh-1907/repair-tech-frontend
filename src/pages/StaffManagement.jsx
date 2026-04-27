@@ -1,399 +1,283 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
 import { motion as Motion } from 'framer-motion';
+import { Bar, Pie, Line, Doughnut } from 'react-chartjs-2';
 import {
-  Search,
-  Shield,
-  Briefcase,
-  Star,
-  TrendingUp,
-  Mail,
-  Phone,
-  MoreVertical,
-  X,
-  Download,
-  UserPlus,
-  Edit2,
-  Trash2,
-  RefreshCw
+  Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler
+} from 'chart.js';
+import {
+  Activity, AlertCircle, ArrowRight, Briefcase, Calendar, Clock, Download, Target, TrendingUp, Users, Wallet, X, Search, Filter, MoreVertical, ChevronRight, UserCheck, CreditCard, Building2, ChevronDown, CheckCircle2, UserPlus, Shield, Mail, Phone, RefreshCw, Trash2, Edit2, Zap, ArrowUpRight, ArrowDownRight, Star, Award, MapPin, CalendarDays
 } from 'lucide-react';
 import { usePrivacy } from '../context/PrivacyContext';
+import './admin/DashboardPremiumStyles.css';
 
-const initialEmployeeForm = {
-  name: '',
-  role: 'staff',
-  email: '',
-  phone: '',
-  joined: new Date().toISOString().slice(0, 10),
-  status: 'Active',
-};
-
-const escapeCsvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+ChartJS.register(
+  CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler
+);
 
 const StaffManagement = () => {
-  const { formatCurrency, isPrivacyOn } = usePrivacy();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const nextStaffId = useRef(5);
-  const [staff, setStaff] = useState([
-    { id: 1, name: 'Admin User', role: 'admin', email: 'admin@enterprise.com', phone: '+91 98765 43210', joined: '2025-01-10', performance: 5.0, status: 'Active' },
-    { id: 2, name: 'Ravi', role: 'staff', email: 'ravi@enterprise.com', phone: '+91 99887 76655', joined: '2025-02-15', performance: 4.8, status: 'Active' },
-    { id: 3, name: 'Dinesh', role: 'staff', email: 'dinesh@enterprise.com', phone: '+91 88776 65544', joined: '2025-03-01', performance: 4.5, status: 'On Leave' },
-    { id: 4, name: 'Anjali', role: 'staff', email: 'anjali@enterprise.com', phone: '+91 77665 54433', joined: '2025-03-10', performance: 4.9, status: 'Active' },
-  ]);
-  const [roleFilter, setRoleFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [form, setForm] = useState(initialEmployeeForm);
-  const [errors, setErrors] = useState({});
-  const [notice, setNotice] = useState('');
-  const [activeDropdownId, setActiveDropdownId] = useState(null);
-  const searchTerm = searchParams.get('q') || '';
-  const isFormOpen = searchParams.get('add') === '1';
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!e.target.closest('.member-action-menu') && !e.target.closest('.action-trigger-btn')) {
-        setActiveDropdownId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const filteredStaff = staff.filter((member) => {
-    const query = searchTerm.toLowerCase();
-    const matchesSearch = member.name.toLowerCase().includes(query)
-      || member.email.toLowerCase().includes(query)
-      || member.role.toLowerCase().includes(query);
-    const matchesRole = roleFilter === 'All' || member.role === roleFilter.toLowerCase();
-    const matchesStatus = statusFilter === 'All' || member.status === statusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
-  const avgPerformance = staff.length > 0 
-    ? (staff.reduce((acc, curr) => acc + curr.performance, 0) / staff.length).toFixed(1) 
-    : '0.0';
-
-  const stats = [
-    { label: 'Total Employees', value: staff.length, icon: Briefcase, color: 'primary' },
-    { label: 'Avg Performance', value: `${avgPerformance}/5`, icon: Star, color: 'warning' },
-    { label: 'Revenue/Staff', value: formatCurrency(52400), icon: TrendingUp, color: 'success' },
-  ];
-
-  const updateForm = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: '' }));
+  const { formatCurrency } = usePrivacy();
+  
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
   };
 
-  const addEmployee = (event) => {
-    event.preventDefault();
-    const nextErrors = {};
-    if (!form.name.trim()) nextErrors.name = 'Employee name is required.';
-    if (!/^\S+@\S+\.\S+$/.test(form.email)) nextErrors.email = 'Enter a valid email address.';
-    if (!/^\+?\d[\d\s-]{8,}$/.test(form.phone.trim())) nextErrors.phone = 'Enter a valid phone number.';
-    if (!form.joined) nextErrors.joined = 'Join date is required.';
-
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors);
-      return;
-    }
-
-    const employee = {
-      id: nextStaffId.current,
-      name: form.name.trim(),
-      role: form.role,
-      email: form.email.trim(),
-      phone: form.phone.trim(),
-      joined: form.joined,
-      performance: 4.5,
-      status: form.status,
-    };
-    nextStaffId.current += 1;
-
-    setStaff((current) => [employee, ...current]);
-    setForm(initialEmployeeForm);
-    closeEmployeeForm();
-    setNotice(`${employee.name} added to staff.`);
-  };
-
-  const closeEmployeeForm = () => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('add');
-    setSearchParams(nextParams);
-    setErrors({});
-    setForm(initialEmployeeForm);
-  };
-
-  const openEmployeeForm = () => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set('add', '1');
-    setSearchParams(nextParams);
-  };
-
-  const handleSearchTermChange = (value) => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (value.trim()) {
-      nextParams.set('q', value);
-    } else {
-      nextParams.delete('q');
-    }
-    setSearchParams(nextParams);
-  };
-
-  const exportStaffData = () => {
-    const rows = [
-      ['ID', 'Name', 'Role', 'Email', 'Phone', 'Joined Date', 'Performance', 'Status'],
-      ...staff.map(member => [
-        member.id,
-        member.name,
-        member.role,
-        member.email,
-        member.phone,
-        member.joined,
-        member.performance,
-        member.status
-      ])
-    ];
-
-    const csv = rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'staff-directory.csv';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    setNotice('Staff directory exported successfully.');
-  };
-
-  const handleDelete = (id, name) => {
-    setStaff(current => current.filter(s => s.id !== id));
-    setNotice(`${name} has been removed.`);
-    setActiveDropdownId(null);
-  };
-
-  const toggleStatus = (id, currentStatus) => {
-    const newStatus = currentStatus === 'Active' ? 'On Leave' : 'Active';
-    setStaff(current => current.map(s => s.id === id ? { ...s, status: newStatus } : s));
-    setActiveDropdownId(null);
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 }
   };
 
   return (
-    <div className="staff-page">
-      <div className="page-header">
-        <div className="topbar-title">
-          <h1>Staff Management</h1>
-          <p>Manage your team members and view performance metrics.</p>
+    <Motion.div 
+      className="premium-dashboard"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      {/* Top Header matching image */}
+      <div className="flex justify-between items-start mb-10">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Staff Portal</h1>
+          <p className="text-slate-400 font-medium text-xs mt-1">Overview of team metrics, performance benchmarks, and operational status.</p>
         </div>
-        <div className="header-actions">
-          <button className="btn btn-secondary" onClick={exportStaffData}>
-            <Download size={18} />
-            <span>Export Data</span>
-          </button>
-          <button className="btn btn-primary" onClick={openEmployeeForm}>
-            <UserPlus size={18} />
-            <span>Add Employee</span>
-          </button>
+        <div className="flex items-center gap-6">
+           <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+              <input type="text" placeholder="Search portal..." className="h-12 w-96 pl-12 pr-4 bg-white border border-slate-100 rounded-2xl shadow-sm text-sm font-medium" />
+           </div>
+           <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black">A</div>
+              <div className="pr-2">
+                 <p className="text-[11px] font-black text-slate-900">Admin User</p>
+                 <p className="text-[9px] font-bold text-slate-400 uppercase">Manager</p>
+              </div>
+           </div>
         </div>
       </div>
 
-      {notice && (
-        <div className="success-banner mb-4" role="status">
-          <span>{notice}</span>
-          <button className="icon-btn" onClick={() => setNotice('')} aria-label="Dismiss staff message">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      {isFormOpen && (
-        <div className="modal-overlay" role="presentation" onClick={closeEmployeeForm}>
-          <div className="modal-panel" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Add Employee</h2>
-              <button className="icon-btn" onClick={closeEmployeeForm} aria-label="Close employee form">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="modal-form">
-              <form className="form-grid" onSubmit={addEmployee}>
-                <div className="form-group">
-                  <label htmlFor="staff-name">Name</label>
-                  <input id="staff-name" type="text" value={form.name} onChange={(event) => updateForm('name', event.target.value)} aria-invalid={Boolean(errors.name)} />
-                  {errors.name && <span className="form-error" style={{ color: 'var(--danger)', fontSize: '0.8rem' }}>{errors.name}</span>}
-                </div>
-                <div className="form-group">
-                  <label htmlFor="staff-role">Role</label>
-                  <select id="staff-role" value={form.role} onChange={(event) => updateForm('role', event.target.value)}>
-                    <option value="staff">Staff</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label htmlFor="staff-email">Email</label>
-                  <input id="staff-email" type="email" value={form.email} onChange={(event) => updateForm('email', event.target.value)} aria-invalid={Boolean(errors.email)} />
-                  {errors.email && <span className="form-error" style={{ color: 'var(--danger)', fontSize: '0.8rem' }}>{errors.email}</span>}
-                </div>
-                <div className="form-group">
-                  <label htmlFor="staff-phone">Phone</label>
-                  <input id="staff-phone" type="tel" value={form.phone} onChange={(event) => updateForm('phone', event.target.value)} aria-invalid={Boolean(errors.phone)} />
-                  {errors.phone && <span className="form-error" style={{ color: 'var(--danger)', fontSize: '0.8rem' }}>{errors.phone}</span>}
-                </div>
-                <div className="form-group">
-                  <label htmlFor="staff-joined">Joined Date</label>
-                  <input id="staff-joined" type="date" value={form.joined} onChange={(event) => updateForm('joined', event.target.value)} aria-invalid={Boolean(errors.joined)} />
-                  {errors.joined && <span className="form-error" style={{ color: 'var(--danger)', fontSize: '0.8rem' }}>{errors.joined}</span>}
-                </div>
-                <div className="form-group">
-                  <label htmlFor="staff-status">Status</label>
-                  <select id="staff-status" value={form.status} onChange={(event) => updateForm('status', event.target.value)}>
-                    <option value="Active">Active</option>
-                    <option value="On Leave">On Leave</option>
-                  </select>
-                </div>
-                <div className="modal-actions" style={{ gridColumn: '1 / -1', marginTop: '1rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                  <button className="btn btn-secondary" type="button" onClick={closeEmployeeForm}>Cancel</button>
-                  <button className="btn btn-primary" type="submit">Save Employee</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="summary-grid mb-4">
-        {stats.map((s) => (
-          <div key={s.label} className="card summary-card staff-stat">
-            <div className={`summary-icon-container ${s.color}`}>
-              <s.icon size={24} />
-            </div>
-            <div className="summary-details">
-              <span className="summary-label">{s.label}</span>
-              <h3 className="summary-value">{s.value}</h3>
-            </div>
-          </div>
-        ))}
+      <div className="flex justify-end mb-8">
+         <button className="h-10 px-6 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
+            <Download size={14} className="text-indigo-600" /> Export Records
+         </button>
       </div>
 
-      <div className="table-controls card mb-4">
-        <div className="search-box">
-          <Search size={18} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Search by name, email or role..."
-            aria-label="Search staff"
-            value={searchTerm}
-            onChange={(event) => handleSearchTermChange(event.target.value)}
-          />
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div className="filter-group">
-            {['All', 'Admin', 'Staff'].map((role) => (
-              <button key={role} className={`filter-btn ${roleFilter === role ? 'active' : ''}`} onClick={() => setRoleFilter(role)}>
-                {role}
-              </button>
-            ))}
-          </div>
-          <div className="filter-group">
-            {['All', 'Active', 'On Leave'].map((status) => (
-              <button key={status} className={`filter-btn ${statusFilter === status ? 'active' : ''}`} onClick={() => setStatusFilter(status)}>
-                {status}
-              </button>
-            ))}
-          </div>
-        </div>
+      {/* KPI Grid matching reference image (7 columns) */}
+      <div className="ref-kpi-grid">
+         <KPIBox title="Total Revenue" value="₹4,50,000" trend="+12.5%" trendUp icon={<Wallet />} color="#6366f1" bg="#e0e7ff" />
+         <KPIBox title="Productivity" value="92%" trend="+4%" trendUp icon={<Zap />} color="#0ea5e9" bg="#e0f2fe" />
+         <KPIBox title="Total Personnel" value="124" trend="+18" trendUp icon={<Users />} color="#8b5cf6" bg="#ede9fe" />
+         <KPIBox title="On Leave" value="12" trend="-2" trendUp={false} icon={<Clock />} color="#f59e0b" bg="#fef3c7" />
+         <KPIBox title="Skill Gaps" value="08" trend="+1" trendUp icon icon={<AlertCircle />} color="#ef4444" bg="#fef2f2" />
+         <KPIBox title="Attendance" value="94%" trend="+2%" trendUp icon={<CheckCircle2 />} color="#10b981" bg="#dcfce7" />
+         <KPIBox title="Active Tasks" value="45" trend="+4" trendUp icon={<Briefcase />} color="#6366f1" bg="#e0e7ff" />
       </div>
 
-      <div className="staff-list-grid">
-        {filteredStaff.map((member) => (
-          <Motion.div
-            key={member.id}
-            className="card staff-member-card"
-            whileHover={{ y: -5 }}
-            transition={{ type: 'spring', stiffness: 300 }}
-          >
-            <div className="member-header" style={{ position: 'relative' }}>
-              <div className="member-main">
-                <div className="member-avatar">
-                  {member.name.split(' ').map((n) => n[0]).join('')}
-                </div>
-                <div>
-                  <h3 className="member-name">{member.name}</h3>
-                  <div className="member-role-tag">
-                    <Shield size={12} />
-                    <span>{member.role.toUpperCase()}</span>
-                  </div>
-                </div>
-              </div>
-              <button 
-                className="icon-btn action-trigger-btn" 
-                aria-label={`More actions for ${member.name}`}
-                onClick={() => setActiveDropdownId(activeDropdownId === member.id ? null : member.id)}
-              >
-                <MoreVertical size={18} />
-              </button>
-              
-              {activeDropdownId === member.id && (
-                <div className="account-dropdown member-action-menu" style={{ top: '100%', right: '0', width: '160px', zIndex: 50 }}>
-                  <button className="account-menu-item" onClick={() => { setActiveDropdownId(null); openEmployeeForm(); }}>
-                    <Edit2 size={16} className="icon-muted" /> Edit Details
-                  </button>
-                  <button className="account-menu-item" onClick={() => toggleStatus(member.id, member.status)}>
-                    <RefreshCw size={16} className="icon-muted" /> Toggle Status
-                  </button>
-                  <button className="account-menu-item" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(member.id, member.name)}>
-                    <Trash2 size={16} /> Delete
-                  </button>
-                </div>
-              )}
+      {/* Analytics Layer */}
+      <div className="ref-charts-grid">
+         <Motion.div className="ref-chart-card" variants={itemVariants}>
+            <div className="ref-chart-header">
+               <div>
+                  <h3 className="ref-chart-title">Performance vs Target</h3>
+                  <p className="ref-chart-subtitle">Monthly efficiency metrics across departments.</p>
+               </div>
+               <span className="ref-chart-period">Q2 2026</span>
             </div>
+            <div className="h-64">
+               <Bar 
+                 data={{
+                   labels: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
+                   datasets: [
+                     { label: 'Achieved', data: [85, 92, 88, 94, 90, 96], backgroundColor: '#6366f1', borderRadius: 12, barThickness: 24 },
+                     { label: 'Target', data: [90, 90, 90, 90, 90, 90], backgroundColor: '#e2e8f0', borderRadius: 12, barThickness: 24 }
+                   ]
+                 }}
+                 options={commonBarOptions}
+               />
+            </div>
+         </Motion.div>
 
-            <div className="member-body">
-              <div className="member-info-row">
-                <Mail size={14} className="icon-muted" />
-                <span className={isPrivacyOn ? 'privacy-blur' : ''}>{member.email}</span>
-              </div>
-              <div className="member-info-row">
-                <Phone size={14} className="icon-muted" />
-                <span className={isPrivacyOn ? 'privacy-blur' : ''}>{member.phone}</span>
-              </div>
-              <div className="member-info-row">
-                <span className="label">Joined:</span>
-                <span className="value">{member.joined}</span>
-              </div>
+         <Motion.div className="ref-chart-card" variants={itemVariants}>
+            <div className="mb-6">
+               <h3 className="ref-chart-title">Role Allocation</h3>
+               <p className="ref-chart-subtitle">Staff distribution by function.</p>
             </div>
+            <div className="h-64 flex items-center justify-center">
+               <Doughnut 
+                 data={{
+                   labels: ['Tech', 'Sales', 'Admin'],
+                   datasets: [{
+                     data: [60, 25, 15],
+                     backgroundColor: ['#6366f1', '#10b981', '#f59e0b'],
+                     borderWidth: 0,
+                     cutout: '70%'
+                   }]
+                 }}
+                 options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }}
+               />
+            </div>
+            <div className="grid grid-cols-2 gap-y-3 mt-6">
+               <LegendItem label="Tech" color="#6366f1" />
+               <LegendItem label="Sales" color="#10b981" />
+               <LegendItem label="Admin" color="#f59e0b" />
+            </div>
+         </Motion.div>
 
-            <div className="member-footer">
-              <div className="performance-meter">
-                <div className="meter-label">
-                  <span>Performance</span>
-                  <span className="meter-value">{member.performance} / 5</span>
-                </div>
-                <div className="meter-bar">
-                  <div
-                    className="meter-fill"
-                    style={{ width: `${(member.performance / 5) * 100}%` }}
-                  ></div>
-                </div>
-              </div>
-              <div className="member-status-row">
-                <span className={`status-dot ${member.status === 'Active' ? 'active' : 'on-leave'}`}></span>
-                <span className="status-text">{member.status}</span>
-              </div>
+         <Motion.div className="ref-chart-card" variants={itemVariants}>
+            <div className="mb-6">
+               <h3 className="ref-chart-title">Attendance Velocity</h3>
+               <p className="ref-chart-subtitle">Presence rate over last 7 days.</p>
             </div>
-          </Motion.div>
-        ))}
+            <div className="h-64">
+               <Line 
+                 data={{
+                   labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                   datasets: [{
+                     data: [92, 95, 88, 94, 91, 75, 82],
+                     borderColor: '#6366f1',
+                     borderWidth: 3,
+                     tension: 0.4,
+                     fill: true,
+                     backgroundColor: 'rgba(99, 102, 241, 0.05)'
+                   }]
+                 }}
+                 options={commonLineOptions}
+               />
+            </div>
+         </Motion.div>
       </div>
 
-      {filteredStaff.length === 0 && (
-        <div className="empty-state card mt-4">
-          <h3>No staff found</h3>
-          <p>Adjust the search or add a new employee.</p>
-        </div>
-      )}
-    </div>
+      {/* Directory & Presence Layer */}
+      <div className="ref-ops-grid">
+         <Motion.div className="ref-ops-card col-span-2" variants={itemVariants}>
+            <div className="flex justify-between items-center mb-8">
+               <div>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Personnel Directory</h3>
+                  <p className="text-[10px] text-slate-400 font-bold mt-1">Real-time team status and performance tracking.</p>
+               </div>
+               <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                  <input type="text" placeholder="Filter team..." className="h-9 pl-10 pr-4 bg-slate-50 border border-slate-100 rounded-xl text-xs font-medium w-64" />
+               </div>
+            </div>
+            <table className="dash-table">
+               <thead>
+                  <tr>
+                     <th>Name</th>
+                     <th>Function</th>
+                     <th>Core Email</th>
+                     <th>Status</th>
+                     <th>Rating</th>
+                     <th className="text-right">Action</th>
+                  </tr>
+               </thead>
+               <tbody>
+                  <StaffRow name="Ravi Kumar" role="Technician" email="ravi@saptarishi.com" status="Active" rate={4.9} />
+                  <StaffRow name="Anjali Nair" role="Sales" email="anjali@saptarishi.com" status="Active" rate={4.7} />
+                  <StaffRow name="Dinesh Rao" role="Support" email="dinesh@saptarishi.com" status="On Leave" rate={4.8} />
+               </tbody>
+            </table>
+         </Motion.div>
+
+         <Motion.div className="ref-ops-card" variants={itemVariants}>
+            <div className="mb-8">
+               <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Top Performance</h3>
+               <p className="text-[10px] text-slate-400 font-bold mt-1">Revenue leaders this month.</p>
+            </div>
+            <div className="space-y-6">
+               <StaffPerfItem name="Ravi" value="₹70,000" color="indigo" progress={90} />
+               <StaffPerfItem name="Dinesh" value="₹55,000" color="purple" progress={75} />
+               <StaffPerfItem name="Anjali" value="₹48,000" color="blue" progress={65} />
+            </div>
+         </Motion.div>
+      </div>
+    </Motion.div>
   );
+};
+
+/* --- Componentized UI Elements for Image Match --- */
+
+const KPIBox = ({ title, value, trend, trendUp, icon, color, bg }) => (
+   <Motion.div className="ref-kpi-card" whileHover={{ y: -4, boxShadow: '0 12px 24px rgba(0,0,0,0.05)' }}>
+      <div className="ref-kpi-icon-box" style={{ backgroundColor: bg, color }}>
+         {React.cloneElement(icon, { size: 20 })}
+      </div>
+      <div className={`ref-kpi-trend-pill ${trendUp ? 'ref-kpi-trend-up' : 'ref-kpi-trend-down'}`}>
+         {trendUp ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
+         {trend}
+      </div>
+      <div className="ref-kpi-circle-bg" style={{ color }}></div>
+      <div className="relative z-10">
+         <p className="ref-kpi-label">{title}</p>
+         <h3 className="ref-kpi-value">{value}</h3>
+      </div>
+   </Motion.div>
+);
+
+const LegendItem = ({ label, color }) => (
+   <div className="flex items-center gap-2">
+      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+      <span className="text-[10px] font-black text-slate-500 uppercase">{label}</span>
+   </div>
+);
+
+const StaffPerfItem = ({ name, value, color, progress }) => (
+   <div className="space-y-3">
+      <div className="flex justify-between items-end">
+         <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs`}>{name[0]}</div>
+            <p className="text-sm font-black text-slate-900">{name}</p>
+         </div>
+         <p className="text-sm font-black text-slate-900">{value}</p>
+      </div>
+      <div className="h-2 bg-slate-50 rounded-full overflow-hidden">
+         <div className={`h-full bg-indigo-600 rounded-full`} style={{ width: `${progress}%` }}></div>
+      </div>
+   </div>
+);
+
+const StaffRow = ({ name, role, email, status, rate }) => (
+   <tr className="group hover:bg-slate-50/50 transition-all">
+      <td>
+         <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs uppercase shadow-sm">{name[0]}</div>
+            <p className="text-sm font-black text-slate-900">{name}</p>
+         </div>
+      </td>
+      <td><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{role}</span></td>
+      <td><span className="text-xs font-bold text-slate-600">{email}</span></td>
+      <td>
+         <span className={`px-3 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{status}</span>
+      </td>
+      <td>
+         <div className="flex items-center gap-1">
+            <Star size={12} className="fill-amber-400 text-amber-400" />
+            <span className="text-[11px] font-black text-slate-900">{rate}</span>
+         </div>
+      </td>
+      <td className="text-right">
+         <button className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 shadow-sm transition-all"><ChevronRight size={14} /></button>
+      </td>
+   </tr>
+);
+
+const commonBarOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: 800, size: 10 } } },
+    y: { grid: { color: '#f8fafc' }, border: { display: false }, ticks: { font: { size: 10 } } }
+  }
+};
+
+const commonLineOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: 800, size: 10 } } },
+    y: { grid: { color: '#f8fafc' }, border: { display: false }, ticks: { font: { size: 10 } } }
+  }
 };
 
 export default StaffManagement;

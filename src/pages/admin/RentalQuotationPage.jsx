@@ -4,6 +4,7 @@ import {
   FileText,
   IndianRupee,
   Mail,
+  MoreVertical,
   Plus,
   Printer,
   Save,
@@ -58,9 +59,20 @@ const RentalQuotationPage = () => {
   const [quotations, setQuotations] = useState([]);
   const [notice, setNotice] = useState('');
   const [errors, setErrors] = useState({});
+  const [activeDropdownId, setActiveDropdownId] = useState(null);
 
   useEffect(() => {
     rentalQuotationService.listQuotations().then(setQuotations);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.member-action-menu') && !event.target.closest('.action-trigger-btn')) {
+        setActiveDropdownId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const totals = useMemo(() => calculateRentalQuotation(form), [form]);
@@ -360,10 +372,49 @@ const RentalQuotationPage = () => {
                 <td>{quotation.createdAt}</td>
                 <td><span className={`status-pill ${statusClass[quotation.status] || 'status-draft'}`}>{quotation.status}</span></td>
                 <td>
-                  <div className="action-btns">
-                    <button className="btn btn-sm btn-secondary" type="button" onClick={() => runQuotationAction(quotation.id, 'approve')}>Approve</button>
-                    <button className="btn btn-sm btn-secondary" type="button" onClick={() => runQuotationAction(quotation.id, 'customer')}>To Customer</button>
-                    <button className="btn btn-sm btn-secondary" type="button" onClick={() => runQuotationAction(quotation.id, 'contract')}>To Contract</button>
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      className="icon-btn action-trigger-btn"
+                      aria-label={`Open actions for ${quotation.id}`}
+                      onClick={() => setActiveDropdownId(activeDropdownId === quotation.id ? null : quotation.id)}
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+                    {activeDropdownId === quotation.id && (
+                      <div className="account-dropdown member-action-menu" style={{ top: '100%', right: 0, width: '160px', zIndex: 50 }}>
+                        <button
+                          type="button"
+                          className="account-menu-item"
+                          onClick={() => {
+                            setActiveDropdownId(null);
+                            runQuotationAction(quotation.id, 'approve');
+                          }}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          className="account-menu-item"
+                          onClick={() => {
+                            setActiveDropdownId(null);
+                            runQuotationAction(quotation.id, 'customer');
+                          }}
+                        >
+                          To Customer
+                        </button>
+                        <button
+                          type="button"
+                          className="account-menu-item"
+                          onClick={() => {
+                            setActiveDropdownId(null);
+                            runQuotationAction(quotation.id, 'contract');
+                          }}
+                        >
+                          To Contract
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>

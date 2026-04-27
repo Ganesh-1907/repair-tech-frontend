@@ -3,7 +3,15 @@ import { rentalStore } from './rentalDataStore';
 export const rentalCustomerService = {
   async listCustomers() {
     await rentalStore.sleep();
-    return rentalStore.listCustomers();
+    const customers = rentalStore.listCustomers();
+    const assets = rentalStore.listAssets();
+    const contracts = rentalStore.listContracts();
+    
+    return customers.map(c => ({
+      ...c,
+      deviceCount: assets.filter(a => a.customerId === c.id).length,
+      contractCount: contracts.filter(con => con.customerId === c.id && con.status === 'Active').length
+    }));
   },
 
   async getCustomer(customerId) {

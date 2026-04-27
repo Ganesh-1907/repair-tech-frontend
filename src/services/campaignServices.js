@@ -464,7 +464,13 @@ export const qrBarcodeService = {
   getJobUrl(jobId) {
     return `${window.location.origin}/admin/campaign/jobs/${jobId}`;
   },
+  getDeviceUrl(jobId, deviceId) {
+    return `${window.location.origin}/admin/campaign/jobs/${jobId}?device=${encodeURIComponent(deviceId)}`;
+  },
   getQrToken(jobId) {
     return `QR:${jobId}`;
+  },
+  getDeviceQrToken(jobId, deviceId) {
+    return `QR:${jobId}:${deviceId}`;
   },
 };

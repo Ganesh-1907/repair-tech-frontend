@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { ExternalLink, FileText, Send, Sparkles, WalletCards, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ExternalLink, FileText, MoreVertical, Send, Sparkles, WalletCards, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { sendQuoteNotification } from '../../services/communicationService';
@@ -57,6 +57,17 @@ const InstantQuotePage = () => {
   const [history, setHistory] = useState(initialHistory);
   const [notice, setNotice] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [activeDropdownId, setActiveDropdownId] = useState(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.member-action-menu') && !event.target.closest('.action-trigger-btn')) {
+        setActiveDropdownId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const selectedTemplate = useMemo(
     () => quoteTemplates.find((template) => template.id === selectedTemplateId) || quoteTemplates[0],
@@ -287,7 +298,6 @@ const InstantQuotePage = () => {
               <th>Estimate</th>
               <th>Status</th>
               <th>Channel</th>
-              <th>Approval</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -306,18 +316,46 @@ const InstantQuotePage = () => {
                 <td><span className={statusClass[quote.status] || 'status-pill status-draft'}>{quote.status}</span></td>
                 <td>{quote.channel}</td>
                 <td>
-                  <Link className="btn btn-sm btn-secondary" to={`/admin/campaign/instant-quote/approval/${quote.id}`}>
-                    Open Link
-                  </Link>
-                </td>
-                <td>
-                  <div className="action-btns">
-                    <button className="btn btn-sm btn-secondary" type="button" onClick={() => loadQuoteForUpdate(quote)}>
-                      Edit
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      className="icon-btn action-trigger-btn"
+                      aria-label={`Open actions for ${quote.id}`}
+                      onClick={() => setActiveDropdownId(activeDropdownId === quote.id ? null : quote.id)}
+                    >
+                      <MoreVertical size={16} />
                     </button>
-                    <button className="btn btn-sm btn-secondary" type="button" onClick={() => setNotice(`${quote.id} marked as Draft placeholder.`)}>
-                      Mark Draft
-                    </button>
+                    {activeDropdownId === quote.id && (
+                      <div className="account-dropdown member-action-menu" style={{ top: '100%', right: 0, width: '170px', zIndex: 50 }}>
+                        <Link
+                          className="account-menu-item"
+                          to={`/admin/campaign/instant-quote/approval/${quote.id}`}
+                          onClick={() => setActiveDropdownId(null)}
+                        >
+                          Open Approval Link
+                        </Link>
+                        <button
+                          className="account-menu-item"
+                          type="button"
+                          onClick={() => {
+                            setActiveDropdownId(null);
+                            loadQuoteForUpdate(quote);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="account-menu-item"
+                          type="button"
+                          onClick={() => {
+                            setActiveDropdownId(null);
+                            setNotice(`${quote.id} marked as Draft placeholder.`);
+                          }}
+                        >
+                          Mark Draft
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>

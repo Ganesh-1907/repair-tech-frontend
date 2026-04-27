@@ -2,6 +2,7 @@ import {
   billingService,
   deliveryService,
   intakeReceiptService,
+  inventoryUsageService,
   jobService,
   leadService,
   messageService,
@@ -20,6 +21,7 @@ const issueTemplates = [
   { issue: 'Software Issue', min: 500, max: 2000, defaultEstimate: 1200 },
   { issue: 'Other', min: 0, max: 0, defaultEstimate: 0 },
 ];
+const enforceOtpVerification = false;
 
 const workflowStateByJob = new Map();
 
@@ -48,6 +50,12 @@ const ensureWorkflowState = (jobId) => {
         customerSigned: false,
       },
       signatureCaptured: false,
+      qr: {
+        generated: false,
+        generatedAt: '',
+        qrToken: '',
+        barcode: '',
+      },
       statusTimeline: [],
       internalActivity: [],
     });
@@ -69,13 +77,173 @@ const isDateTimeInPast = (value) => {
   return new Date(value).getTime() < Date.now();
 };
 
+const getApprovalLink = (jobId) => `${window.location.origin}/admin/campaign/instant-quote/approval/${jobId}`;
+const getRejectLink = (jobId) => `${window.location.origin}/admin/campaign/instant-quote/approval/${jobId}?decision=reject`;
+const makeDeviceBarcode = (jobId, deviceId) => ({
+  qrToken: qrBarcodeService.getDeviceQrToken(jobId, deviceId),
+  barcode: `BAR-${jobId}-${deviceId}`,
+  scanUrl: qrBarcodeService.getDeviceUrl(jobId, deviceId),
+});
+
+const normalizeJobRecord = (job) => {
+  if (!job) return null;
+  const state = ensureWorkflowState(job.id);
+  const totals = jobService.totalsForJob(job);
+  const latestQuote = (job.quoteHistory || [])[0] || job.quote || {};
+  const receipt = state.receipt || null;
+  const qrState = state.qr || { generated: false, qrToken: '', barcode: '' };
+  const intakeDevices = Array.isArray(receipt?.devices) && receipt.devices.length
+    ? receipt.devices
+    : [{
+      deviceId: `${job.id}-1`,
+      deviceType: job.deviceType || 'Device',
+      deviceModel: job.deviceModel || '',
+      serialNumber: job.serialNumber || '',
+      condition: (job.condition || []).join(', '),
+      accessories: (job.accessories || []).join(', '),
+      expectedDelivery: job.expectedDelivery || '',
+      ...makeDeviceBarcode(job.id, `${job.id}-1`),
+    }];
+
+  return {
+    ...job,
+    jobCardId: job.id,
+    customer: job.customerName,
+    phone: job.phoneNumber,
+    device: job.deviceType,
+    status: job.jobStatus,
+    workflow: {
+      quote: {
+        issue: latestQuote.issue || '',
+        estimate: Number(latestQuote.estimate || 0),
+        status: latestQuote.status || job.quoteStatus || 'Draft',
+      },
+      intake: {
+        condition: receipt?.condition || job.condition || [],
+        accessories: receipt?.accessories || job.accessories || [],
+        expectedDelivery: receipt?.expectedDelivery || job.expectedDelivery || '',
+        receiptGenerated: Boolean(receipt?.receiptNumber),
+        receiptNumber: receipt?.receiptNumber || '',
+        devices: intakeDevices,
+      },
+      billing: {
+        parts: job.partsUsed || [],
+        labour: Number(job.labourCharge || 0),
+        total: Number(totals.total || 0),
+        paymentStatus: job.paymentStatus || 'Unpaid',
+      },
+      delivery: {
+        type: job.delivery?.type || '',
+        assignedTo: job.delivery?.person || '',
+        status: job.delivery?.status || job.deliveryStatus || 'Not Planned',
+      },
+      qr: {
+        generated: Boolean(qrState.generated),
+        generatedAt: qrState.generatedAt || '',
+        qrToken: qrState.qrToken || qrBarcodeService.getQrToken(job.id),
+        barcode: qrState.barcode || `BAR-${job.id}`,
+      },
+      timeline: state.statusTimeline || [],
+    },
+  };
+};
+
 export const campaignJobWorkflowService = {
   async listJobs() {
-    return jobService.listJobs();
+    const rows = await jobService.listJobs();
+    return rows.map((row) => normalizeJobRecord(row));
   },
 
   async getJob(jobId) {
-    return jobService.getJob(jobId);
+    const row = await jobService.getJob(jobId);
+    return normalizeJobRecord(row);
+  },
+
+  async getJobById(jobId) {
+    return this.getJob(jobId);
+  },
+
+  async createJob(payload) {
+    const created = await this.createQuickEntry(payload);
+    const row = await this.getJob(created.jobCardId);
+    return row;
+  },
+
+  async updateJob(jobId, payload) {
+    const patch = {
+      customerName: String(payload?.name || payload?.customerName || '').trim(),
+      phoneNumber: String(payload?.phoneNumber || payload?.phone || '').trim(),
+      deviceType: String(payload?.deviceType || payload?.device || '').trim(),
+      problem: String(payload?.problem || '').trim(),
+      problemNotes: String(payload?.problemNotes || payload?.notes || '').trim(),
+    };
+    if (!patch.customerName) throw new Error('Customer name is required.');
+    if (!phonePattern.test(patch.phoneNumber)) throw new Error('Valid phone number is required.');
+    if (!patch.deviceType) throw new Error('Device type is required.');
+    if (!patch.problem) throw new Error('Problem is required.');
+    await jobService.updateJob(jobId, patch, 'Job details updated');
+    return this.getJob(jobId);
+  },
+
+  async updateWorkflowStep(jobId, step, payload) {
+    const key = String(step || '').toLowerCase();
+    if (key === 'quote') {
+      return this.createQuote(jobId, { ...payload, status: payload?.status || 'Draft' });
+    }
+    if (key === 'intake') {
+      return this.generateReceipt(jobId, payload);
+    }
+    if (key === 'status') {
+      return this.updateJobStatus(jobId, payload);
+    }
+    if (key === 'billing') {
+      return this.collectPayment(jobId, payload);
+    }
+    if (key === 'delivery') {
+      return this.saveDeliveryPlan(jobId, payload);
+    }
+    throw new Error('Unsupported workflow step.');
+  },
+
+  async getJobs() {
+    return this.listJobs();
+  },
+
+  async updateQuote(jobId, payload) {
+    return this.createQuote(jobId, payload);
+  },
+
+  async updateIntake(jobId, payload) {
+    return this.generateReceipt(jobId, payload);
+  },
+
+  async updateStatus(jobId, payload) {
+    return this.updateJobStatus(jobId, payload);
+  },
+
+  async updateBilling(jobId, payload) {
+    const current = await jobService.getJob(jobId);
+    const nextParts = Array.isArray(payload?.parts) ? payload.parts : current.partsUsed;
+    const nextLabour = Number(payload?.labour || 0);
+    const nextTax = Number(payload?.tax || 0);
+    await jobService.updateJob(jobId, {
+      partsUsed: nextParts,
+      labourCharge: nextLabour,
+      tax: nextTax,
+    }, 'Billing details updated');
+    return this.getJob(jobId);
+  },
+
+  async updateDelivery(jobId, payload) {
+    return this.saveDeliveryPlan(jobId, payload);
+  },
+
+  async listInventoryParts() {
+    return inventoryUsageService.listParts();
+  },
+
+  async consumeInventoryPart(jobId, partId, quantity) {
+    return inventoryUsageService.addUsage(jobId, partId, quantity);
   },
 
   async sendOtp(phoneNumber) {
@@ -102,7 +270,9 @@ export const campaignJobWorkflowService = {
     if (!phonePattern.test(phoneNumber)) throw new Error('Valid phone number is required.');
     if (!deviceType) throw new Error('Device type is required.');
     if (!problem) throw new Error('Problem is required.');
-    if (!payload?.otpVerified) throw new Error('OTP verification is required.');
+    if (enforceOtpVerification && !payload?.otpVerified) {
+      throw new Error('OTP verification is required.');
+    }
 
     const created = await leadService.createWalkIn({
       name,
@@ -113,6 +283,15 @@ export const campaignJobWorkflowService = {
       campaignSource: payload.campaignSource || '',
     });
     ensureWorkflowState(created.jobCardId);
+    if (!payload?.otpVerified) {
+      appendInternalActivity(created.jobCardId, {
+        action: 'OTP verification skipped (mock mode)',
+        user: 'Reception',
+        channel: 'System',
+        status: 'Delivered',
+        notes: 'Job created without strict OTP verification.',
+      });
+    }
     appendInternalActivity(created.jobCardId, {
       action: 'Ticket created',
       user: 'Reception',
@@ -130,6 +309,13 @@ export const campaignJobWorkflowService = {
   async generateQrBarcode(jobId) {
     const qrUrl = qrBarcodeService.getJobUrl(jobId);
     const token = qrBarcodeService.getQrToken(jobId);
+    const state = ensureWorkflowState(jobId);
+    state.qr = {
+      generated: true,
+      generatedAt: new Date().toISOString(),
+      qrToken: token,
+      barcode: `BAR-${jobId}`,
+    };
     appendInternalActivity(jobId, {
       action: 'QR generated',
       user: 'System',
@@ -141,7 +327,40 @@ export const campaignJobWorkflowService = {
       qrToken: token,
       barcode: `BAR-${jobId}`,
       qrUrl,
+      generatedAt: state.qr.generatedAt,
     };
+  },
+
+  async generateDeviceBarcodes(jobId, devices = []) {
+    const state = ensureWorkflowState(jobId);
+    const receipt = state.receipt || {};
+    const source = Array.isArray(devices) && devices.length ? devices : (receipt.devices || []);
+    if (!source.length) {
+      throw new Error('Add at least one device in intake to generate barcodes.');
+    }
+    const normalized = source.map((device, index) => {
+      const deviceId = String(device.deviceId || `${jobId}-${index + 1}`);
+      return {
+        ...device,
+        deviceId,
+        ...makeDeviceBarcode(jobId, deviceId),
+      };
+    });
+    state.receipt = { ...receipt, devices: normalized };
+    state.qr = {
+      generated: true,
+      generatedAt: new Date().toISOString(),
+      qrToken: qrBarcodeService.getQrToken(jobId),
+      barcode: `BAR-${jobId}`,
+    };
+    appendInternalActivity(jobId, {
+      action: 'Device barcodes generated',
+      user: 'System',
+      channel: 'System',
+      status: 'Delivered',
+      notes: `${normalized.length} devices`,
+    });
+    return normalized;
   },
 
   async getPricingTemplates() {
@@ -189,21 +408,50 @@ export const campaignJobWorkflowService = {
   },
 
   async sendQuoteMessage(jobId, payload) {
+    const job = await jobService.getJob(jobId);
+    const approvalLink = getApprovalLink(jobId);
+    const rejectLink = getRejectLink(jobId);
     await messageService.sendPlaceholder({
       jobId,
-      action: 'Quote sent',
+      action: `Quote sent on WhatsApp: ${job.quote?.issue || ''} / INR ${Number(job.quote?.estimate || 0)} / Approve: ${approvalLink} / Reject: ${rejectLink}`.trim(),
       channel: payload?.channel || 'WhatsApp',
     });
-    return { sent: true };
+    return { sent: true, approvalLink, rejectLink };
   },
 
   async sendUpdatedQuoteMessage(jobId, payload) {
+    const job = await jobService.getJob(jobId);
+    const approvalLink = getApprovalLink(jobId);
     await messageService.sendPlaceholder({
       jobId,
-      action: 'Updated quote sent',
+      action: `Updated quote sent: ${job.quote?.issue || ''} / INR ${Number(job.quote?.estimate || 0)} / Approve or Reject: ${approvalLink}`.trim(),
       channel: payload?.channel || 'WhatsApp',
     });
-    return { sent: true };
+    return { sent: true, approvalLink, rejectLink: getRejectLink(jobId) };
+  },
+
+  async processCustomerQuoteDecision(jobId, decision) {
+    const normalized = String(decision || '').toLowerCase();
+    if (normalized === 'approve') {
+      await this.approveQuote(jobId);
+      await messageService.sendPlaceholder({
+        jobId,
+        action: 'Customer approved quote from WhatsApp link',
+        channel: 'WhatsApp',
+      });
+      return { decision: 'Approved', nextStep: 'Device Intake' };
+    }
+    if (normalized === 'reject') {
+      await this.rejectQuote(jobId);
+      await jobService.updateJob(jobId, { jobStatus: 'Closed' }, 'Closed after customer rejected quote');
+      await messageService.sendPlaceholder({
+        jobId,
+        action: 'Customer rejected quote from WhatsApp link. Job closed.',
+        channel: 'WhatsApp',
+      });
+      return { decision: 'Rejected', nextStep: 'Closed' };
+    }
+    throw new Error('Invalid decision.');
   },
 
   async approveQuote(jobId) {
@@ -228,10 +476,19 @@ export const campaignJobWorkflowService = {
     if (!payload?.expectedDelivery) throw new Error('Expected delivery date and time is required.');
     if (isDateTimeInPast(payload.expectedDelivery)) throw new Error('Expected delivery cannot be in the past.');
     const receipt = await intakeReceiptService.generateReceipt(jobId, payload);
+    const devices = Array.isArray(payload?.devices) ? payload.devices.map((device, index) => {
+      const deviceId = String(device.deviceId || `${jobId}-${index + 1}`);
+      return {
+        ...device,
+        deviceId,
+        ...makeDeviceBarcode(jobId, deviceId),
+      };
+    }) : [];
     const state = ensureWorkflowState(jobId);
     state.receipt = {
       receiptNumber: receipt.receiptId,
       generatedAt: receipt.generatedAt,
+      devices,
       ...payload,
     };
     appendInternalActivity(jobId, {
@@ -379,7 +636,7 @@ export const campaignJobWorkflowService = {
       status: 'Delivered',
       notes: allowPending ? 'Closed with pending payment approval.' : 'Closed after full handover.',
     });
-    return updated;
+    return normalizeJobRecord(updated);
   },
 
   async saveRepairChecklist(jobId, checklist) {
@@ -419,4 +676,3 @@ export const campaignJobWorkflowService = {
     return [...state.internalActivity, ...external].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   },
 };
-

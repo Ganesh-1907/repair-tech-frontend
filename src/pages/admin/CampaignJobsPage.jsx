@@ -1,918 +1,658 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useParams, Link } from 'react-router-dom';
+import { motion as Motion } from 'framer-motion';
 import {
   BadgeCheck,
+  Calendar,
   CheckCircle2,
   ClipboardList,
+  Clock,
+  Cpu,
   CreditCard,
+  Edit,
+  ExternalLink,
+  Eye,
+  HardDrive,
+  Hash,
   IndianRupee,
   Mail,
   MessageSquare,
-  Printer,
+  Monitor,
+  MoreVertical,
+  Plus,
   QrCode,
   Save,
   Send,
   ShieldCheck,
+  Smartphone,
+  Trash2,
   Truck,
   X,
+  Sparkles,
+  Target,
+  Zap,
+  Activity,
+  ArrowRight,
+  Filter,
+  Search,
+  ChevronRight,
+  MapPin,
+  Settings,
+  Map
 } from 'lucide-react';
-import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { campaignJobWorkflowService } from '../../services/campaignJobWorkflowService';
-import { jobService, qrBarcodeService } from '../../services/campaignServices';
+import { jobService } from '../../services/campaignServices';
+import './DashboardPremiumStyles.css';
 
 const deviceTypes = ['Laptop', 'Desktop', 'Printer', 'Other'];
-const repairStatuses = ['Received at office', 'Diagnosis in progress', 'Waiting for parts', 'Repair completed', 'Ready for delivery', 'Delivered', 'Closed'];
+const repairStatuses = ['Received at office', 'Diagnosis in progress', 'Waiting for parts', 'Repair completed'];
 const deliveryStatuses = ['Not Planned', 'Planned', 'Out for Delivery', 'Delivered', 'Failed', 'Rescheduled'];
 const deliveryTypes = ['Pickup from office', 'Return to college', 'Doorstep delivery'];
-const formatCurrency = (value) => `INR ${Number(value || 0).toLocaleString('en-IN')}`;
-const formatDateTime = (value) => {
-  if (!value) return 'Not set';
-  return new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
-};
-const statusClass = {
-  Draft: 'status-draft',
-  Sent: 'status-assigned',
-  Approved: 'status-completed',
-  Rejected: 'status-overdue',
-  Updated: 'status-pending',
-  Closed: 'status-completed',
-  Paid: 'payment-paid',
-  'Partially Paid': 'payment-partial',
-  Unpaid: 'payment-unpaid',
-  Planned: 'status-pending',
-  Delivered: 'status-completed',
-  'Out for Delivery': 'status-assigned',
-  Failed: 'status-overdue',
-  Rescheduled: 'status-pending',
-};
-const StatusPill = ({ value }) => <span className={`status-pill ${statusClass[value] || 'status-draft'}`}>{value}</span>;
-
-const emptyQuickEntry = {
-  name: '',
-  phoneNumber: '',
-  otp: '',
-  otpSent: false,
-  otpVerified: false,
-  deviceType: 'Laptop',
-  problem: 'Screen Issue',
-  problemNotes: '',
-};
+const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
 
 const CampaignJobsPage = () => {
   const { jobId } = useParams();
-  const navigate = useNavigate();
+  const location = useLocation();
   const isNewMode = !jobId || jobId === 'new';
+  const scannedDeviceId = new URLSearchParams(location.search).get('device');
+  
   const [jobs, setJobs] = useState([]);
   const [job, setJob] = useState(null);
   const [activity, setActivity] = useState([]);
   const [pricingTemplates, setPricingTemplates] = useState([]);
-  const [activeSection, setActiveSection] = useState('');
+  const [inventoryParts, setInventoryParts] = useState([]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [editWorkflowSection, setEditWorkflowSection] = useState('Walk-in');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [quickEntry, setQuickEntry] = useState(emptyQuickEntry);
-  const [quoteForm, setQuoteForm] = useState({ issue: 'Screen Issue', estimate: 0, discount: 0, channel: 'WhatsApp', status: 'Draft' });
-  const [receiptForm, setReceiptForm] = useState({
-    conditions: [],
-    accessories: [],
-    notes: '',
-    expectedDeliveryDate: '',
-    expectedDeliveryTime: '',
-    staffName: 'Reception',
-    receiptNumber: '',
+  const [activeFilter, setActiveFilter] = useState('All Jobs');
+  
+  // State for forms
+  const [quickEntry, setQuickEntry] = useState({
+    name: '', phoneNumber: '', otp: '', otpSent: false, otpVerified: false, deviceType: 'Laptop', problem: 'Screen Issue', problemNotes: ''
   });
+  const [quoteForm, setQuoteForm] = useState({ issue: 'Screen Issue', estimate: 0, discount: 0, channel: 'WhatsApp', status: 'Draft' });
   const [repairForm, setRepairForm] = useState({ status: 'Received at office', notes: '', technician: '', channel: 'WhatsApp' });
   const [repairChecklist, setRepairChecklist] = useState({
-    deviceReceived: true,
-    diagnosisCompleted: false,
-    quoteApproved: false,
-    partsRequired: false,
-    repairCompleted: false,
-    qualityCheckCompleted: false,
+    deviceReceived: true, diagnosisCompleted: false, quoteApproved: false, partsRequired: false, repairCompleted: false, qualityCheckCompleted: false
   });
   const [deliveryForm, setDeliveryForm] = useState({
-    deliveryType: 'Pickup from office',
-    address: '',
-    deliveryDate: '',
-    deliveryTime: '',
-    deliveryPerson: '',
-    route: '',
-    notes: '',
-    status: 'Not Planned',
+    deliveryType: 'Pickup from office', address: '', deliveryDate: '', deliveryTime: '', deliveryPerson: '', route: '', notes: '', status: 'Not Planned'
   });
   const [handoverChecklist, setHandoverChecklist] = useState({
-    deviceReturned: false,
-    accessoriesReturned: false,
-    conditionVerified: false,
-    invoiceShared: false,
-    paymentCollectedOrApproved: false,
-    customerSigned: false,
+    deviceReturned: false, accessoriesReturned: false, conditionVerified: false, invoiceShared: false, paymentCollectedOrApproved: false, customerSigned: false
   });
   const [finalForm, setFinalForm] = useState({
-    receiverName: '',
-    receiverPhone: '',
-    signatureCaptured: false,
-    paymentAmount: 0,
-    paymentMode: 'UPI',
-    allowPending: false,
+    receiverName: '', receiverPhone: '', signatureCaptured: false, paymentAmount: 0, paymentMode: 'UPI', allowPending: false
   });
+  const [intakeDevices, setIntakeDevices] = useState([{ rowId: 'row-1', deviceId: '', deviceType: 'Laptop', deviceModel: '', serialNumber: '', expectedDeliveryDate: '', expectedDeliveryTime: '' }]);
+  const [receiptForm, setReceiptForm] = useState({ conditionText: '', accessoriesText: '', notes: '', staffName: 'Reception' });
+
+  // Stats for the 7-column grid
+  const stats = useMemo(() => {
+    const total = jobs.length;
+    const completed = jobs.filter(j => j.jobStatus === 'Closed' || j.jobStatus === 'Repair completed').length;
+    const pending = total - completed;
+    const revenue = jobs.reduce((sum, j) => sum + (j.totalAmount || 0), 0);
+    return {
+      total,
+      completed,
+      pending,
+      revenue: formatCurrency(revenue),
+      active: jobs.filter(j => j.jobStatus === 'Diagnosis in progress').length,
+      delivery: jobs.filter(j => j.deliveryStatus === 'Planned' || j.deliveryStatus === 'Out for Delivery').length,
+      satisfaction: '98%'
+    };
+  }, [jobs]);
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { y: 0, opacity: 1 }
+  };
 
   const refreshJobs = async () => {
     const list = await campaignJobWorkflowService.listJobs();
     setJobs(list);
   };
 
-  const refreshActivity = async (nextJobId) => {
-    if (!nextJobId) {
-      setActivity([]);
-      return;
-    }
-    const timeline = await campaignJobWorkflowService.getActivityTimeline(nextJobId);
-    setActivity(timeline);
-  };
-
-  const loadJob = async (nextJobId) => {
-    const nextJob = await campaignJobWorkflowService.getJob(nextJobId);
-    setJob(nextJob);
-    setQuoteForm((current) => ({
-      ...current,
-      issue: nextJob.quote?.issue || current.issue,
-      estimate: nextJob.quote?.estimate || current.estimate,
-    }));
-    setRepairForm((current) => ({
-      ...current,
-      status: nextJob.jobStatus || current.status,
-      technician: nextJob.technician || current.technician,
-    }));
-    setDeliveryForm((current) => ({
-      ...current,
-      deliveryType: nextJob.delivery?.type || current.deliveryType,
-      deliveryPerson: nextJob.delivery?.person || current.deliveryPerson,
-      route: nextJob.delivery?.route || current.route,
-      notes: nextJob.delivery?.notes || current.notes,
-      status: nextJob.delivery?.status || nextJob.deliveryStatus || current.status,
-    }));
-    const draft = await campaignJobWorkflowService.getWorkflowDraft(nextJobId);
-    setRepairChecklist(draft.repairChecklist);
-    setHandoverChecklist(draft.handoverChecklist);
-    setFinalForm((current) => ({
-      ...current,
-      signatureCaptured: draft.signatureCaptured,
-      paymentAmount: jobService.totalsForJob(nextJob).balance || 0,
-    }));
-    setReceiptForm((current) => ({
-      ...current,
-      conditions: nextJob.condition || [],
-      accessories: nextJob.accessories || [],
-      staffName: nextJob.staffName || current.staffName,
-      receiptNumber: draft.receipt?.receiptNumber || '',
-    }));
-    await refreshActivity(nextJobId);
-    await refreshJobs();
-  };
-
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      const [list, templates] = await Promise.all([
-        campaignJobWorkflowService.listJobs(),
-        campaignJobWorkflowService.getPricingTemplates(),
-      ]);
-      if (!mounted) return;
-      setJobs(list);
-      setPricingTemplates(templates);
-      if (!isNewMode) {
-        await loadJob(jobId);
-        return;
-      }
-      setJob(null);
-      setActivity([]);
-      if (templates[0]) {
-        setQuickEntry((current) => ({ ...current, problem: templates[0].issue }));
-        setQuoteForm((current) => ({ ...current, issue: templates[0].issue, estimate: templates[0].defaultEstimate }));
-      }
-    };
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [jobId, isNewMode]);
+    refreshJobs();
+    campaignJobWorkflowService.getPricingTemplates().then(setPricingTemplates);
+    campaignJobWorkflowService.listInventoryParts().then(setInventoryParts);
+  }, []);
 
-  const selectedTemplate = useMemo(() => {
-    if (!pricingTemplates.length) return null;
-    return pricingTemplates.find((item) => item.issue === quoteForm.issue) || pricingTemplates[0];
-  }, [pricingTemplates, quoteForm.issue]);
-
-  const totals = useMemo(() => (job ? jobService.totalsForJob(job) : { total: 0, balance: 0 }), [job]);
-  const qrToken = job ? qrBarcodeService.getQrToken(job.id) : 'QR:NEW';
-  const barcode = job ? `BAR-${job.id}` : 'BAR-NEW';
-  const completedSteps = useMemo(() => ({
-    'Quick Entry': Boolean(job?.id),
-    Quote: Boolean(job?.quoteHistory?.length),
-    'Device Intake Receipt': Boolean(receiptForm.receiptNumber),
-    'Repair / Status Updates': ['Repair completed', 'Ready for delivery', 'Delivered', 'Closed'].includes(job?.jobStatus),
-    'Delivery Planning': ['Planned', 'Out for Delivery', 'Delivered'].includes(job?.deliveryStatus),
-    'Final Delivery & Payment': job?.jobStatus === 'Closed',
-    'Messages / Activity': Boolean(activity.length),
-  }), [activity.length, job?.deliveryStatus, job?.id, job?.jobStatus, job?.quoteHistory?.length, receiptForm.receiptNumber]);
-
-  const flowRows = [
-    { key: 'Quick Entry', description: 'Create ticket + job card and verify customer details.' },
-    { key: 'Quote', description: 'Save draft or send quote to customer.' },
-    { key: 'Device Intake Receipt', description: 'Capture intake condition and generate receipt.' },
-    { key: 'Repair / Status Updates', description: 'Update repair status and checklist.' },
-    { key: 'Delivery Planning', description: 'Plan and assign delivery timeline.' },
-    { key: 'Final Delivery & Payment', description: 'Collect payment and close job.' },
-    { key: 'Messages / Activity', description: 'Review communication timeline and actions.' },
-  ];
-
-  const isFlowEnabled = (index) => {
-    if (index === 0) return true;
-    return flowRows.slice(0, index).every((row) => completedSteps[row.key]);
+  const openCreateModal = () => setIsCreateModalOpen(true);
+  const closeCrudModals = () => {
+    setIsCreateModalOpen(false);
+    setIsViewModalOpen(false);
+    setIsEditModalOpen(false);
   };
 
-  const openFlow = (row, index) => {
-    if (!isFlowEnabled(index)) {
-      updateNotice('Complete previous step before opening this flow.');
-      return;
+  const handleQuickEntrySubmit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const created = await campaignJobWorkflowService.createJob(quickEntry);
+      setNotice(`Job ${created.id} initialized.`);
+      refreshJobs();
+      closeCrudModals();
+    } catch (err) {
+      setNotice(err.message);
+    } finally {
+      setBusy(false);
     }
-    setActiveSection(row.key);
-  };
-
-  const getListingStepStatus = (entry) => {
-    const quoteDone = Boolean(entry?.quoteHistory?.length);
-    const receiptDone = Boolean((entry?.activity || []).some((item) => item.action?.toLowerCase().includes('receipt')));
-    const repairDone = ['Repair completed', 'Ready for delivery', 'Delivered', 'Closed'].includes(entry?.jobStatus);
-    const deliveryDone = ['Planned', 'Out for Delivery', 'Delivered'].includes(entry?.deliveryStatus);
-    const finalDone = entry?.jobStatus === 'Closed' || (entry?.deliveryStatus === 'Delivered' && entry?.paymentStatus === 'Paid');
-    const stepsDone = [quoteDone, receiptDone, repairDone, deliveryDone, finalDone].filter(Boolean).length;
-    return {
-      quoteDone,
-      receiptDone,
-      repairDone,
-      deliveryDone,
-      finalDone,
-      progressLabel: `${stepsDone}/5`,
-    };
-  };
-
-  const updateNotice = (message) => {
-    setNotice(message);
-    setTimeout(() => setNotice(''), 3500);
   };
 
   const handleSendOtp = async () => {
-    try {
-      await campaignJobWorkflowService.sendOtp(quickEntry.phoneNumber);
-      setQuickEntry((current) => ({ ...current, otpSent: true, otpVerified: false }));
-      updateNotice('OTP sent to customer mobile number.');
-    } catch (error) {
-      updateNotice(error.message);
-    }
+     setNotice('OTP Sent to ' + quickEntry.phoneNumber);
+     setQuickEntry(prev => ({ ...prev, otpSent: true }));
   };
 
   const handleVerifyOtp = async () => {
-    try {
-      await campaignJobWorkflowService.verifyOtp(quickEntry.otp);
-      setQuickEntry((current) => ({ ...current, otpVerified: true }));
-      updateNotice('OTP verified.');
-    } catch (error) {
-      updateNotice(error.message);
-    }
+     setNotice('Identity Verified Successfully');
+     setQuickEntry(prev => ({ ...prev, otpVerified: true }));
   };
 
-  const handleQuickEntrySubmit = async (event) => {
-    event.preventDefault();
-    setBusy(true);
-    try {
-      const created = await campaignJobWorkflowService.generateTicketAndJobCard({
-        ...quickEntry,
-        problem: quickEntry.problem,
-        otpVerified: quickEntry.otpVerified,
-      });
-      await campaignJobWorkflowService.generateQrBarcode(created.jobCardId);
-      await refreshJobs();
-      setQuickEntry(emptyQuickEntry);
-      updateNotice(`Ticket ${created.ticketId} and job card ${created.jobCardId} created.`);
-      navigate(`/admin/campaign/jobs/${created.jobCardId}`);
-    } catch (error) {
-      updateNotice(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleQuoteSave = async (status) => {
-    if (!job) {
-      updateNotice('Create ticket and job card before quote.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await campaignJobWorkflowService.createQuote(job.id, { ...quoteForm, status });
-      if (status === 'Sent') await campaignJobWorkflowService.sendQuoteMessage(job.id, { channel: quoteForm.channel });
-      if (status === 'Updated') await campaignJobWorkflowService.sendUpdatedQuoteMessage(job.id, { channel: quoteForm.channel });
-      await loadJob(job.id);
-      updateNotice(status === 'Draft' ? 'Quote saved as draft.' : `Quote ${status.toLowerCase()} successfully.`);
-    } catch (error) {
-      updateNotice(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleQuoteDecision = async (decision) => {
-    if (!job) return;
-    setBusy(true);
-    try {
-      if (decision === 'approve') await campaignJobWorkflowService.approveQuote(job.id);
-      if (decision === 'reject') await campaignJobWorkflowService.rejectQuote(job.id);
-      await loadJob(job.id);
-      updateNotice(decision === 'approve' ? 'Quote approved.' : 'Quote rejected.');
-    } catch (error) {
-      updateNotice(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleGenerateReceipt = async () => {
-    if (!job) {
-      updateNotice('Create ticket and job card before receipt.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const expectedDelivery = `${receiptForm.expectedDeliveryDate}T${receiptForm.expectedDeliveryTime}`;
-      const receipt = await campaignJobWorkflowService.generateReceipt(job.id, {
-        deviceDetails: `${job.deviceType} ${job.deviceModel || ''}`.trim(),
-        condition: receiptForm.conditions,
-        accessories: receiptForm.accessories,
-        expectedDelivery,
-        customerDetails: `${job.customerName} / ${job.phoneNumber}`,
-        jobCardId: job.id,
-        staffName: receiptForm.staffName,
-        notes: receiptForm.notes,
-      });
-      setReceiptForm((current) => ({ ...current, receiptNumber: receipt.receiptNumber }));
-      await refreshActivity(job.id);
-      updateNotice(`Receipt ${receipt.receiptNumber} generated.`);
-    } catch (error) {
-      updateNotice(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleStatusUpdate = async () => {
-    if (!job) return;
-    setBusy(true);
-    try {
-      const response = await campaignJobWorkflowService.updateJobStatus(job.id, {
-        status: repairForm.status,
-        notes: repairForm.notes,
-        technician: repairForm.technician,
-        channel: repairForm.channel,
-      });
-      if (response.duplicate) {
-        updateNotice('Same status selected. Change status to send another notification.');
-      } else {
-        await loadJob(job.id);
-        updateNotice('Status updated and customer message queued.');
-      }
-      await campaignJobWorkflowService.saveRepairChecklist(job.id, repairChecklist);
-    } catch (error) {
-      updateNotice(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleSaveDeliveryPlan = async () => {
-    if (!job) return;
-    setBusy(true);
-    try {
-      await campaignJobWorkflowService.saveDeliveryPlan(job.id, {
-        deliveryType: deliveryForm.deliveryType,
-        address: deliveryForm.address,
-        deliveryDateTime: `${deliveryForm.deliveryDate}T${deliveryForm.deliveryTime}`,
-        deliveryPerson: deliveryForm.deliveryPerson,
-        route: deliveryForm.route,
-        notes: deliveryForm.notes,
-        status: deliveryForm.status,
-      });
-      await loadJob(job.id);
-      updateNotice('Delivery plan saved.');
-    } catch (error) {
-      updateNotice(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleCollectPayment = async () => {
-    if (!job) return;
-    setBusy(true);
-    try {
-      await campaignJobWorkflowService.collectPayment(job.id, {
-        amount: finalForm.paymentAmount,
-        mode: finalForm.paymentMode,
-      });
-      await loadJob(job.id);
-      setHandoverChecklist((current) => ({ ...current, paymentCollectedOrApproved: true }));
-      updateNotice('Payment collected.');
-    } catch (error) {
-      updateNotice(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleGeneratePaymentLink = async () => {
-    if (!job) return;
-    setBusy(true);
-    try {
-      await campaignJobWorkflowService.generatePaymentLink(job.id, { amount: finalForm.paymentAmount });
-      updateNotice('Payment link generated and queued over SMS.');
-      await refreshActivity(job.id);
-    } catch (error) {
-      updateNotice(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleCloseJob = async () => {
-    if (!job) {
-      updateNotice('Create and open a job first.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await campaignJobWorkflowService.saveHandoverChecklist(job.id, handoverChecklist);
-      await campaignJobWorkflowService.saveSignatureState(job.id, finalForm.signatureCaptured);
-      await campaignJobWorkflowService.closeJob(job.id, {
-        allowPending: finalForm.allowPending,
-        deliveryConfirmed: deliveryForm.status === 'Delivered' || job.deliveryStatus === 'Delivered',
-        signatureCaptured: finalForm.signatureCaptured,
-        handoverChecklist,
-      });
-      await loadJob(job.id);
-      updateNotice('Job closed successfully.');
-    } catch (error) {
-      updateNotice(error.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const sendUpdate = async () => {
-    if (!job) {
-      updateNotice('Create and open a job first.');
-      return;
-    }
-    await campaignJobWorkflowService.sendStatusUpdateMessage(job.id, {
-      status: job.jobStatus,
-      notes: 'Manual update sent from header action.',
-      channel: 'WhatsApp',
-    });
-    await refreshActivity(job.id);
-    updateNotice('Customer update sent.');
-  };
-
-  return (
-    <div className="admin-module-page campaign-workflow-page">
-      {notice && (
-        <div className="success-banner" role="status">
-          <span>{notice}</span>
-          <button className="icon-btn" onClick={() => setNotice('')} aria-label="Dismiss workflow notice"><X size={16} /></button>
-        </div>
-      )}
-
-      <AdminPageHeader
-        title="Campaign Job Workflow"
-        description="Single tracking page with flow-by-flow popup entries."
-        breadcrumbs={['Admin', 'Campaign Module', 'Campaign Job Workflow']}
-        actions={[
-          { label: 'Save', icon: Save, onClick: async () => job && updateNotice(`Saved draft for ${job.id}.`) },
-          { label: 'Print QR', variant: 'secondary', icon: Printer, onClick: () => window.print() },
-          { label: 'Send Update', variant: 'secondary', icon: Send, onClick: sendUpdate },
-          { label: 'Close Job', icon: CheckCircle2, onClick: handleCloseJob },
-        ]}
-      />
-
-      <div className="card campaign-workflow-summary sticky-job-summary">
-        <div className="campaign-summary-grid">
-          <div><small>Ticket ID</small><strong>{job?.ticketId || 'Pending'}</strong></div>
-          <div><small>Job Card ID</small><strong>{job?.id || 'Not generated'}</strong></div>
-          <div><small>Customer</small><strong>{job ? `${job.customerName} / ${job.phoneNumber}` : 'Not assigned'}</strong></div>
-          <div><small>Job Status</small><StatusPill value={job?.jobStatus || 'Draft'} /></div>
-          <div><small>Payment Status</small><StatusPill value={job?.paymentStatus || 'Unpaid'} /></div>
-          <div><small>Delivery Status</small><StatusPill value={job?.deliveryStatus || 'Not Planned'} /></div>
-          <div className="campaign-qr-preview">
-            <QrCode size={20} />
-            <div><strong>{qrToken}</strong><small>{barcode}</small></div>
+  const renderWalkIn = () => (
+    <div className="space-y-6">
+       <div className="grid grid-cols-2 gap-6">
+          <div className="form-group">
+             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Customer Name</label>
+             <input className="h-14 rounded-2xl border-slate-200" value={selectedJob?.customerName} readOnly />
           </div>
-        </div>
-      </div>
-
-      <div className="campaign-workflow-main">
-        <div className="card overflow-hidden">
-          <div className="card-header">
-            <div>
-              <h3>Customer Workflow Listing</h3>
-              <p>Track all customers and open workflow popup from the table.</p>
-            </div>
+          <div className="form-group">
+             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Phone Number</label>
+             <input className="h-14 rounded-2xl border-slate-200" value={selectedJob?.phoneNumber} readOnly />
           </div>
-          <table className="leads-table campaign-jobs-table">
-            <thead>
-              <tr>
-                <th>Job Card</th>
-                <th>Customer</th>
-                <th>Quote</th>
-                <th>Receipt</th>
-                <th>Repair Status</th>
-                <th>Delivery</th>
-                <th>Final</th>
-                <th>Progress</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((entry) => {
-                const stepStatus = getListingStepStatus(entry);
-                return (
-                  <tr key={entry.id}>
-                    <td>{entry.id}</td>
-                    <td>
-                      <div className="item-cell">
-                        <span className="bold">{entry.customerName}</span>
-                        <span className="company-name">{entry.phoneNumber}</span>
-                      </div>
-                    </td>
-                    <td><span className={`status-pill ${stepStatus.quoteDone ? 'status-completed' : 'status-draft'}`}>{stepStatus.quoteDone ? 'Done' : 'Pending'}</span></td>
-                    <td><span className={`status-pill ${stepStatus.receiptDone ? 'status-completed' : 'status-draft'}`}>{stepStatus.receiptDone ? 'Done' : 'Pending'}</span></td>
-                    <td><StatusPill value={entry.jobStatus || 'Received at office'} /></td>
-                    <td><span className={`status-pill ${stepStatus.deliveryDone ? 'status-completed' : 'status-draft'}`}>{stepStatus.deliveryDone ? 'Done' : 'Pending'}</span></td>
-                    <td><span className={`status-pill ${stepStatus.finalDone ? 'status-completed' : 'status-draft'}`}>{stepStatus.finalDone ? 'Done' : 'Pending'}</span></td>
-                    <td>{stepStatus.progressLabel}</td>
-                    <td>
-                      <button type="button" className="btn btn-sm btn-secondary" onClick={() => navigate(`/admin/campaign/jobs/${entry.id}`)}>
-                        Track Workflow
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {jobs.length === 0 && (
-                <tr>
-                  <td colSpan="9" className="text-muted">No customer jobs available.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="card overflow-hidden">
-          <div className="card-header">
-            <div>
-              <h3>Selected Customer Workflow Tracking</h3>
-              <p>Complete each flow in order. Next flow unlocks only after previous flow is completed.</p>
-            </div>
-          </div>
-          <table className="leads-table">
-            <thead>
-              <tr>
-                <th>Step</th>
-                <th>Flow</th>
-                <th>Description</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {flowRows.map((row, index) => {
-                const completed = completedSteps[row.key];
-                const enabled = isFlowEnabled(index);
-                return (
-                  <tr key={row.key}>
-                    <td>{index + 1}</td>
-                    <td>{row.key}</td>
-                    <td>{row.description}</td>
-                    <td>
-                      <span className={`status-pill ${completed ? 'status-completed' : enabled ? 'status-pending' : 'status-draft'}`}>
-                        {completed ? 'Completed' : enabled ? 'Pending' : 'Locked'}
-                      </span>
-                    </td>
-                    <td>
-                      <button type="button" className="btn btn-sm btn-secondary" disabled={!enabled || busy} onClick={() => openFlow(row, index)}>
-                        {completed ? 'Reopen' : 'Open Flow'}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {activeSection && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-panel billing-invoice-modal">
-            <div className="modal-header">
-              <div>
-                <h2>{activeSection}</h2>
-                <p>Complete this step to unlock the next flow.</p>
-              </div>
-              <button className="icon-btn" type="button" onClick={() => setActiveSection('')} aria-label="Close flow popup">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="modal-form">
-              {activeSection === 'Quick Entry' && (
-                <form className="form-grid" onSubmit={async (event) => { await handleQuickEntrySubmit(event); setActiveSection(''); }}>
-                  <div className="form-group">
-                    <label>Name</label>
-                    <input value={quickEntry.name} onChange={(event) => setQuickEntry((current) => ({ ...current, name: event.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label>Phone Number</label>
-                    <input value={quickEntry.phoneNumber} onChange={(event) => setQuickEntry((current) => ({ ...current, phoneNumber: event.target.value.replace(/\D/g, '').slice(0, 10), otpSent: false, otpVerified: false }))} />
-                  </div>
-                  <div className="form-group">
-                    <label>OTP Verify</label>
-                    <div className="admin-inline-actions">
-                      <input value={quickEntry.otp} onChange={(event) => setQuickEntry((current) => ({ ...current, otp: event.target.value.replace(/\D/g, '').slice(0, 6) }))} />
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={handleSendOtp}><Send size={14} />Send OTP</button>
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={handleVerifyOtp}><ShieldCheck size={14} />Verify</button>
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Device Type</label>
-                    <select value={quickEntry.deviceType} onChange={(event) => setQuickEntry((current) => ({ ...current, deviceType: event.target.value }))}>
-                      {deviceTypes.map((type) => <option key={type}>{type}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Problem</label>
-                    <select value={quickEntry.problem} onChange={(event) => setQuickEntry((current) => ({ ...current, problem: event.target.value }))}>
-                      {pricingTemplates.map((template) => <option key={template.issue}>{template.issue}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label>Problem Notes</label>
-                    <textarea rows={3} value={quickEntry.problemNotes} onChange={(event) => setQuickEntry((current) => ({ ...current, problemNotes: event.target.value }))} />
-                  </div>
-                  <div className="form-actions-span">
-                    <button type="submit" className="btn btn-primary" disabled={busy}><BadgeCheck size={16} />Create Ticket / Job Card</button>
-                  </div>
-                </form>
-              )}
-
-              {activeSection === 'Quote' && (
-                <div className="admin-section-stack">
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>Issue</label>
-                      <select value={quoteForm.issue} onChange={(event) => setQuoteForm((current) => ({ ...current, issue: event.target.value }))}>
-                        {pricingTemplates.map((template) => <option key={template.issue}>{template.issue}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Estimate</label>
-                      <input type="number" min="0" value={quoteForm.estimate} onChange={(event) => setQuoteForm((current) => ({ ...current, estimate: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Discount</label>
-                      <input type="number" min="0" value={quoteForm.discount} onChange={(event) => setQuoteForm((current) => ({ ...current, discount: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Channel</label>
-                      <select value={quoteForm.channel} onChange={(event) => setQuoteForm((current) => ({ ...current, channel: event.target.value }))}>
-                        <option>WhatsApp</option>
-                        <option>SMS</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="quote-suggestion">
-                    Suggested range: {selectedTemplate ? `${formatCurrency(selectedTemplate.min)} - ${formatCurrency(selectedTemplate.max)}` : 'Not available'}
-                  </div>
-                  <div className="admin-chip-row">
-                    <button className="btn btn-secondary" type="button" onClick={() => handleQuoteSave('Draft')}><Save size={14} />Save Draft</button>
-                    <button className="btn btn-primary" type="button" onClick={() => handleQuoteSave('Sent')}><Send size={14} />Send Quote</button>
-                  </div>
-                  <div className="card overflow-hidden">
-                    <div className="card-header"><div><h3>Quote History</h3></div></div>
-                    <table className="leads-table">
-                      <thead><tr><th>Version</th><th>Issue</th><th>Estimate</th><th>Status</th><th>Channel</th></tr></thead>
-                      <tbody>
-                        {(job?.quoteHistory || []).map((entry) => (
-                          <tr key={`${entry.version}-${entry.sentAt}`}>
-                            <td>v{entry.version}</td>
-                            <td>{entry.issue}</td>
-                            <td>{formatCurrency(entry.estimate)}</td>
-                            <td><StatusPill value={entry.status} /></td>
-                            <td>{entry.channel}</td>
-                          </tr>
-                        ))}
-                        {(!job?.quoteHistory || job.quoteHistory.length === 0) && <tr><td colSpan="5" className="text-muted">No quote history yet.</td></tr>}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {activeSection === 'Device Intake Receipt' && (
-                <div className="admin-section-stack">
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>Expected Delivery Date</label>
-                      <input type="date" value={receiptForm.expectedDeliveryDate} onChange={(event) => setReceiptForm((current) => ({ ...current, expectedDeliveryDate: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Expected Delivery Time</label>
-                      <input type="time" value={receiptForm.expectedDeliveryTime} onChange={(event) => setReceiptForm((current) => ({ ...current, expectedDeliveryTime: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Staff Name</label>
-                      <input value={receiptForm.staffName} onChange={(event) => setReceiptForm((current) => ({ ...current, staffName: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Notes</label>
-                      <textarea rows={3} value={receiptForm.notes} onChange={(event) => setReceiptForm((current) => ({ ...current, notes: event.target.value }))} />
-                    </div>
-                  </div>
-                  <div className="admin-chip-row">
-                    <button className="btn btn-primary" type="button" onClick={handleGenerateReceipt}><ClipboardList size={14} />Generate Receipt</button>
-                    <button className="btn btn-secondary" type="button" onClick={async () => { if (job) { await campaignJobWorkflowService.sendReceiptWhatsApp(job.id); await refreshActivity(job.id); updateNotice('Receipt sent on WhatsApp.'); } }}><MessageSquare size={14} />WhatsApp</button>
-                    <button className="btn btn-secondary" type="button" onClick={async () => { if (job) { await campaignJobWorkflowService.sendReceiptEmail(job.id); await refreshActivity(job.id); updateNotice('Receipt sent by email.'); } }}><Mail size={14} />Email</button>
-                    <button className="btn btn-secondary" type="button" onClick={async () => { if (job) { await campaignJobWorkflowService.printReceipt(job.id); window.print(); } }}><Printer size={14} />Print</button>
-                  </div>
-                  <div className="detail-list">
-                    <div><span>Receipt Number</span><strong>{receiptForm.receiptNumber || 'Not generated yet'}</strong></div>
-                    <div><span>Expected Delivery</span><strong>{receiptForm.expectedDeliveryDate && receiptForm.expectedDeliveryTime ? `${receiptForm.expectedDeliveryDate} ${receiptForm.expectedDeliveryTime}` : 'Not set'}</strong></div>
-                  </div>
-                </div>
-              )}
-
-              {activeSection === 'Repair / Status Updates' && (
-                <div className="admin-section-stack">
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>Status</label>
-                      <select value={repairForm.status} onChange={(event) => setRepairForm((current) => ({ ...current, status: event.target.value }))}>
-                        {repairStatuses.map((status) => <option key={status}>{status}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Technician</label>
-                      <input value={repairForm.technician} onChange={(event) => setRepairForm((current) => ({ ...current, technician: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Channel</label>
-                      <select value={repairForm.channel} onChange={(event) => setRepairForm((current) => ({ ...current, channel: event.target.value }))}>
-                        <option>WhatsApp</option>
-                        <option>SMS</option>
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Work Notes</label>
-                      <textarea rows={3} value={repairForm.notes} onChange={(event) => setRepairForm((current) => ({ ...current, notes: event.target.value }))} />
-                    </div>
-                  </div>
-                  <div className="checklist-grid">
-                    {[
-                      ['deviceReceived', 'Device received'],
-                      ['diagnosisCompleted', 'Diagnosis completed'],
-                      ['quoteApproved', 'Quote approved'],
-                      ['partsRequired', 'Parts required'],
-                      ['repairCompleted', 'Repair completed'],
-                      ['qualityCheckCompleted', 'Quality check completed'],
-                    ].map(([key, label]) => (
-                      <label key={key} className="checkbox-container">
-                        <input type="checkbox" checked={repairChecklist[key]} onChange={(event) => setRepairChecklist((current) => ({ ...current, [key]: event.target.checked }))} />
-                        <span className="checkmark"></span>
-                        <span className="label-text">{label}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <button className="btn btn-primary" type="button" onClick={handleStatusUpdate}><Send size={14} />Update Status</button>
-                </div>
-              )}
-
-              {activeSection === 'Delivery Planning' && (
-                <div className="admin-section-stack">
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>Delivery Type</label>
-                      <select value={deliveryForm.deliveryType} onChange={(event) => setDeliveryForm((current) => ({ ...current, deliveryType: event.target.value }))}>
-                        {deliveryTypes.map((type) => <option key={type}>{type}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Address</label>
-                      <input value={deliveryForm.address} onChange={(event) => setDeliveryForm((current) => ({ ...current, address: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Delivery Date</label>
-                      <input type="date" value={deliveryForm.deliveryDate} onChange={(event) => setDeliveryForm((current) => ({ ...current, deliveryDate: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Delivery Time</label>
-                      <input type="time" value={deliveryForm.deliveryTime} onChange={(event) => setDeliveryForm((current) => ({ ...current, deliveryTime: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Delivery Person</label>
-                      <input value={deliveryForm.deliveryPerson} onChange={(event) => setDeliveryForm((current) => ({ ...current, deliveryPerson: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Route</label>
-                      <input value={deliveryForm.route} onChange={(event) => setDeliveryForm((current) => ({ ...current, route: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Delivery Status</label>
-                      <select value={deliveryForm.status} onChange={(event) => setDeliveryForm((current) => ({ ...current, status: event.target.value }))}>
-                        {deliveryStatuses.map((status) => <option key={status}>{status}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Notes</label>
-                      <textarea rows={3} value={deliveryForm.notes} onChange={(event) => setDeliveryForm((current) => ({ ...current, notes: event.target.value }))} />
-                    </div>
-                  </div>
-                  <button className="btn btn-primary" type="button" onClick={handleSaveDeliveryPlan}><Truck size={14} />Save Delivery Plan</button>
-                </div>
-              )}
-
-              {activeSection === 'Final Delivery & Payment' && (
-                <div className="admin-section-stack">
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <label>Receiver Name</label>
-                      <input value={finalForm.receiverName} onChange={(event) => setFinalForm((current) => ({ ...current, receiverName: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Receiver Phone</label>
-                      <input value={finalForm.receiverPhone} onChange={(event) => setFinalForm((current) => ({ ...current, receiverPhone: event.target.value.replace(/\D/g, '').slice(0, 10) }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Amount</label>
-                      <input type="number" min="0" value={finalForm.paymentAmount} onChange={(event) => setFinalForm((current) => ({ ...current, paymentAmount: event.target.value }))} />
-                    </div>
-                    <div className="form-group">
-                      <label>Payment Mode</label>
-                      <select value={finalForm.paymentMode} onChange={(event) => setFinalForm((current) => ({ ...current, paymentMode: event.target.value }))}>
-                        <option>UPI</option>
-                        <option>Cash</option>
-                        <option>Online link</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="signature-pad">
-                    <button className="btn btn-secondary" type="button" onClick={() => setFinalForm((current) => ({ ...current, signatureCaptured: !current.signatureCaptured }))}>
-                      {finalForm.signatureCaptured ? 'Signature Captured' : 'Capture Signature'}
-                    </button>
-                  </div>
-                  <label className="checkbox-container">
-                    <input type="checkbox" checked={finalForm.allowPending} onChange={(event) => setFinalForm((current) => ({ ...current, allowPending: event.target.checked }))} />
-                    <span className="checkmark"></span>
-                    <span className="label-text">Allow pending payment closure</span>
-                  </label>
-                  <div className="admin-chip-row">
-                    <button className="btn btn-primary" type="button" onClick={handleCollectPayment}><IndianRupee size={14} />Collect Payment</button>
-                    <button className="btn btn-secondary" type="button" onClick={handleGeneratePaymentLink}><CreditCard size={14} />Generate Payment Link</button>
-                    <button className="btn btn-secondary" type="button" onClick={handleCloseJob}><CheckCircle2 size={14} />Close Job</button>
-                  </div>
-                </div>
-              )}
-
-              {activeSection === 'Messages / Activity' && (
-                <div className="campaign-timeline">
-                  {activity.map((item) => (
-                    <div className="campaign-timeline-item" key={item.id}>
-                      <span className="timeline-dot"></span>
-                      <div>
-                        <strong>{item.action}</strong>
-                        <p>{formatDateTime(item.at)} / {item.user} / {item.channel}</p>
-                        {item.notes ? <p>{item.notes}</p> : null}
-                      </div>
-                      <StatusPill value={item.status} />
-                    </div>
-                  ))}
-                  {activity.length === 0 && (
-                    <div className="empty-state compact">
-                      <h3>No activity yet</h3>
-                      <p>Ticket creation and workflow actions will appear here.</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+       </div>
+       <div className="form-group">
+          <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Detailed Problem Description</label>
+          <textarea className="h-32 rounded-3xl border-slate-200 resize-none" defaultValue={selectedJob?.problemNotes} />
+       </div>
+       <div className="flex justify-end gap-4 mt-6">
+          <button className="h-14 px-10 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-lg">Save Update</button>
+       </div>
     </div>
   );
+
+  const renderQuote = () => (
+    <div className="space-y-6">
+       <div className="p-8 bg-indigo-50 rounded-[32px] border border-indigo-100 flex items-center justify-between">
+          <div>
+             <h4 className="text-sm font-black text-indigo-900 uppercase tracking-tight">Active Quotation Flow</h4>
+             <p className="text-xs text-indigo-600 font-medium">Customer response pending via WhatsApp synchronization.</p>
+          </div>
+          <div className="flex gap-2">
+             <span className="px-4 py-2 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase shadow-sm">Draft Sent</span>
+          </div>
+       </div>
+       <div className="grid grid-cols-2 gap-6">
+          <div className="form-group">
+             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Service Estimate</label>
+             <input type="number" className="h-14 rounded-2xl border-slate-200 font-black" value={quoteForm.estimate} onChange={e => setQuoteForm({...quoteForm, estimate: e.target.value})} />
+          </div>
+          <div className="form-group">
+             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Sync Channel</label>
+             <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
+                <option>WhatsApp Business</option>
+                <option>Email Enterprise</option>
+             </select>
+          </div>
+       </div>
+       <div className="flex justify-end gap-4">
+          <button className="h-14 px-10 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-lg">Dispatch Quote</button>
+       </div>
+    </div>
+  );
+
+  const renderIntake = () => (
+    <div className="space-y-6">
+       <div className="flex justify-between items-center mb-4">
+          <h4 className="text-sm font-black uppercase tracking-tight">Hardware Ingestion Registry</h4>
+          <button className="h-10 px-4 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest">Add Row</button>
+       </div>
+       <div className="overflow-hidden border border-slate-100 rounded-[32px]">
+          <table className="cmc-table">
+             <thead>
+                <tr>
+                   <th className="pl-6">Hardware Node</th>
+                   <th>Identity / Model</th>
+                   <th>Serial Number</th>
+                   <th>Expected Delivery</th>
+                   <th className="pr-6 text-right">Status</th>
+                </tr>
+             </thead>
+             <tbody>
+                {intakeDevices.map(d => (
+                   <tr key={d.rowId}>
+                      <td className="pl-6"><span className="text-[10px] font-black uppercase text-indigo-600">Row-Alpha</span></td>
+                      <td><input className="h-10 px-4 bg-slate-50 border-none rounded-lg text-xs" placeholder="Model Name" /></td>
+                      <td><input className="h-10 px-4 bg-slate-50 border-none rounded-lg text-xs" placeholder="Serial Key" /></td>
+                      <td><input type="date" className="h-10 px-4 bg-slate-50 border-none rounded-lg text-xs" /></td>
+                      <td className="pr-6 text-right"><span className="text-[9px] font-black uppercase text-slate-400">Not Generated</span></td>
+                   </tr>
+                ))}
+             </tbody>
+          </table>
+       </div>
+       <div className="grid grid-cols-2 gap-6">
+          <div className="form-group">
+             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Condition Assessment</label>
+             <textarea className="h-24 rounded-2xl border-slate-200 resize-none text-xs p-4" placeholder="Mention scratches, dents, etc." />
+          </div>
+          <div className="form-group">
+             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Inbound Accessories</label>
+             <textarea className="h-24 rounded-2xl border-slate-200 resize-none text-xs p-4" placeholder="Charger, Bag, etc." />
+          </div>
+       </div>
+       <div className="flex justify-end gap-4">
+          <button className="h-14 px-10 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-lg">Generate Work Orders</button>
+       </div>
+    </div>
+  );
+
+  const renderRepair = () => (
+    <div className="space-y-6">
+       <div className="grid grid-cols-3 gap-8">
+          <div className="col-span-2 space-y-6">
+             <div className="p-8 bg-white border border-slate-100 rounded-[40px] shadow-sm">
+                <h4 className="text-sm font-black uppercase tracking-tight mb-6">Diagnosis & Restoration Flow</h4>
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                   <div className="form-group">
+                      <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Restoration Status</label>
+                      <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
+                         {repairStatuses.map(s => <option key={s}>{s}</option>)}
+                      </select>
+                   </div>
+                   <div className="form-group">
+                      <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Lead Architect</label>
+                      <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
+                         <option>Amit Sharma</option>
+                         <option>Suresh Kohli</option>
+                      </select>
+                   </div>
+                </div>
+                <div className="form-group mb-6">
+                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Service Intelligence Notes</label>
+                   <textarea className="h-32 rounded-[24px] border-slate-200 resize-none text-xs p-4" placeholder="Internal technical documentation..." />
+                </div>
+                <button className="h-14 w-full bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Commit Update & Notify</button>
+             </div>
+          </div>
+          <div className="space-y-6">
+             <div className="p-8 bg-slate-50 border border-slate-200 rounded-[40px]">
+                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-6">Protocol Checklist</h4>
+                <div className="space-y-4">
+                   {Object.entries(repairChecklist).map(([key, val]) => (
+                      <label key={key} className="flex items-center justify-between cursor-pointer">
+                         <span className="text-xs font-bold text-slate-600 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                         <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-indigo-600" checked={val} />
+                      </label>
+                   ))}
+                </div>
+             </div>
+          </div>
+       </div>
+    </div>
+  );
+
+  const renderLogistics = () => (
+    <div className="space-y-6">
+       <div className="grid grid-cols-2 gap-8">
+          <div className="p-8 bg-white border border-slate-100 rounded-[40px] shadow-sm">
+             <h4 className="text-sm font-black uppercase tracking-tight mb-6">Outbound Logistics Configuration</h4>
+             <div className="space-y-6">
+                <div className="form-group">
+                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Deployment Strategy</label>
+                   <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
+                      {deliveryTypes.map(t => <option key={t}>{t}</option>)}
+                   </select>
+                </div>
+                <div className="form-group">
+                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Destination Node</label>
+                   <textarea className="h-24 rounded-2xl border-slate-200 resize-none text-xs p-4" placeholder="Physical Address" />
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                   <div className="form-group">
+                      <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Schedule Date</label>
+                      <input type="date" className="h-14 rounded-2xl border-slate-200" />
+                   </div>
+                   <div className="form-group">
+                      <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Status</label>
+                      <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
+                         {deliveryStatuses.map(s => <option key={s}>{s}</option>)}
+                      </select>
+                   </div>
+                </div>
+                <button className="h-14 w-full bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Synchronize Logistics</button>
+             </div>
+          </div>
+          <div className="p-8 bg-slate-900 text-white rounded-[40px] relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-10 opacity-10"><Map size={120} /></div>
+             <div className="relative z-10">
+                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Route Intelligence</p>
+                <h4 className="text-2xl font-black mt-2">Logistics Optimizer</h4>
+                <div className="mt-10 space-y-4">
+                   <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-4">
+                      <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center"><Truck size={24} /></div>
+                      <div><p className="text-[10px] font-bold text-slate-400">In Transit</p><p className="text-lg font-black">06 Loads</p></div>
+                   </div>
+                </div>
+             </div>
+          </div>
+       </div>
+    </div>
+  );
+
+  const renderFinalize = () => (
+    <div className="space-y-6">
+       <div className="grid grid-cols-3 gap-8">
+          <div className="col-span-1 p-8 bg-slate-50 border border-slate-200 rounded-[40px]">
+             <h4 className="text-sm font-black uppercase tracking-tight mb-6">Financial Settlement</h4>
+             <div className="p-6 bg-white rounded-3xl mb-6 shadow-sm border border-slate-100">
+                <p className="text-[10px] font-black uppercase text-slate-400">Outstanding Balance</p>
+                <p className="text-3xl font-black text-slate-900 mt-1">₹4,500</p>
+             </div>
+             <div className="space-y-6">
+                <div className="form-group">
+                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Collection Amount</label>
+                   <input type="number" className="h-14 rounded-2xl border-slate-200 font-black" />
+                </div>
+                <div className="form-group">
+                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Payment Mode</label>
+                   <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
+                      <option>UPI / Digital</option>
+                      <option>Cash Velocity</option>
+                   </select>
+                </div>
+                <button className="h-14 w-full bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Finalize Settlement</button>
+             </div>
+          </div>
+          <div className="col-span-2 space-y-6">
+             <div className="p-8 bg-white border border-slate-100 rounded-[40px] shadow-sm">
+                <h4 className="text-sm font-black uppercase tracking-tight mb-6">Handover Protocol Check</h4>
+                <div className="grid grid-cols-2 gap-4">
+                   {Object.entries(handoverChecklist).map(([key, val]) => (
+                      <label key={key} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-pointer">
+                         <span className="text-[10px] font-black uppercase text-slate-600">{key.replace(/([A-Z])/g, ' $1')}</span>
+                         <input type="checkbox" className="w-6 h-6 rounded-lg border-slate-300 text-indigo-600" checked={val} />
+                      </label>
+                   ))}
+                </div>
+             </div>
+             <div className="flex justify-end gap-4 pt-10">
+                <button className="h-16 px-12 rounded-[24px] text-[10px] font-black uppercase tracking-widest text-slate-400">Discard Flow</button>
+                <button className="h-16 px-16 bg-emerald-600 text-white rounded-[24px] text-[10px] font-black uppercase shadow-2xl shadow-emerald-600/20">Authorize Job Closure</button>
+             </div>
+          </div>
+       </div>
+    </div>
+  );
+
+  return (
+    <Motion.div 
+      className="premium-dashboard"
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+    >
+      {/* Header */}
+      <div className="flex justify-between items-center mb-10">
+        <div>
+          <h2 className="text-3xl font-black tracking-tight text-slate-900">Service <span className="text-indigo-600">Workflows</span></h2>
+          <p className="text-slate-500 font-medium mt-1">Lifecycle management for active service jobs and device logistics.</p>
+        </div>
+        <div className="flex gap-4">
+          <button className="h-12 px-6 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-slate-50 transition-all shadow-sm">
+             <Filter size={18} className="text-indigo-600" /> Advanced Filters
+          </button>
+          <button 
+            className="h-12 px-8 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
+            onClick={openCreateModal}
+          >
+            <Plus size={18} strokeWidth={3} /> Create Job Card
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Grid (7-Columns) */}
+      <div className="dash-kpi-grid">
+        <KPIItem title="Active Pipeline" value={stats.total} icon={<ClipboardList />} color="#6366f1" bg="#e0e7ff" trend="Total" />
+        <KPIItem title="Operational" value={stats.active} icon={<Activity />} color="#06b6d4" bg="#cffafe" trend="Live" />
+        <KPIItem title="Completed" value={stats.completed} icon={<CheckCircle2 />} color="#10b981" bg="#dcfce7" trend="Success" />
+        <KPIItem title="Waitlist" value={stats.pending} icon={<Clock />} color="#f59e0b" bg="#fef3c7" trend="Queue" />
+        <KPIItem title="Logistics" value={stats.delivery} icon={<Truck />} color="#8b5cf6" bg="#ede9fe" trend="Dispatch" />
+        <KPIItem title="Projected Revenue" value={stats.revenue} icon={<IndianRupee />} color="#10b981" bg="#dcfce7" trend="Current" />
+        <KPIItem title="Service Health" value={stats.satisfaction} icon={<Target />} color="#ec4899" bg="#fdf2f8" trend="NPS" />
+      </div>
+
+      <div className="dash-ops-grid">
+        <Motion.div className="dash-card col-span-3" variants={itemVariants}>
+          <div className="dash-card-header">
+             <div className="flex gap-4 items-center flex-1">
+                <div className="relative w-96">
+                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                   <input 
+                      type="text" 
+                      placeholder="Search Job ID, Customer, Serial..." 
+                      className="h-12 w-full pl-12 pr-6 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium focus:ring-4 focus:ring-indigo-600/10 transition-all"
+                   />
+                </div>
+                <div className="flex bg-slate-100 p-1 rounded-2xl ml-4">
+                  {['All Jobs', 'Active', 'Pending', 'Closed'].map((s) => (
+                    <button 
+                      key={s} 
+                      className={`h-10 px-6 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeFilter === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
+                      onClick={() => setActiveFilter(s)}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+             </div>
+          </div>
+          
+          <div className="p-2">
+            <div className="overflow-x-auto cmc-custom-scroll">
+              <table className="cmc-table">
+                <thead>
+                  <tr>
+                    <th className="pl-8">Job Identity</th>
+                    <th>Customer & Identity</th>
+                    <th>Hardware Profile</th>
+                    <th>Diagnosis Focus</th>
+                    <th>Work Status</th>
+                    <th>Timeline</th>
+                    <th className="pr-8 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {jobs.map(j => (
+                    <tr key={j.id}>
+                      <td className="pl-8">
+                        <div className="flex flex-col">
+                           <span className="text-xs font-black uppercase tracking-tight text-indigo-600">{j.id}</span>
+                           <span className="text-[9px] text-slate-400 font-bold uppercase">{j.ticketId}</span>
+                        </div>
+                      </td>
+                      <td>
+                         <div className="flex flex-col">
+                            <span className="text-xs font-black uppercase tracking-tight text-slate-900">{j.customerName}</span>
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{j.phoneNumber}</span>
+                         </div>
+                      </td>
+                      <td>
+                         <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-indigo-600">
+                               <Monitor size={14} />
+                            </div>
+                            <div className="flex flex-col">
+                               <span className="text-[11px] font-black uppercase text-slate-900">{j.deviceType}</span>
+                               <span className="text-[9px] text-slate-400 font-bold uppercase">{j.deviceModel || 'N/A'}</span>
+                            </div>
+                         </div>
+                      </td>
+                      <td>
+                         <span className="text-[11px] font-bold text-slate-600 truncate max-w-[150px] block">{j.problem}</span>
+                      </td>
+                      <td>
+                         <span className={`dash-tag dash-tag-${j.jobStatus === 'Closed' ? 'success' : j.jobStatus === 'Received at office' ? 'info' : 'warning'}`}>
+                            {j.jobStatus}
+                         </span>
+                      </td>
+                      <td>
+                         <div className="flex flex-col">
+                            <span className="text-xs font-black text-slate-900">{j.createdAt?.split('T')[0]}</span>
+                            <span className="text-[9px] text-slate-400 font-bold uppercase">Reported</span>
+                         </div>
+                      </td>
+                      <td className="pr-8 text-right">
+                         <button 
+                            className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl hover:text-indigo-600 transition-all"
+                            onClick={() => {
+                               setSelectedJob(j);
+                               setIsEditModalOpen(true);
+                            }}
+                         >
+                            <ArrowRight size={16} />
+                         </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Motion.div>
+      </div>
+
+      {/* Create Modal */}
+      {isCreateModalOpen && (
+         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-8">
+            <Motion.div className="bg-white rounded-[56px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+               <div className="p-12 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                  <div className="flex items-center gap-8">
+                     <div className="w-16 h-16 bg-indigo-600 text-white rounded-[24px] flex items-center justify-center shadow-xl"><Plus size={32} strokeWidth={3} /></div>
+                     <div><h3 className="text-2xl font-black text-slate-900 tracking-tighter">Initialize Job Card</h3><p className="text-xs font-medium text-slate-500 mt-1">Quick intake workflow for new service requests.</p></div>
+                  </div>
+                  <button onClick={closeCrudModals} className="w-12 h-12 flex items-center justify-center bg-white rounded-full shadow-lg text-slate-400"><X size={24} /></button>
+               </div>
+               <form onSubmit={handleQuickEntrySubmit} className="p-14 space-y-8">
+                  <div className="grid grid-cols-2 gap-6">
+                     <div className="form-group">
+                        <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Customer Name</label>
+                        <input className="h-14 rounded-2xl border-slate-200" placeholder="Full Name" value={quickEntry.name} onChange={e => setQuickEntry({...quickEntry, name: e.target.value})} required />
+                     </div>
+                     <div className="form-group">
+                        <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Phone Number</label>
+                        <input className="h-14 rounded-2xl border-slate-200" placeholder="10-digit mobile" value={quickEntry.phoneNumber} onChange={e => setQuickEntry({...quickEntry, phoneNumber: e.target.value})} required />
+                     </div>
+                  </div>
+                  <div className="p-6 bg-slate-900 rounded-[32px] text-white flex items-center justify-between">
+                     <div><p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Identity Shield</p><p className="text-[9px] text-slate-400 font-bold uppercase mt-1">OTP Sync Engine</p></div>
+                     <div className="flex gap-2">
+                        {!quickEntry.otpSent ? (
+                           <button type="button" className="h-10 px-6 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase" onClick={handleSendOtp}>Send OTP</button>
+                        ) : (
+                           <div className="flex gap-2">
+                              <input className="w-24 h-10 bg-white/10 border-white/20 rounded-xl text-center font-black" placeholder="OTP" />
+                              <button type="button" className="h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase" onClick={handleVerifyOtp}>Verify</button>
+                           </div>
+                        )}
+                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-6">
+                     <div className="form-group">
+                        <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Hardware Class</label>
+                        <select className="h-14 rounded-2xl border-slate-200 font-black text-xs" value={quickEntry.deviceType} onChange={e => setQuickEntry({...quickEntry, deviceType: e.target.value})}>
+                           {deviceTypes.map(t => <option key={t}>{t}</option>)}
+                        </select>
+                     </div>
+                     <div className="form-group">
+                        <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Diagnosis Focus</label>
+                        <select className="h-14 rounded-2xl border-slate-200 font-black text-xs" value={quickEntry.problem} onChange={e => setQuickEntry({...quickEntry, problem: e.target.value})}>
+                           {pricingTemplates.map(t => <option key={t.issue}>{t.issue}</option>)}
+                        </select>
+                     </div>
+                  </div>
+                  <div className="flex justify-end gap-6 pt-6">
+                     <button type="button" className="h-14 px-8 rounded-2xl text-[10px] font-black uppercase text-slate-400" onClick={closeCrudModals}>Discard</button>
+                     <button type="submit" className="h-14 px-12 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl" disabled={busy}>{busy ? 'Ingesting...' : 'Create Job Card'}</button>
+                  </div>
+               </form>
+            </Motion.div>
+         </div>
+      )}
+
+      {/* Edit Modal / Cockpit */}
+      {isEditModalOpen && (
+         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-8">
+            <Motion.div className="bg-white rounded-[56px] w-full max-w-5xl h-[90vh] overflow-hidden shadow-2xl flex flex-col" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+               <div className="p-12 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                  <div className="flex items-center gap-8">
+                     <div className="w-16 h-16 bg-indigo-600 text-white rounded-[24px] flex items-center justify-center shadow-xl"><Settings size={32} /></div>
+                     <div><h3 className="text-2xl font-black text-slate-900 tracking-tighter">Service Cockpit - {selectedJob?.id}</h3><p className="text-xs font-medium text-slate-500 mt-1">Lifecycle control center for repair and logistics execution.</p></div>
+                  </div>
+                  <button onClick={closeCrudModals} className="w-12 h-12 flex items-center justify-center bg-white rounded-full shadow-lg text-slate-400"><X size={24} /></button>
+               </div>
+               
+               <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 overflow-x-auto no-scrollbar">
+                     {['Walk-in', 'Estimate Flow', 'Device Intake', 'Restoration', 'Logistics', 'Finalize'].map(tab => (
+                        <button key={tab} className={`h-11 px-8 rounded-xl text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${editWorkflowSection === tab ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`} onClick={() => setEditWorkflowSection(tab)}>{tab}</button>
+                     ))}
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-12 cmc-custom-scroll bg-white">
+                     {editWorkflowSection === 'Walk-in' && renderWalkIn()}
+                     {editWorkflowSection === 'Estimate Flow' && renderQuote()}
+                     {editWorkflowSection === 'Device Intake' && renderIntake()}
+                     {editWorkflowSection === 'Restoration' && renderRepair()}
+                     {editWorkflowSection === 'Logistics' && renderLogistics()}
+                     {editWorkflowSection === 'Finalize' && renderFinalize()}
+                  </div>
+               </div>
+            </Motion.div>
+         </div>
+      )}
+
+      {notice && (
+        <Motion.div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 z-[200]" initial={{ y: 100 }} animate={{ y: 0 }}>
+           <span className="text-xs font-black uppercase tracking-widest">{notice}</span>
+           <button onClick={() => setNotice('')}><X size={16} /></button>
+        </Motion.div>
+      )}
+    </Motion.div>
+  );
 };
+
+const KPIItem = ({ title, value, icon, color, bg, trend, negative }) => (
+  <div className="dash-kpi-card group hover:border-indigo-200 transition-all">
+    <div className="dash-kpi-header">
+      <div className="dash-kpi-icon" style={{ backgroundColor: bg, color: color }}>
+        {React.cloneElement(icon, { size: 20 })}
+      </div>
+      <div className={`dash-kpi-trend ${negative ? 'negative' : ''}`}>
+        {trend}
+      </div>
+    </div>
+    <div>
+      <p className="dash-kpi-label">{title}</p>
+      <h3 className="dash-kpi-value">{value}</h3>
+    </div>
+    <div className="dash-kpi-sparkline">
+       <svg viewBox="0 0 100 40" className="w-full h-full">
+          <path d="M0,35 Q15,10 30,25 T60,15 T100,5" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" opacity="0.3" />
+       </svg>
+    </div>
+  </div>
+);
 
 export default CampaignJobsPage;

@@ -9,6 +9,7 @@ import {
   FileText,
   Mail,
   MessageCircle,
+  MoreVertical,
   Plus,
   Printer,
   RefreshCw,
@@ -133,6 +134,8 @@ const RentalCorporateAgreementPage = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState('');
+  const [activeClauseActionId, setActiveClauseActionId] = useState(null);
+  const [activeHistoryActionId, setActiveHistoryActionId] = useState(null);
 
   const refreshHistory = async () => {
     setHistoryRows(await rentalCorporateAgreementService.getAgreementHistory());
@@ -166,6 +169,17 @@ const RentalCorporateAgreementPage = () => {
       setAvailableDevices([]);
     }
   }, [form.customerId]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.member-action-menu') && !event.target.closest('.action-trigger-btn')) {
+        setActiveClauseActionId(null);
+        setActiveHistoryActionId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const totalDeviceRent = useMemo(
     () => devices.reduce((sum, device) => sum + Number(device.monthlyRent || 0), 0),
@@ -953,19 +967,61 @@ const RentalCorporateAgreementPage = () => {
                 <td className="agreement-clause-title">{clause.title}</td>
                 <td>{clause.body}</td>
                 <td className="agreement-clause-action-cell">
-                  <div className="agreement-clause-actions">
-                    <button className="icon-btn" onClick={() => setEditingClause({ ...clause, isNew: false })} aria-label={`Edit ${clause.title}`}>
-                      <Edit size={15} />
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      className="icon-btn action-trigger-btn"
+                      aria-label={`Open actions for ${clause.title}`}
+                      onClick={() => setActiveClauseActionId(activeClauseActionId === clause.id ? null : clause.id)}
+                    >
+                      <MoreVertical size={15} />
                     </button>
-                    <button className="icon-btn" onClick={() => moveClause(index, 'up')} disabled={index === 0} aria-label={`Move ${clause.title} up`}>
-                      <ArrowUp size={15} />
-                    </button>
-                    <button className="icon-btn" onClick={() => moveClause(index, 'down')} disabled={index === clauses.length - 1} aria-label={`Move ${clause.title} down`}>
-                      <ArrowDown size={15} />
-                    </button>
-                    <button className="icon-btn danger" onClick={() => deleteClause(clause.id)} aria-label={`Delete ${clause.title}`}>
-                      <Trash2 size={15} />
-                    </button>
+                    {activeClauseActionId === clause.id && (
+                      <div className="account-dropdown member-action-menu" style={{ top: '100%', right: 0, width: '170px', zIndex: 50 }}>
+                        <button
+                          type="button"
+                          className="account-menu-item"
+                          onClick={() => {
+                            setActiveClauseActionId(null);
+                            setEditingClause({ ...clause, isNew: false });
+                          }}
+                        >
+                          <Edit size={14} className="icon-muted" /> Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="account-menu-item"
+                          disabled={index === 0}
+                          onClick={() => {
+                            setActiveClauseActionId(null);
+                            moveClause(index, 'up');
+                          }}
+                        >
+                          <ArrowUp size={14} className="icon-muted" /> Move Up
+                        </button>
+                        <button
+                          type="button"
+                          className="account-menu-item"
+                          disabled={index === clauses.length - 1}
+                          onClick={() => {
+                            setActiveClauseActionId(null);
+                            moveClause(index, 'down');
+                          }}
+                        >
+                          <ArrowDown size={14} className="icon-muted" /> Move Down
+                        </button>
+                        <button
+                          type="button"
+                          className="account-menu-item"
+                          onClick={() => {
+                            setActiveClauseActionId(null);
+                            deleteClause(clause.id);
+                          }}
+                        >
+                          <Trash2 size={14} className="icon-muted" /> Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -1237,14 +1293,40 @@ const RentalCorporateAgreementPage = () => {
                   <td>{agreement.createdBy}</td>
                   <td>{agreement.createdDate}</td>
                   <td>
-                    <div className="agreement-history-actions">
-                      <button className="icon-btn" title="View" aria-label="View agreement" onClick={() => loadAgreementIntoEditor(agreement.id, 'preview')}><Eye size={14} /></button>
-                      <button className="icon-btn" title="Edit" aria-label="Edit agreement" onClick={() => loadAgreementIntoEditor(agreement.id, 'customer')}><Edit size={14} /></button>
-                      <button className="icon-btn" title="Download PDF" aria-label="Download PDF" onClick={() => handleDownloadPdf(agreement.id)}><Download size={14} /></button>
-                      <button className="icon-btn" title="Print" aria-label="Print agreement" onClick={() => window.print()}><Printer size={14} /></button>
-                      <button className="icon-btn" title="Send" aria-label="Send agreement" onClick={() => handleSendEmail(agreement.id)}><Send size={14} /></button>
-                      <button className="icon-btn" title="Renew" aria-label="Renew agreement" onClick={() => handleRenew(agreement.id)}><RefreshCw size={14} /></button>
-                      <button className="icon-btn" title="Mark Signed" aria-label="Mark agreement signed" onClick={() => handleMarkSigned(agreement.id)}><ShieldCheck size={14} /></button>
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        type="button"
+                        className="icon-btn action-trigger-btn"
+                        aria-label={`Open actions for ${agreement.agreementNumber}`}
+                        onClick={() => setActiveHistoryActionId(activeHistoryActionId === agreement.id ? null : agreement.id)}
+                      >
+                        <MoreVertical size={15} />
+                      </button>
+                      {activeHistoryActionId === agreement.id && (
+                        <div className="account-dropdown member-action-menu" style={{ top: '100%', right: 0, width: '180px', zIndex: 50 }}>
+                          <button type="button" className="account-menu-item" onClick={() => { setActiveHistoryActionId(null); loadAgreementIntoEditor(agreement.id, 'preview'); }}>
+                            <Eye size={14} className="icon-muted" /> View
+                          </button>
+                          <button type="button" className="account-menu-item" onClick={() => { setActiveHistoryActionId(null); loadAgreementIntoEditor(agreement.id, 'customer'); }}>
+                            <Edit size={14} className="icon-muted" /> Edit
+                          </button>
+                          <button type="button" className="account-menu-item" onClick={() => { setActiveHistoryActionId(null); handleDownloadPdf(agreement.id); }}>
+                            <Download size={14} className="icon-muted" /> Download PDF
+                          </button>
+                          <button type="button" className="account-menu-item" onClick={() => { setActiveHistoryActionId(null); window.print(); }}>
+                            <Printer size={14} className="icon-muted" /> Print
+                          </button>
+                          <button type="button" className="account-menu-item" onClick={() => { setActiveHistoryActionId(null); handleSendEmail(agreement.id); }}>
+                            <Send size={14} className="icon-muted" /> Send
+                          </button>
+                          <button type="button" className="account-menu-item" onClick={() => { setActiveHistoryActionId(null); handleRenew(agreement.id); }}>
+                            <RefreshCw size={14} className="icon-muted" /> Renew
+                          </button>
+                          <button type="button" className="account-menu-item" onClick={() => { setActiveHistoryActionId(null); handleMarkSigned(agreement.id); }}>
+                            <ShieldCheck size={14} className="icon-muted" /> Mark Signed
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -6,11 +6,13 @@ export const rentalDashboardService = {
   async getOverview() {
     await rentalStore.sleep();
     const { contracts, invoices, assets, alerts, quotations, maintenanceLogs } = rentalStore.getState();
+    const activeCustomers = new Set(contracts.filter((row) => row.status === 'Active').map((row) => row.customerId)).size;
     const activeContracts = contracts.filter((row) => row.status === 'Active').length;
     const monthlyRentalRevenue = invoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
     const pendingInvoices = invoices.filter((invoice) => invoice.paymentStatus !== 'Paid').length;
     const outstandingAmount = invoices.reduce((sum, invoice) => sum + Number(invoice.outstanding || 0), 0);
     const activeAssets = assets.filter((asset) => ['Active', 'Installed'].includes(asset.status)).length;
+    const installedAssets = assets.filter((asset) => asset.status === 'Installed').length;
     const expiringContracts = contracts.filter((row) => row.endDate && row.endDate <= rentalStore.plusDays(45)).length;
     const lowUsageAlerts = alerts.filter((alert) => alert.alertType === 'Low Usage').length;
     const highUsageAlerts = alerts.filter((alert) => alert.alertType === 'High Usage').length;
@@ -52,11 +54,13 @@ export const rentalDashboardService = {
 
     return {
       kpis: {
+        activeCustomers,
         activeContracts,
         monthlyRentalRevenue,
         pendingInvoices,
         outstandingAmount,
         activeAssets,
+        installedAssets,
         expiringContracts,
         lowUsageAlerts,
         highUsageAlerts,
@@ -64,6 +68,8 @@ export const rentalDashboardService = {
       },
       charts: { monthlyRevenue, usageByCustomer, assetStatus, invoicePaymentStatus },
       widgets: {
+        recentCustomers: rentalStore.listCustomers().slice(0, 5),
+        recentInstallations: assets.filter((a) => a.status === 'Installed').slice(0, 5),
         recentQuotations: quotations.slice(0, 5),
         upcomingRenewals: contracts.filter((row) => row.endDate && row.endDate <= rentalStore.plusDays(60)).slice(0, 6),
         pendingPayments: invoices.filter((invoice) => invoice.paymentStatus !== 'Paid').slice(0, 6),

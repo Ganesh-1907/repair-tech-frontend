@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { inventoryService } from '../services/inventoryService';
 import {
   AlertCircle,
   CheckCircle,
@@ -324,10 +325,27 @@ const Billing = () => {
   };
 
   const handleGenerateInvoice = () => {
-    if (!validateInvoice()) return;
+    // Inventory Stock Check Logic
+    try {
+      items.forEach(billingItem => {
+        const invItem = inventoryService.getItems().find(i => 
+          i.name.toLowerCase() === billingItem.name.toLowerCase() || 
+          i.sku.toLowerCase() === billingItem.name.toLowerCase()
+        );
+        
+        if (invItem && invItem.isStockDependent) {
+          if (invItem.currentStock < billingItem.qty) {
+            throw new Error(`Insufficient stock for "${billingItem.name}". Available: ${invItem.currentStock}, Requested: ${billingItem.qty}`);
+          }
+        }
+      });
+    } catch (err) {
+      setNotice(`Billing Failed: ${err.message}`);
+      setErrors(prev => ({ ...prev, items: err.message }));
+      return;
+    }
 
-    const now = new Date();
-    const issueDate = now.toISOString().slice(0, 10);
+    if (!validateInvoice()) return;
     const seed = nextInvoiceId;
     const invoiceNumber = createInvoiceNumber(seed);
     const generatedInvoice = {

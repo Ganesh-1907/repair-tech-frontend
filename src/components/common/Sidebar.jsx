@@ -13,6 +13,8 @@ import {
   Workflow,
   Wrench,
   Boxes,
+  UserCog,
+  ReceiptText
 } from 'lucide-react';
 import { usePrivacy } from '../../context/PrivacyContext';
 import { useAuth } from '../../context/AuthContext';
@@ -27,6 +29,8 @@ const menuIcons = {
   Wrench,
   UserCircle,
   Boxes,
+  UserCog,
+  ReceiptText
 };
 
 const hasChildren = (item) => Array.isArray(item.children) && item.children.length > 0;
