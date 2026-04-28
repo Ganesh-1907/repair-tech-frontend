@@ -34,10 +34,7 @@ const AMCBillingRenewalsPage = () => {
   return (
     <div className="admin-module-page amc-billing-renewals-page p-8">
       <div className="flex justify-between items-center mb-10">
-        <div>
-          <h2 className="text-3xl font-black text-main tracking-tight">Billing & Renewals</h2>
-          <p className="text-xs text-muted font-bold uppercase tracking-widest mt-1">Revenue Lifecycle & Retention Engine</p>
-        </div>
+        
         <div className="flex gap-4">
            <button className="px-8 py-4 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl shadow-primary/30 hover:bg-primary-light transition-all flex items-center gap-2">
               <TrendingUp size={16} /> Maximize Renewals

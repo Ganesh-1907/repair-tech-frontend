@@ -81,10 +81,7 @@ const CMCReportsPage = () => {
     >
       {/* CMC Header */}
       <div className="flex justify-between items-center mb-10">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight text-slate-900">CMC <span className="text-indigo-600">Intelligence</span></h2>
-          <p className="text-slate-500 font-medium mt-1">Advanced analytical suite for enterprise contract performance and financial audits.</p>
-        </div>
+        
         <div className="flex gap-4">
           <button className="h-12 px-6 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-slate-50 transition-all shadow-sm">
              <Calendar size={18} className="text-indigo-600" /> FY 2026-27 Audit

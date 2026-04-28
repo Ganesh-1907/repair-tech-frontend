@@ -33,10 +33,7 @@ const AMCReportsPage = () => {
   return (
     <div className="admin-module-page amc-reports-page p-8">
       <div className="flex justify-between items-center mb-10">
-        <div>
-          <h2 className="text-3xl font-black text-main tracking-tight">Business Intelligence</h2>
-          <p className="text-xs text-muted font-bold uppercase tracking-widest mt-1">AMC Performance Analytics & Reports</p>
-        </div>
+        
         <div className="flex gap-4">
            <div className="relative">
               <button className="px-6 py-3 bg-white border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">

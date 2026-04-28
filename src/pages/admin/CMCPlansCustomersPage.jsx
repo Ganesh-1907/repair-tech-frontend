@@ -106,10 +106,7 @@ const CMCPlansCustomersPage = () => {
     >
       {/* CMC Header */}
       <div className="flex justify-between items-center mb-10">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight text-slate-900">Contract <span className="text-indigo-600">Intelligence</span></h2>
-          <p className="text-slate-500 font-medium mt-1">Enterprise framework management for CMC service plans and client lifecycle.</p>
-        </div>
+        
         <div className="flex gap-4">
            <div className="flex bg-slate-100 p-1 rounded-2xl">
               <button 

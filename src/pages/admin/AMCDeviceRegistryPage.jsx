@@ -49,10 +49,7 @@ const AMCDeviceRegistryPage = () => {
   return (
     <div className="admin-module-page amc-device-registry-page p-8">
       <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-2xl font-black text-main tracking-tight">Device Registry</h2>
-          <p className="text-xs text-muted font-bold uppercase tracking-widest mt-1">Enrollment & Lifecycle Tracking</p>
-        </div>
+        
         <button 
           className="px-6 py-3 bg-primary text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-primary-light transition-all shadow-lg shadow-primary/20"
           onClick={() => openDeviceModal()}

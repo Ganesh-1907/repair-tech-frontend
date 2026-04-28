@@ -74,10 +74,7 @@ const AMCDashboardPage = () => {
     >
       {/* Top Header matching image */}
       <div className="flex justify-between items-start mb-10">
-        <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">AMC Dashboard</h1>
-          <p className="text-slate-400 font-medium text-xs mt-1">Management of Annual Maintenance Contracts and recurring service excellence.</p>
-        </div>
+        
         <div className="flex items-center gap-6">
            <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />

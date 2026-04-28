@@ -70,10 +70,7 @@ const AMCPlansCustomersPage = () => {
   return (
     <div className="admin-module-page amc-plans-customers-page p-8">
       <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-2xl font-black text-main tracking-tight">Plans & Customers</h2>
-          <p className="text-xs text-muted font-bold uppercase tracking-widest mt-1">Manage AMC Inventory & Client Agreements</p>
-        </div>
+        
         <div className="amc-tab-header">
           <button 
             className={`amc-tab-btn ${activeTab === 'plans' ? 'active' : ''}`}
@@ -609,10 +606,7 @@ const QuotationModal = ({ customer, onClose }) => {
 
           <div className="agreement-paper animate-in slide-in-from-bottom-8 duration-700">
             <div className="flex justify-between items-start mb-16">
-              <div>
-                 <h1 className="text-3xl font-black mb-1">AMC QUOTATION</h1>
-                 <p className="text-xs font-bold text-muted uppercase tracking-widest">{formData.quoteNo}</p>
-              </div>
+              
               <div className="text-right">
                  <p className="font-black text-sm">SAPTARISHI SOLUTIONS</p>
                  <p className="text-[10px] opacity-60">Plot No 45, Tech Hub, Mumbai</p>

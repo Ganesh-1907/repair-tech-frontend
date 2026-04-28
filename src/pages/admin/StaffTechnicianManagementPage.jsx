@@ -145,9 +145,8 @@ const StaffTechnicianManagementPage = () => {
             gridTemplateRows: 'auto auto 260px 1fr'
           }}
         >
-          {/* Row 1: Title */}
+          {/* Row 1: Title (Removed to prevent double heading) */}
           <div className="col-span-3 flex items-center gap-2 pt-1 pb-1">
-            <h1 className="text-[20px] font-bold text-slate-800">Technicians</h1>
             <span className="text-slate-300 font-bold tracking-widest text-sm mt-0.5">»»»</span>
           </div>
           
