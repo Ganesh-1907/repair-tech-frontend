@@ -1,0 +1,347 @@
+/* Rental Documents & Agreement Forms Styles */
+
+.documents-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(15,23,42,0.06);
+  padding: 24px;
+  margin-top: 24px;
+}
+
+.documents-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.documents-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 6px;
+  background: #f1f5f9;
+  border-radius: 14px;
+  margin-bottom: 20px;
+  width: fit-content;
+}
+
+.documents-tab {
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.documents-tab.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.documents-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.documents-table th {
+  background: #f8fafc;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.documents-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 14px;
+}
+
+/* Modal & Builder Layout */
+.document-modal {
+  width: 98vw;
+  max-width: 1600px;
+  height: 95vh;
+  background: #ffffff;
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.document-form-layout {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.document-form-panel {
+  padding: 24px;
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.document-preview-panel {
+  padding: 40px;
+  background: #f8fafc;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.document-section-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.document-section-card h3 {
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 16px;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.document-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.document-field label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.document-field input,
+.document-field select,
+.document-field textarea {
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  padding: 0 14px;
+  font-size: 14px;
+  outline: none;
+}
+
+.document-field textarea {
+  min-height: 100px;
+  padding-top: 10px;
+  resize: vertical;
+}
+
+.document-field.full {
+  grid-column: 1 / -1;
+}
+
+/* Device Table Editor */
+.device-table-editor {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.device-table-editor th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  padding: 8px;
+}
+
+.device-table-editor td {
+  padding: 4px;
+}
+
+.device-table-editor input {
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid #dbe3ef;
+  width: 100%;
+}
+
+/* Preview Paper Styling */
+.agreement-preview-paper,
+.quotation-preview-paper {
+  width: 100%;
+  max-width: 794px;
+  min-height: 1123px;
+  background: #ffffff;
+  padding: 60px 70px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+  font-family: "Times New Roman", Times, serif;
+  line-height: 1.6;
+  color: #111827;
+}
+
+.agreement-preview-paper h1,
+.quotation-preview-paper h1 {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+  text-decoration: underline;
+}
+
+.agreement-preview-paper h2,
+.quotation-preview-paper h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.agreement-preview-paper table,
+.quotation-preview-paper table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.agreement-preview-paper th,
+.agreement-preview-paper td,
+.quotation-preview-paper th,
+.quotation-preview-paper td {
+  border: 1px solid #000;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.signature-block {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 60px;
+  margin-top: 60px;
+}
+
+.sig-line {
+  border-top: 1px solid #000;
+  padding-top: 6px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* Buttons */
+.primary-button {
+  height: 42px;
+  border-radius: 12px;
+  padding: 0 20px;
+  background: #4f46e5;
+  color: #ffffff;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.secondary-button {
+  height: 42px;
+  border-radius: 12px;
+  padding: 0 20px;
+  background: #ffffff;
+  border: 1px solid #dbe3ef;
+  color: #0f172a;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748b;
+}
+
+/* Print CSS */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .agreement-preview-paper,
+  .agreement-preview-paper *,
+  .quotation-preview-paper,
+  .quotation-preview-paper * {
+    visibility: visible;
+  }
+
+  .agreement-preview-paper,
+  .quotation-preview-paper {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 210mm;
+    min-height: 297mm;
+    padding: 18mm;
+    margin: 0;
+    box-shadow: none;
+    border: none;
+  }
+
+  .sidebar,
+  .app-header,
+  .no-print,
+  button,
+  .document-form-panel,
+  .documents-tabs,
+  .documents-toolbar {
+    display: none !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}
+
+@media (max-width: 1024px) {
+  .document-form-layout {
+    grid-template-columns: 1fr;
+  }
+  .document-form-panel {
+    overflow-y: visible;
+  }
+}

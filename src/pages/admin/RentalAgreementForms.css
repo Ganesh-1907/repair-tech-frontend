@@ -1,0 +1,291 @@
+/* Rental Agreement Forms Styles */
+
+.agreement-page-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.agreement-layout {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.agreement-form-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+/* Custom Scrollbar for Form Panel */
+.agreement-form-panel::-webkit-scrollbar {
+  width: 6px;
+}
+.agreement-form-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+.agreement-form-panel::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.agreement-section-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  box-shadow: 0 4px 15px rgba(15,23,42,0.04);
+  padding: 24px;
+}
+
+.agreement-section-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.agreement-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.agreement-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agreement-field label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.agreement-field input,
+.agreement-field select,
+.agreement-field textarea {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid #dbe3ef;
+  padding: 0 14px;
+  font-size: 14px;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.agreement-field input:focus,
+.agreement-field select:focus,
+.agreement-field textarea:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.agreement-field textarea {
+  min-height: 110px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+.agreement-field.full {
+  grid-column: 1 / -1;
+}
+
+.agreement-device-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.agreement-device-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  padding: 8px;
+}
+
+.agreement-device-table td {
+  padding: 6px;
+}
+
+.agreement-device-table input {
+  min-height: 38px;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 8px;
+}
+
+.agreement-preview-panel {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 40px;
+  display: flex;
+  justify-content: center;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.agreement-preview-paper {
+  width: 100%;
+  max-width: 794px; /* A4 width in px at 96 DPI is ~794px */
+  min-height: 1123px; /* A4 height in px at 96 DPI is ~1123px */
+  background: #ffffff;
+  color: #111827;
+  padding: 60px 80px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 14px 40px rgba(15,23,42,0.1);
+  font-family: "Times New Roman", Times, serif;
+  line-height: 1.6;
+  font-size: 15px;
+  position: relative;
+}
+
+.agreement-preview-title {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 32px;
+  text-decoration: underline;
+}
+
+.agreement-preview-paper h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 24px;
+  margin-bottom: 12px;
+  color: #000;
+}
+
+.agreement-preview-paper table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+}
+
+.agreement-preview-paper th,
+.agreement-preview-paper td {
+  border: 1px solid #111827;
+  padding: 10px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.agreement-preview-paper th {
+  background: #f9fafb;
+}
+
+.agreement-clause {
+  margin-top: 20px;
+  text-align: justify;
+}
+
+.agreement-signatures {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 80px;
+  margin-top: 80px;
+}
+
+.sig-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sig-line {
+  border-top: 1px solid #000;
+  margin-bottom: 8px;
+  padding-top: 4px;
+  font-weight: 700;
+}
+
+.print-button {
+  height: 42px;
+  border-radius: 12px;
+  padding: 0 20px;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  border: none;
+}
+
+/* Print Mode Styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .agreement-preview-paper,
+  .agreement-preview-paper * {
+    visibility: visible;
+  }
+
+  .agreement-preview-paper {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    padding: 20mm;
+    margin: 0;
+    box-shadow: none;
+    border: none;
+    background: white;
+  }
+
+  .no-print,
+  .sidebar,
+  .app-header,
+  .agreement-form-panel,
+  .documents-tabs,
+  .document-toolbar,
+  .modal-overlay:not(.print-active),
+  button,
+  .modal-card > div:not(.agreement-layout) {
+    display: none !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
+
+@media (max-width: 1200px) {
+  .agreement-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .agreement-preview-paper {
+    width: 100%;
+    padding: 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .agreement-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

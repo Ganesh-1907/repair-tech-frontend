@@ -26,6 +26,7 @@ import InstantMessagePage from './pages/admin/InstantMessagePage';
 import AssetManagementPage from './pages/admin/AssetManagementPage';
 import AssetDetailPage from './pages/admin/AssetDetailPage';
 import QuoteApprovalPlaceholderPage from './pages/admin/QuoteApprovalPlaceholderPage';
+import CampaignDashboardPage from './pages/admin/CampaignDashboardPage';
 import CampaignJobsPage from './pages/admin/CampaignJobsPage';
 import CampaignReportsPage from './pages/admin/CampaignReportsPage';
 
@@ -79,7 +80,8 @@ const existingAdminRouteComponents = {
   '/admin/instant-massage-option': InstantMessagePage,
   '/admin/inventory': Inventory,
   '/admin/inventory/asset-management': AssetManagementPage,
-  '/admin/campaign/jobs/new': CampaignJobsPage,
+  '/admin/campaign/dashboard': CampaignDashboardPage,
+  '/admin/campaign/jobs': CampaignJobsPage,
   '/admin/campaign/reports': CampaignReportsPage,
   '/admin/rental': RentalDashboardPage,
   '/admin/rental/dashboard': RentalDashboardPage,
@@ -157,6 +159,10 @@ function App() {
               <Route path="/admin/cmc/inventory-integration" element={<Navigate to="/admin/cmc/billing-renewals" replace />} />
               <Route path="/admin/cmc/billing-renewal-automation" element={<Navigate to="/admin/cmc/billing-renewals" replace />} />
               <Route path="/admin/cmc/contract-profit-tracking" element={<Navigate to="/admin/cmc/reports" replace />} />
+
+              {/* Explicit Campaign Routes */}
+              <Route path="/admin/campaign/dashboard" element={<Layout><CampaignDashboardPage /></Layout>} />
+              <Route path="/admin/campaign/jobs" element={<Layout><CampaignJobsPage /></Layout>} />
 
               {/* Dynamic Admin Routes */}
               {safeRouteEntries.map((route) => {

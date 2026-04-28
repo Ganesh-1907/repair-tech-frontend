@@ -1,655 +1,706 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useParams, Link } from 'react-router-dom';
-import { motion as Motion } from 'framer-motion';
-import {
-  BadgeCheck,
-  Calendar,
-  CheckCircle2,
-  ClipboardList,
-  Clock,
-  Cpu,
-  CreditCard,
-  Edit,
-  ExternalLink,
-  Eye,
-  HardDrive,
-  Hash,
-  IndianRupee,
-  Mail,
-  MessageSquare,
-  Monitor,
-  MoreVertical,
-  Plus,
-  QrCode,
-  Save,
-  Send,
-  ShieldCheck,
-  Smartphone,
-  Trash2,
-  Truck,
-  X,
-  Sparkles,
-  Target,
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Download, 
+  MoreVertical, 
+  Eye, 
+  Edit2, 
+  Trash2, 
+  QrCode, 
+  Printer, 
+  Send, 
+  Smartphone, 
+  IndianRupee, 
+  CheckCircle2, 
+  X, 
+  ChevronRight, 
+  ClipboardList, 
+  Monitor, 
+  Clock, 
+  Truck, 
+  History,
+  Info,
+  Package,
+  Wrench,
+  Receipt,
+  User,
   Zap,
-  Activity,
   ArrowRight,
-  Filter,
-  Search,
-  ChevronRight,
+  ShieldCheck,
   MapPin,
-  Settings,
-  Map
+  Save,
+  Check,
+  RefreshCcw,
+  XCircle,
+  ThumbsUp,
+  CreditCard
 } from 'lucide-react';
-import { campaignJobWorkflowService } from '../../services/campaignJobWorkflowService';
-import { jobService } from '../../services/campaignServices';
-import './DashboardPremiumStyles.css';
-
-const deviceTypes = ['Laptop', 'Desktop', 'Printer', 'Other'];
-const repairStatuses = ['Received at office', 'Diagnosis in progress', 'Waiting for parts', 'Repair completed'];
-const deliveryStatuses = ['Not Planned', 'Planned', 'Out for Delivery', 'Delivered', 'Failed', 'Rescheduled'];
-const deliveryTypes = ['Pickup from office', 'Return to college', 'Doorstep delivery'];
-const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
+import { motion, AnimatePresence } from 'framer-motion';
+import './CampaignModule.css';
 
 const CampaignJobsPage = () => {
-  const { jobId } = useParams();
-  const location = useLocation();
-  const isNewMode = !jobId || jobId === 'new';
-  const scannedDeviceId = new URLSearchParams(location.search).get('device');
-  
-  const [jobs, setJobs] = useState([]);
-  const [job, setJob] = useState(null);
-  const [activity, setActivity] = useState([]);
-  const [pricingTemplates, setPricingTemplates] = useState([]);
-  const [inventoryParts, setInventoryParts] = useState([]);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [editWorkflowSection, setEditWorkflowSection] = useState('Walk-in');
-  const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('All Jobs');
-  
-  // State for forms
-  const [quickEntry, setQuickEntry] = useState({
-    name: '', phoneNumber: '', otp: '', otpSent: false, otpVerified: false, deviceType: 'Laptop', problem: 'Screen Issue', problemNotes: ''
-  });
-  const [quoteForm, setQuoteForm] = useState({ issue: 'Screen Issue', estimate: 0, discount: 0, channel: 'WhatsApp', status: 'Draft' });
-  const [repairForm, setRepairForm] = useState({ status: 'Received at office', notes: '', technician: '', channel: 'WhatsApp' });
-  const [repairChecklist, setRepairChecklist] = useState({
-    deviceReceived: true, diagnosisCompleted: false, quoteApproved: false, partsRequired: false, repairCompleted: false, qualityCheckCompleted: false
-  });
-  const [deliveryForm, setDeliveryForm] = useState({
-    deliveryType: 'Pickup from office', address: '', deliveryDate: '', deliveryTime: '', deliveryPerson: '', route: '', notes: '', status: 'Not Planned'
-  });
-  const [handoverChecklist, setHandoverChecklist] = useState({
-    deviceReturned: false, accessoriesReturned: false, conditionVerified: false, invoiceShared: false, paymentCollectedOrApproved: false, customerSigned: false
-  });
-  const [finalForm, setFinalForm] = useState({
-    receiverName: '', receiverPhone: '', signatureCaptured: false, paymentAmount: 0, paymentMode: 'UPI', allowPending: false
-  });
-  const [intakeDevices, setIntakeDevices] = useState([{ rowId: 'row-1', deviceId: '', deviceType: 'Laptop', deviceModel: '', serialNumber: '', expectedDeliveryDate: '', expectedDeliveryTime: '' }]);
-  const [receiptForm, setReceiptForm] = useState({ conditionText: '', accessoriesText: '', notes: '', staffName: 'Reception' });
+  // --- Local State ---
+  const [jobs, setJobs] = useState([
+    { 
+      id: 'JOB-1001', 
+      ticketId: 'TCK-260501', 
+      customer: 'Rahul Sharma', 
+      phone: '9876543210', 
+      campaign: 'ABC Engineering College', 
+      device: 'Laptop', 
+      deviceModel: 'ThinkPad E14',
+      problem: 'SSD Upgrade', 
+      quote: 2500, 
+      quoteStatus: 'Sent', 
+      status: 'Quote Sent', 
+      technician: 'Ravi Kumar', 
+      deliveryType: 'Return to College', 
+      payment: 'Unpaid', 
+      paidAmount: 0,
+      createdAt: '2026-05-10 10:30',
+      timeline: [
+        { time: '2026-05-10 10:30', event: 'Job card created at Office' },
+        { time: '2026-05-10 11:45', event: 'Quotation sent to customer (₹2,500)' }
+      ]
+    },
+    { 
+      id: 'JOB-1002', 
+      ticketId: 'TCK-260502', 
+      customer: 'Priya Mehta', 
+      phone: '9988776655', 
+      campaign: 'ABC Engineering College', 
+      device: 'Laptop', 
+      deviceModel: 'Dell Vostro 3510',
+      problem: 'Screen Issue', 
+      quote: 4500, 
+      quoteStatus: 'Approved', 
+      status: 'Repair in Progress', 
+      technician: 'Amit Singh', 
+      deliveryType: 'Pickup from Office', 
+      payment: 'Partial', 
+      paidAmount: 2000,
+      createdAt: '2026-05-10 11:15',
+      timeline: [
+        { time: '2026-05-10 11:15', event: 'Job card created' },
+        { time: '2026-05-10 12:00', event: 'Diagnosis started' },
+        { time: '2026-05-10 14:30', event: 'Quote approved by customer' }
+      ]
+    },
+    { 
+      id: 'JOB-1003', 
+      ticketId: 'TCK-260503', 
+      customer: 'Arjun Rao', 
+      phone: '9765432109', 
+      campaign: 'Modern Degree College', 
+      device: 'Desktop', 
+      deviceModel: 'Custom Rig',
+      problem: 'Software Issue', 
+      quote: 800, 
+      quoteStatus: 'Approved', 
+      status: 'Repair Completed', 
+      technician: 'Priya Sharma', 
+      deliveryType: 'Doorstep Delivery', 
+      payment: 'Paid', 
+      paidAmount: 800,
+      createdAt: '2026-05-12 09:45',
+      timeline: [
+        { time: '2026-05-12 09:45', event: 'Job card created' },
+        { time: '2026-05-12 11:00', event: 'Repair completed' }
+      ]
+    },
+  ]);
 
-  // Stats for the 7-column grid
-  const stats = useMemo(() => {
-    const total = jobs.length;
-    const completed = jobs.filter(j => j.jobStatus === 'Closed' || j.jobStatus === 'Repair completed').length;
-    const pending = total - completed;
-    const revenue = jobs.reduce((sum, j) => sum + (j.totalAmount || 0), 0);
-    return {
-      total,
-      completed,
-      pending,
-      revenue: formatCurrency(revenue),
-      active: jobs.filter(j => j.jobStatus === 'Diagnosis in progress').length,
-      delivery: jobs.filter(j => j.deliveryStatus === 'Planned' || j.deliveryStatus === 'Out for Delivery').length,
-      satisfaction: '98%'
-    };
+  const [inventory, setInventory] = useState([
+    { id: 'INV-1', part: 'SSD 256GB', stock: 20, price: 1800 },
+    { id: 'INV-2', part: 'SSD 512GB', stock: 12, price: 2800 },
+    { id: 'INV-3', part: 'RAM 8GB', stock: 18, price: 2200 },
+    { id: 'INV-4', part: 'Laptop Battery', stock: 10, price: 3500 },
+    { id: 'INV-5', part: 'Keyboard', stock: 15, price: 1200 },
+  ]);
+
+  const [isQuickEntryOpen, setIsQuickEntryOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [activeTab, setActiveTab] = useState('Overview');
+  const [toasts, setToasts] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All Status');
+
+  // --- Sync Selected Job ---
+  useEffect(() => {
+    if (selectedJob) {
+      const updated = jobs.find(j => j.id === selectedJob.id);
+      if (updated) setSelectedJob(updated);
+    }
   }, [jobs]);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+  // --- Helpers ---
+  const addToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
   };
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
+  const updateJob = (id, updates) => {
+    setJobs(prev => prev.map(j => {
+      if (j.id === id) {
+        const newTimeline = [...(j.timeline || [])];
+        if (updates.status && updates.status !== j.status) {
+          newTimeline.push({ time: new Date().toLocaleString(), event: `Status updated to ${updates.status}` });
+        }
+        if (updates.event) {
+          newTimeline.push({ time: new Date().toLocaleString(), event: updates.event });
+          delete updates.event;
+        }
+        return { ...j, ...updates, timeline: newTimeline };
+      }
+      return j;
+    }));
   };
 
-  const refreshJobs = async () => {
-    const list = await campaignJobWorkflowService.listJobs();
-    setJobs(list);
-  };
+  const filteredJobs = useMemo(() => {
+    return jobs.filter(j => {
+      const matchSearch = 
+        j.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        j.phone.includes(searchTerm) ||
+        j.ticketId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        j.device.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchStatus = statusFilter === 'All Status' || j.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [jobs, searchTerm, statusFilter]);
 
-  useEffect(() => {
-    refreshJobs();
-    campaignJobWorkflowService.getPricingTemplates().then(setPricingTemplates);
-    campaignJobWorkflowService.listInventoryParts().then(setInventoryParts);
-  }, []);
+  const jobStats = useMemo(() => {
+    return [
+      { label: 'Total Jobs', value: jobs.length, icon: <ClipboardList />, color: '#4f46e5' },
+      { label: 'Quote Sent', value: jobs.filter(j => j.status === 'Quote Sent').length, icon: <Send />, color: '#f59e0b' },
+      { label: 'Approved', value: jobs.filter(j => j.quoteStatus === 'Approved').length, icon: <ThumbsUp />, color: '#10b981' },
+      { label: 'Repairing', value: jobs.filter(j => j.status === 'Repair in Progress').length, icon: <Wrench />, color: '#8b5cf6' },
+      { label: 'Delivered', value: jobs.filter(j => j.status === 'Delivered').length, icon: <Truck />, color: '#06b6d4' },
+      { label: 'Closed', value: jobs.filter(j => j.status === 'Closed').length, icon: <CheckCircle2 />, color: '#64748b' },
+    ];
+  }, [jobs]);
 
-  const openCreateModal = () => setIsCreateModalOpen(true);
-  const closeCrudModals = () => {
-    setIsCreateModalOpen(false);
-    setIsViewModalOpen(false);
-    setIsEditModalOpen(false);
-  };
-
-  const handleQuickEntrySubmit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      const created = await campaignJobWorkflowService.createJob(quickEntry);
-      setNotice(`Job ${created.id} initialized.`);
-      refreshJobs();
-      closeCrudModals();
-    } catch (err) {
-      setNotice(err.message);
-    } finally {
-      setBusy(false);
+  const getStatusClass = (status) => {
+    switch(status) {
+      case 'Received at Office': return 'status-received';
+      case 'Diagnosis in Progress': return 'status-diagnosis';
+      case 'Quote Sent': return 'status-quote';
+      case 'Customer Approved': return 'status-approved';
+      case 'Waiting for Parts': return 'status-parts';
+      case 'Repair in Progress': return 'status-repair';
+      case 'Repair Completed': return 'status-completed';
+      case 'Out for Delivery': return 'status-delivery';
+      case 'Delivered': return 'status-delivered';
+      case 'Closed': return 'status-closed';
+      case 'Rejected / Cancelled': return 'status-rejected';
+      default: return '';
     }
   };
 
-  const handleSendOtp = async () => {
-     setNotice('OTP Sent to ' + quickEntry.phoneNumber);
-     setQuickEntry(prev => ({ ...prev, otpSent: true }));
+  const getPaymentClass = (p) => {
+    if (p === 'Paid') return 'payment-paid';
+    if (p === 'Partial') return 'payment-partial';
+    return 'payment-unpaid';
   };
 
-  const handleVerifyOtp = async () => {
-     setNotice('Identity Verified Successfully');
-     setQuickEntry(prev => ({ ...prev, otpVerified: true }));
+  // --- Flow Actions ---
+  const handleStartDiagnosis = () => {
+    updateJob(selectedJob.id, { status: 'Diagnosis in Progress' });
+    addToast('Diagnosis started');
   };
 
-  const renderWalkIn = () => (
-    <div className="space-y-6">
-       <div className="grid grid-cols-2 gap-6">
-          <div className="form-group">
-             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Customer Name</label>
-             <input className="h-14 rounded-2xl border-slate-200" value={selectedJob?.customerName} readOnly />
-          </div>
-          <div className="form-group">
-             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Phone Number</label>
-             <input className="h-14 rounded-2xl border-slate-200" value={selectedJob?.phoneNumber} readOnly />
-          </div>
-       </div>
-       <div className="form-group">
-          <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Detailed Problem Description</label>
-          <textarea className="h-32 rounded-3xl border-slate-200 resize-none" defaultValue={selectedJob?.problemNotes} />
-       </div>
-       <div className="flex justify-end gap-4 mt-6">
-          <button className="h-14 px-10 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-lg">Save Update</button>
-       </div>
-    </div>
-  );
+  const handleSendQuote = (amount) => {
+    updateJob(selectedJob.id, { 
+      status: 'Quote Sent', 
+      quote: amount, 
+      quoteStatus: 'Sent',
+      event: `Quote sent for ₹${amount}`
+    });
+    addToast('Quote dispatched via WhatsApp');
+  };
 
-  const renderQuote = () => (
-    <div className="space-y-6">
-       <div className="p-8 bg-indigo-50 rounded-[32px] border border-indigo-100 flex items-center justify-between">
-          <div>
-             <h4 className="text-sm font-black text-indigo-900 uppercase tracking-tight">Active Quotation Flow</h4>
-             <p className="text-xs text-indigo-600 font-medium">Customer response pending via WhatsApp synchronization.</p>
-          </div>
-          <div className="flex gap-2">
-             <span className="px-4 py-2 bg-white text-indigo-600 rounded-xl text-[10px] font-black uppercase shadow-sm">Draft Sent</span>
-          </div>
-       </div>
-       <div className="grid grid-cols-2 gap-6">
-          <div className="form-group">
-             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Service Estimate</label>
-             <input type="number" className="h-14 rounded-2xl border-slate-200 font-black" value={quoteForm.estimate} onChange={e => setQuoteForm({...quoteForm, estimate: e.target.value})} />
-          </div>
-          <div className="form-group">
-             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Sync Channel</label>
-             <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
-                <option>WhatsApp Business</option>
-                <option>Email Enterprise</option>
-             </select>
-          </div>
-       </div>
-       <div className="flex justify-end gap-4">
-          <button className="h-14 px-10 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-lg">Dispatch Quote</button>
-       </div>
-    </div>
-  );
+  const handleApproveQuote = () => {
+    updateJob(selectedJob.id, { 
+      status: 'Repair in Progress', 
+      quoteStatus: 'Approved',
+      event: 'Customer approved the quote'
+    });
+    addToast('Quote approved. Repair started.');
+  };
 
-  const renderIntake = () => (
-    <div className="space-y-6">
-       <div className="flex justify-between items-center mb-4">
-          <h4 className="text-sm font-black uppercase tracking-tight">Hardware Ingestion Registry</h4>
-          <button className="h-10 px-4 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest">Add Row</button>
-       </div>
-       <div className="overflow-hidden border border-slate-100 rounded-[32px]">
-          <table className="cmc-table">
-             <thead>
-                <tr>
-                   <th className="pl-6">Hardware Node</th>
-                   <th>Identity / Model</th>
-                   <th>Serial Number</th>
-                   <th>Expected Delivery</th>
-                   <th className="pr-6 text-right">Status</th>
-                </tr>
-             </thead>
-             <tbody>
-                {intakeDevices.map(d => (
-                   <tr key={d.rowId}>
-                      <td className="pl-6"><span className="text-[10px] font-black uppercase text-indigo-600">Row-Alpha</span></td>
-                      <td><input className="h-10 px-4 bg-slate-50 border-none rounded-lg text-xs" placeholder="Model Name" /></td>
-                      <td><input className="h-10 px-4 bg-slate-50 border-none rounded-lg text-xs" placeholder="Serial Key" /></td>
-                      <td><input type="date" className="h-10 px-4 bg-slate-50 border-none rounded-lg text-xs" /></td>
-                      <td className="pr-6 text-right"><span className="text-[9px] font-black uppercase text-slate-400">Not Generated</span></td>
-                   </tr>
-                ))}
-             </tbody>
-          </table>
-       </div>
-       <div className="grid grid-cols-2 gap-6">
-          <div className="form-group">
-             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Condition Assessment</label>
-             <textarea className="h-24 rounded-2xl border-slate-200 resize-none text-xs p-4" placeholder="Mention scratches, dents, etc." />
-          </div>
-          <div className="form-group">
-             <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Inbound Accessories</label>
-             <textarea className="h-24 rounded-2xl border-slate-200 resize-none text-xs p-4" placeholder="Charger, Bag, etc." />
-          </div>
-       </div>
-       <div className="flex justify-end gap-4">
-          <button className="h-14 px-10 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-indigo-600 text-white shadow-lg">Generate Work Orders</button>
-       </div>
-    </div>
-  );
+  const handleCompleteRepair = () => {
+    updateJob(selectedJob.id, { status: 'Repair Completed' });
+    addToast('Repair marked as complete');
+  };
 
-  const renderRepair = () => (
-    <div className="space-y-6">
-       <div className="grid grid-cols-3 gap-8">
-          <div className="col-span-2 space-y-6">
-             <div className="p-8 bg-white border border-slate-100 rounded-[40px] shadow-sm">
-                <h4 className="text-sm font-black uppercase tracking-tight mb-6">Diagnosis & Restoration Flow</h4>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                   <div className="form-group">
-                      <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Restoration Status</label>
-                      <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
-                         {repairStatuses.map(s => <option key={s}>{s}</option>)}
-                      </select>
-                   </div>
-                   <div className="form-group">
-                      <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Lead Architect</label>
-                      <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
-                         <option>Amit Sharma</option>
-                         <option>Suresh Kohli</option>
-                      </select>
-                   </div>
-                </div>
-                <div className="form-group mb-6">
-                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Service Intelligence Notes</label>
-                   <textarea className="h-32 rounded-[24px] border-slate-200 resize-none text-xs p-4" placeholder="Internal technical documentation..." />
-                </div>
-                <button className="h-14 w-full bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Commit Update & Notify</button>
-             </div>
-          </div>
-          <div className="space-y-6">
-             <div className="p-8 bg-slate-50 border border-slate-200 rounded-[40px]">
-                <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-6">Protocol Checklist</h4>
-                <div className="space-y-4">
-                   {Object.entries(repairChecklist).map(([key, val]) => (
-                      <label key={key} className="flex items-center justify-between cursor-pointer">
-                         <span className="text-xs font-bold text-slate-600 capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-                         <input type="checkbox" className="w-5 h-5 rounded-lg border-slate-300 text-indigo-600" checked={val} />
-                      </label>
-                   ))}
-                </div>
-             </div>
-          </div>
-       </div>
-    </div>
-  );
+  const handleRecordPayment = (amount, mode) => {
+    const newPaid = (selectedJob.paidAmount || 0) + Number(amount);
+    const status = newPaid >= selectedJob.quote ? 'Paid' : 'Partial';
+    updateJob(selectedJob.id, { 
+      paidAmount: newPaid, 
+      payment: status,
+      event: `Recorded payment of ₹${amount} via ${mode}`
+    });
+    addToast(`Payment of ₹${amount} recorded`);
+  };
 
-  const renderLogistics = () => (
-    <div className="space-y-6">
-       <div className="grid grid-cols-2 gap-8">
-          <div className="p-8 bg-white border border-slate-100 rounded-[40px] shadow-sm">
-             <h4 className="text-sm font-black uppercase tracking-tight mb-6">Outbound Logistics Configuration</h4>
-             <div className="space-y-6">
-                <div className="form-group">
-                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Deployment Strategy</label>
-                   <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
-                      {deliveryTypes.map(t => <option key={t}>{t}</option>)}
-                   </select>
-                </div>
-                <div className="form-group">
-                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Destination Node</label>
-                   <textarea className="h-24 rounded-2xl border-slate-200 resize-none text-xs p-4" placeholder="Physical Address" />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                   <div className="form-group">
-                      <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Schedule Date</label>
-                      <input type="date" className="h-14 rounded-2xl border-slate-200" />
-                   </div>
-                   <div className="form-group">
-                      <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Status</label>
-                      <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
-                         {deliveryStatuses.map(s => <option key={s}>{s}</option>)}
-                      </select>
-                   </div>
-                </div>
-                <button className="h-14 w-full bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Synchronize Logistics</button>
-             </div>
-          </div>
-          <div className="p-8 bg-slate-900 text-white rounded-[40px] relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-10 opacity-10"><Map size={120} /></div>
-             <div className="relative z-10">
-                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Route Intelligence</p>
-                <h4 className="text-2xl font-black mt-2">Logistics Optimizer</h4>
-                <div className="mt-10 space-y-4">
-                   <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center gap-4">
-                      <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center"><Truck size={24} /></div>
-                      <div><p className="text-[10px] font-bold text-slate-400">In Transit</p><p className="text-lg font-black">06 Loads</p></div>
-                   </div>
-                </div>
-             </div>
-          </div>
-       </div>
-    </div>
-  );
+  const handleCloseJob = () => {
+    updateJob(selectedJob.id, { status: 'Closed' });
+    addToast('Job card closed successfully');
+    setIsDetailOpen(false);
+  };
 
-  const renderFinalize = () => (
-    <div className="space-y-6">
-       <div className="grid grid-cols-3 gap-8">
-          <div className="col-span-1 p-8 bg-slate-50 border border-slate-200 rounded-[40px]">
-             <h4 className="text-sm font-black uppercase tracking-tight mb-6">Financial Settlement</h4>
-             <div className="p-6 bg-white rounded-3xl mb-6 shadow-sm border border-slate-100">
-                <p className="text-[10px] font-black uppercase text-slate-400">Outstanding Balance</p>
-                <p className="text-3xl font-black text-slate-900 mt-1">₹4,500</p>
-             </div>
-             <div className="space-y-6">
-                <div className="form-group">
-                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Collection Amount</label>
-                   <input type="number" className="h-14 rounded-2xl border-slate-200 font-black" />
-                </div>
-                <div className="form-group">
-                   <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Payment Mode</label>
-                   <select className="h-14 rounded-2xl border-slate-200 font-black text-xs">
-                      <option>UPI / Digital</option>
-                      <option>Cash Velocity</option>
-                   </select>
-                </div>
-                <button className="h-14 w-full bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-lg">Finalize Settlement</button>
-             </div>
-          </div>
-          <div className="col-span-2 space-y-6">
-             <div className="p-8 bg-white border border-slate-100 rounded-[40px] shadow-sm">
-                <h4 className="text-sm font-black uppercase tracking-tight mb-6">Handover Protocol Check</h4>
-                <div className="grid grid-cols-2 gap-4">
-                   {Object.entries(handoverChecklist).map(([key, val]) => (
-                      <label key={key} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl cursor-pointer">
-                         <span className="text-[10px] font-black uppercase text-slate-600">{key.replace(/([A-Z])/g, ' $1')}</span>
-                         <input type="checkbox" className="w-6 h-6 rounded-lg border-slate-300 text-indigo-600" checked={val} />
-                      </label>
-                   ))}
-                </div>
-             </div>
-             <div className="flex justify-end gap-4 pt-10">
-                <button className="h-16 px-12 rounded-[24px] text-[10px] font-black uppercase tracking-widest text-slate-400">Discard Flow</button>
-                <button className="h-16 px-16 bg-emerald-600 text-white rounded-[24px] text-[10px] font-black uppercase shadow-2xl shadow-emerald-600/20">Authorize Job Closure</button>
-             </div>
-          </div>
-       </div>
-    </div>
-  );
+  const handleQuickEntry = (e) => {
+    e.preventDefault();
+    const ticketId = `TCK-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newJob = {
+      id: `JOB-${jobs.length + 1001}`,
+      ticketId,
+      customer: e.target.customer.value,
+      phone: e.target.phone.value,
+      campaign: e.target.campaign.value,
+      device: e.target.deviceType.value,
+      problem: e.target.problem.value,
+      deviceModel: e.target.model.value || 'N/A',
+      status: 'Received at Office',
+      createdAt: new Date().toLocaleString(),
+      payment: 'Unpaid',
+      paidAmount: 0,
+      timeline: [{ time: new Date().toLocaleString(), event: 'Job card created at Campaign Site' }]
+    };
+    setJobs([newJob, ...jobs]);
+    addToast('Job card created successfully');
+    setIsQuickEntryOpen(false);
+  };
 
   return (
-    <Motion.div 
-      className="premium-dashboard"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
-      {/* Header */}
-      <div className="flex justify-between items-center mb-10">
-        
-        <div className="flex gap-4">
-          <button className="h-12 px-6 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-slate-50 transition-all shadow-sm">
-             <Filter size={18} className="text-indigo-600" /> Advanced Filters
-          </button>
-          <button 
-            className="h-12 px-8 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
-            onClick={openCreateModal}
-          >
-            <Plus size={18} strokeWidth={3} /> Create Job Card
-          </button>
+    <div className="campaign-page">
+      {/* --- Breadcrumb Card --- */}
+      <section className="breadcrumb-card">
+        <div className="breadcrumb">
+          <span>Admin</span> <ChevronRight size={14} /> <span>Campaign Module</span> <ChevronRight size={14} /> <strong>Customers & Jobs</strong>
         </div>
-      </div>
-
-      {/* KPI Grid (7-Columns) */}
-      <div className="dash-kpi-grid">
-        <KPIItem title="Active Pipeline" value={stats.total} icon={<ClipboardList />} color="#6366f1" bg="#e0e7ff" trend="Total" />
-        <KPIItem title="Operational" value={stats.active} icon={<Activity />} color="#06b6d4" bg="#cffafe" trend="Live" />
-        <KPIItem title="Completed" value={stats.completed} icon={<CheckCircle2 />} color="#10b981" bg="#dcfce7" trend="Success" />
-        <KPIItem title="Waitlist" value={stats.pending} icon={<Clock />} color="#f59e0b" bg="#fef3c7" trend="Queue" />
-        <KPIItem title="Logistics" value={stats.delivery} icon={<Truck />} color="#8b5cf6" bg="#ede9fe" trend="Dispatch" />
-        <KPIItem title="Projected Revenue" value={stats.revenue} icon={<IndianRupee />} color="#10b981" bg="#dcfce7" trend="Current" />
-        <KPIItem title="Service Health" value={stats.satisfaction} icon={<Target />} color="#ec4899" bg="#fdf2f8" trend="NPS" />
-      </div>
-
-      <div className="dash-ops-grid">
-        <Motion.div className="dash-card col-span-3" variants={itemVariants}>
-          <div className="dash-card-header">
-             <div className="flex gap-4 items-center flex-1">
-                <div className="relative w-96">
-                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                   <input 
-                      type="text" 
-                      placeholder="Search Job ID, Customer, Serial..." 
-                      className="h-12 w-full pl-12 pr-6 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium focus:ring-4 focus:ring-indigo-600/10 transition-all"
-                   />
-                </div>
-                <div className="flex bg-slate-100 p-1 rounded-2xl ml-4">
-                  {['All Jobs', 'Active', 'Pending', 'Closed'].map((s) => (
-                    <button 
-                      key={s} 
-                      className={`h-10 px-6 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeFilter === s ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
-                      onClick={() => setActiveFilter(s)}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-             </div>
+        <div className="flex justify-between items-end">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 m-0">Campaign Customers & Jobs</h1>
+            <p className="text-slate-500 text-sm m-0 mt-1">Capture customers, create job cards, track repair, delivery, and billing.</p>
           </div>
-          
-          <div className="p-2">
-            <div className="overflow-x-auto cmc-custom-scroll">
-              <table className="cmc-table">
-                <thead>
-                  <tr>
-                    <th className="pl-8">Job Identity</th>
-                    <th>Customer & Identity</th>
-                    <th>Hardware Profile</th>
-                    <th>Diagnosis Focus</th>
-                    <th>Work Status</th>
-                    <th>Timeline</th>
-                    <th className="pr-8 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {jobs.map(j => (
-                    <tr key={j.id}>
-                      <td className="pl-8">
-                        <div className="flex flex-col">
-                           <span className="text-xs font-black uppercase tracking-tight text-indigo-600">{j.id}</span>
-                           <span className="text-[9px] text-slate-400 font-bold uppercase">{j.ticketId}</span>
-                        </div>
-                      </td>
-                      <td>
-                         <div className="flex flex-col">
-                            <span className="text-xs font-black uppercase tracking-tight text-slate-900">{j.customerName}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{j.phoneNumber}</span>
-                         </div>
-                      </td>
-                      <td>
-                         <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-indigo-600">
-                               <Monitor size={14} />
-                            </div>
-                            <div className="flex flex-col">
-                               <span className="text-[11px] font-black uppercase text-slate-900">{j.deviceType}</span>
-                               <span className="text-[9px] text-slate-400 font-bold uppercase">{j.deviceModel || 'N/A'}</span>
-                            </div>
-                         </div>
-                      </td>
-                      <td>
-                         <span className="text-[11px] font-bold text-slate-600 truncate max-w-[150px] block">{j.problem}</span>
-                      </td>
-                      <td>
-                         <span className={`dash-tag dash-tag-${j.jobStatus === 'Closed' ? 'success' : j.jobStatus === 'Received at office' ? 'info' : 'warning'}`}>
-                            {j.jobStatus}
-                         </span>
-                      </td>
-                      <td>
-                         <div className="flex flex-col">
-                            <span className="text-xs font-black text-slate-900">{j.createdAt?.split('T')[0]}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase">Reported</span>
-                         </div>
-                      </td>
-                      <td className="pr-8 text-right">
-                         <button 
-                            className="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-xl hover:text-indigo-600 transition-all"
-                            onClick={() => {
-                               setSelectedJob(j);
-                               setIsEditModalOpen(true);
-                            }}
-                         >
-                            <ArrowRight size={16} />
-                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="flex gap-3">
+            <button className="secondary-button"><Download size={18} /> Export Jobs</button>
+            <button className="primary-button" onClick={() => setIsQuickEntryOpen(true)}><Plus size={18} /> Quick Entry</button>
+          </div>
+        </div>
+      </section>
+
+      {/* --- Stats Grid --- */}
+      <section className="stats-grid">
+        {jobStats.map((s, i) => (
+          <div key={i} className="stat-card">
+            <div className="flex justify-between items-start">
+              <span className="stat-label">{s.label}</span>
+              <div style={{ color: s.color }}>{s.icon}</div>
             </div>
+            <span className="stat-value">{s.value}</span>
           </div>
-        </Motion.div>
+        ))}
+      </section>
+
+      {/* --- Filter Card --- */}
+      <section className="filter-card">
+        <div className="relative flex-1">
+          <input 
+            type="text" 
+            placeholder="Search by name, phone, ticket ID, device..." 
+            className="w-full h-[42px] pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        </div>
+        <select className="filter-select" onChange={(e) => setStatusFilter(e.target.value)}>
+          <option>All Status</option>
+          <option>Received at Office</option>
+          <option>Quote Sent</option>
+          <option>Repair in Progress</option>
+          <option>Delivered</option>
+          <option>Closed</option>
+        </select>
+        <button className="icon-button" onClick={() => { setSearchTerm(''); setStatusFilter('All Status'); }}><RefreshCcw size={18} /></button>
+      </section>
+
+      {/* --- Table Card --- */}
+      <section className="table-card">
+        <div className="table-toolbar">
+          <h3 className="text-lg font-black text-slate-900 m-0">Customer & Job Listing</h3>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{filteredJobs.length} Jobs Total</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Ticket ID</th>
+                <th>Customer</th>
+                <th>Campaign</th>
+                <th>Device & Problem</th>
+                <th>Quote</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th className="text-center">QR</th>
+                <th className="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredJobs.map(j => (
+                <tr key={j.id}>
+                  <td className="font-mono text-xs font-black text-indigo-600">{j.ticketId}</td>
+                  <td>
+                    <div className="font-bold text-slate-800">{j.customer}</div>
+                    <div className="text-[10px] text-slate-500 font-medium tracking-widest">{j.phone}</div>
+                  </td>
+                  <td><span className="text-xs font-semibold text-slate-600">{j.campaign}</span></td>
+                  <td>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-indigo-600"><Monitor size={14} /></div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">{j.device}</div>
+                        <div className="text-[10px] text-slate-500">{j.problem}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div className="text-xs font-black text-slate-900">₹{j.quote?.toLocaleString() || '—'}</div>
+                    <div className="text-[9px] font-bold text-slate-400 uppercase">{j.quoteStatus || 'Draft'}</div>
+                  </td>
+                  <td><span className={`status-badge ${getStatusClass(j.status)}`}>{j.status}</span></td>
+                  <td><span className={`status-badge ${getPaymentClass(j.payment)}`}>{j.payment}</span></td>
+                  <td className="text-center"><QrCode size={18} className="text-slate-400 mx-auto cursor-pointer hover:text-indigo-600" /></td>
+                  <td className="text-right">
+                    <button className="icon-button inline-flex" onClick={() => { setSelectedJob(j); setIsDetailOpen(true); }}><ArrowRight size={18} /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* --- Quick Entry Modal --- */}
+      <AnimatePresence>
+        {isQuickEntryOpen && (
+          <div className="modal-overlay" onClick={() => setIsQuickEntryOpen(false)}>
+            <motion.div 
+              className="modal-card" 
+              onClick={e => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+            >
+              <div className="modal-header">
+                <h2 className="text-xl font-black text-slate-900 m-0">Quick Customer Entry</h2>
+                <button className="icon-button !border-none" onClick={() => setIsQuickEntryOpen(false)}><X size={20} /></button>
+              </div>
+              <form onSubmit={handleQuickEntry}>
+                <div className="modal-body">
+                  <div className="form-grid">
+                    <div className="form-field">
+                      <label>Campaign</label>
+                      <select name="campaign">
+                        <option>ABC Engineering College</option>
+                        <option>Modern Degree College</option>
+                        <option>City Polytechnic</option>
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>Customer Name</label>
+                      <input name="customer" placeholder="Enter customer name" required />
+                    </div>
+                    <div className="form-field">
+                      <label>Phone Number</label>
+                      <div className="flex gap-2">
+                        <input name="phone" placeholder="10-digit mobile" className="flex-1" required />
+                        <button type="button" className="secondary-button !h-[42px] !text-[10px]" onClick={() => addToast('OTP Sent Successfully')}>Verify OTP</button>
+                      </div>
+                    </div>
+                    <div className="form-field">
+                      <label>Device Type</label>
+                      <select name="deviceType">
+                        <option>Laptop</option><option>Desktop</option><option>Printer</option><option>Mobile</option><option>Other</option>
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>Brand / Model</label>
+                      <input name="model" placeholder="e.g. Dell Latitude 3420" />
+                    </div>
+                    <div className="form-field">
+                      <label>Problem Area</label>
+                      <select name="problem">
+                        <option>Screen Issue</option><option>SSD Upgrade</option><option>RAM Upgrade</option>
+                        <option>Battery Issue</option><option>Keyboard Issue</option><option>Software Issue</option>
+                      </select>
+                    </div>
+                    <div className="form-field full">
+                      <label>Condition & Notes</label>
+                      <textarea name="notes" placeholder="Mention scratches, dents, or specific complaints..." />
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="secondary-button" onClick={() => setIsQuickEntryOpen(false)}>Cancel</button>
+                  <button type="submit" className="primary-button">Create Job Card</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- Job Detail Drawer --- */}
+      <AnimatePresence>
+        {isDetailOpen && (
+          <div className="modal-overlay" onClick={() => setIsDetailOpen(false)}>
+            <motion.div 
+              className="modal-card !max-w-[1000px] !h-[95vh] flex flex-col" 
+              onClick={e => e.stopPropagation()}
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            >
+              <div className="modal-header">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center font-black">TCK</div>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 m-0">{selectedJob?.ticketId}</h2>
+                    <p className="text-xs font-bold text-slate-500 m-0 uppercase">{selectedJob?.customer} • {selectedJob?.device}</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                   <span className={`status-badge ${getStatusClass(selectedJob?.status)}`}>{selectedJob?.status}</span>
+                   <button className="icon-button !border-none" onClick={() => setIsDetailOpen(false)}><X size={20} /></button>
+                </div>
+              </div>
+
+              <div className="flex border-b border-slate-100 overflow-x-auto no-scrollbar">
+                {['Overview', 'Quote', 'Receipt', 'Repair & Inventory', 'Delivery', 'Billing', 'Timeline'].map(tab => (
+                  <button 
+                    key={tab} 
+                    className={`px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-400 hover:text-slate-600'}`}
+                    onClick={() => setActiveTab(tab)}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 bg-[#fdfdfd]">
+                {activeTab === 'Overview' && (
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-6">
+                      <div className="document-section-card">
+                        <h3 className="card-title !m-0 !mb-4"><Info size={16} /> Device Information</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div><label className="text-[10px] font-black uppercase text-slate-400">Type</label><p className="text-sm font-bold">{selectedJob?.device}</p></div>
+                          <div><label className="text-[10px] font-black uppercase text-slate-400">Model</label><p className="text-sm font-bold">{selectedJob?.deviceModel}</p></div>
+                          <div className="col-span-2"><label className="text-[10px] font-black uppercase text-slate-400">Problem</label><p className="text-sm font-bold">{selectedJob?.problem}</p></div>
+                        </div>
+                      </div>
+                      <div className="document-section-card">
+                        <h3 className="card-title !m-0 !mb-4"><User size={16} /> Customer Information</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div><label className="text-[10px] font-black uppercase text-slate-400">Name</label><p className="text-sm font-bold">{selectedJob?.customer}</p></div>
+                          <div><label className="text-[10px] font-black uppercase text-slate-400">Phone</label><p className="text-sm font-bold">{selectedJob?.phone}</p></div>
+                          <div className="col-span-2"><label className="text-[10px] font-black uppercase text-slate-400">Campaign</label><p className="text-sm font-bold">{selectedJob?.campaign}</p></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-6">
+                       <div className="qr-card">
+                         <QrCode size={100} className="text-slate-900" />
+                         <span className="text-[10px] font-black font-mono">{selectedJob?.ticketId}</span>
+                         <button className="secondary-button !h-10 !text-[10px]" onClick={() => addToast('Printing QR Sticker...')}><Printer size={14} /> Print Sticker</button>
+                       </div>
+                       <div className="document-section-card">
+                          <h3 className="card-title !m-0 !mb-4"><Clock size={16} /> Status Workflow</h3>
+                          <div className="flex flex-col gap-3">
+                             {selectedJob?.status === 'Received at Office' && (
+                               <button className="primary-button !justify-center" onClick={handleStartDiagnosis}>Start Diagnosis</button>
+                             )}
+                             {selectedJob?.status === 'Repair Completed' && (
+                               <button className="primary-button !justify-center" onClick={() => updateJob(selectedJob.id, { status: 'Out for Delivery' })}>Mark Out for Delivery</button>
+                             )}
+                             {selectedJob?.status === 'Out for Delivery' && (
+                               <button className="primary-button !justify-center" onClick={() => updateJob(selectedJob.id, { status: 'Delivered' })}>Mark as Delivered</button>
+                             )}
+                             {selectedJob?.status === 'Delivered' && selectedJob?.payment === 'Paid' && (
+                               <button className="primary-button !justify-center bg-emerald-600" onClick={handleCloseJob}>Close Job Card</button>
+                             )}
+                             <p className="text-[10px] text-center text-slate-400 font-bold uppercase mt-2">Next step depends on status & payment</p>
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'Quote' && (
+                  <div className="space-y-6">
+                    <div className="p-6 bg-amber-50 rounded-2xl border border-amber-100 flex items-center justify-between">
+                       <div className="flex items-center gap-4">
+                          <Zap size={24} className="text-amber-600" />
+                          <div><h4 className="text-sm font-black text-amber-900">Suggested Pricing</h4><p className="text-xs text-amber-600">Based on problem: <strong>{selectedJob?.problem}</strong></p></div>
+                       </div>
+                       <div className="text-lg font-black text-amber-900">₹2,000 - ₹3,500</div>
+                    </div>
+                    {selectedJob?.quoteStatus === 'Approved' ? (
+                       <div className="p-8 bg-emerald-50 rounded-2xl border border-emerald-100 text-center">
+                          <ThumbsUp size={48} className="text-emerald-600 mx-auto mb-4" />
+                          <h3 className="text-lg font-black text-emerald-900">Quote Approved</h3>
+                          <p className="text-sm text-emerald-600">Customer has approved the estimate of ₹{selectedJob?.quote.toLocaleString()}</p>
+                       </div>
+                    ) : (
+                      <div className="form-grid">
+                        <div className="form-field"><label>Total Estimate (₹)</label><input type="number" id="quoteAmount" defaultValue={selectedJob?.quote || 2500} /></div>
+                        <div className="form-field"><label>Expected Parts</label><input placeholder="e.g. SSD, Battery" /></div>
+                        <div className="form-field full"><label>Internal Technical Notes</label><textarea placeholder="Diagnosis details..." /></div>
+                        <div className="flex justify-end gap-3 col-span-2">
+                           <button className="primary-button" onClick={() => handleSendQuote(document.getElementById('quoteAmount').value)}><Send size={16} /> Send via WhatsApp</button>
+                           {selectedJob?.quoteStatus === 'Sent' && (
+                             <button className="secondary-button !bg-emerald-600 !text-white !border-none" onClick={handleApproveQuote}><Check size={16} /> Mark Approved</button>
+                           )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'Repair & Inventory' && (
+                  <div className="space-y-6">
+                    <div className="form-grid">
+                       <div className="form-field"><label>Assign Technician</label><select value={selectedJob?.technician} onChange={(e) => updateJob(selectedJob.id, { technician: e.target.value })}><option>Ravi Kumar</option><option>Amit Singh</option><option>Priya Sharma</option></select></div>
+                       <div className="form-field"><label>Repair Priority</label><select><option>Standard</option><option>Express</option><option>Urgent</option></select></div>
+                    </div>
+                    <div className="document-section-card">
+                       <h3 className="card-title !m-0 !mb-4"><Package size={16} /> Parts Used</h3>
+                       <div className="flex gap-3 mb-4">
+                          <select className="flex-1 h-10 border rounded-xl px-3 text-sm" id="partSelect">
+                             {inventory.map(i => <option key={i.id} value={i.id}>{i.part} (₹{i.price})</option>)}
+                          </select>
+                          <button className="primary-button !h-10" onClick={() => addToast('Part added to job ledger')}>Add Part</button>
+                       </div>
+                       <div className="p-10 border-2 border-dashed border-slate-100 rounded-2xl text-center">
+                          <p className="text-slate-400 text-xs font-bold uppercase">No inventory items linked yet</p>
+                       </div>
+                    </div>
+                    {selectedJob?.status === 'Repair in Progress' && (
+                      <button className="primary-button w-full !h-14 !text-sm" onClick={handleCompleteRepair}>Mark Repair Completed</button>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === 'Billing' && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-3 gap-6">
+                       <div className="stat-card">
+                          <span className="stat-label">Total Amount</span>
+                          <span className="stat-value">₹{selectedJob?.quote?.toLocaleString() || '0'}</span>
+                       </div>
+                       <div className="stat-card">
+                          <span className="stat-label">Paid Amount</span>
+                          <span className="stat-value text-emerald-600">₹{selectedJob?.paidAmount?.toLocaleString() || '0'}</span>
+                       </div>
+                       <div className="stat-card">
+                          <span className="stat-label">Balance Due</span>
+                          <span className="stat-value text-rose-600">₹{(selectedJob?.quote - selectedJob?.paidAmount).toLocaleString() || '0'}</span>
+                       </div>
+                    </div>
+                    
+                    <div className="document-section-card">
+                       <h3 className="card-title !m-0 !mb-4"><CreditCard size={16} /> Record Payment</h3>
+                       <div className="grid grid-cols-3 gap-4">
+                          <div className="form-field"><label>Amount (₹)</label><input type="number" id="payAmount" defaultValue={selectedJob?.quote - selectedJob?.paidAmount} /></div>
+                          <div className="form-field">
+                             <label>Mode</label>
+                             <select id="payMode"><option>UPI</option><option>Cash</option><option>Card</option></select>
+                          </div>
+                          <div className="flex items-end">
+                             <button className="primary-button w-full" onClick={() => handleRecordPayment(document.getElementById('payAmount').value, document.getElementById('payMode').value)}>Record Payment</button>
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'Timeline' && (
+                  <div className="timeline mt-4">
+                    {(selectedJob?.timeline || []).slice().reverse().map((t, i) => (
+                      <div key={i} className="timeline-item">
+                        <div className="timeline-time">{t.time}</div>
+                        <div className="timeline-content">{t.event}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {activeTab === 'Receipt' && (
+                  <div className="flex flex-col items-center gap-6">
+                     <div className="w-full max-w-[500px] bg-white border border-slate-200 p-10 shadow-lg text-xs font-mono leading-relaxed receipt-paper">
+                        <div className="text-center mb-8 border-b border-black pb-4">
+                           <h2 className="text-lg font-black uppercase">Acknowledgement Receipt</h2>
+                           <p>REPAIRBOY CAMPAIGN SERVICE</p>
+                        </div>
+                        <div className="space-y-2">
+                           <div className="flex justify-between"><span>RECEIPT ID:</span><strong>{selectedJob?.ticketId}-R</strong></div>
+                           <div className="flex justify-between"><span>CAMPAIGN:</span><strong>{selectedJob?.campaign}</strong></div>
+                           <div className="flex justify-between"><span>CUSTOMER:</span><strong>{selectedJob?.customer}</strong></div>
+                           <div className="flex justify-between"><span>PHONE:</span><strong>{selectedJob?.phone}</strong></div>
+                           <div className="flex justify-between"><span>DEVICE:</span><strong>{selectedJob?.device}</strong></div>
+                           <div className="flex justify-between"><span>MODEL:</span><strong>{selectedJob?.deviceModel}</strong></div>
+                           <div className="flex justify-between"><span>PROBLEM:</span><strong>{selectedJob?.problem}</strong></div>
+                           <div className="flex justify-between"><span>RECEIVED BY:</span><strong>Reception</strong></div>
+                        </div>
+                        <div className="mt-8 border-t border-black pt-4">
+                           <p className="text-[10px]"><strong>TERMS:</strong> Device condition verified as "Good". Accessories: Charger only. Minimum repair time 24-48 hrs.</p>
+                        </div>
+                        <div className="mt-12 flex justify-between">
+                           <div className="border-t border-black w-24 text-center pt-1">CUSTOMER</div>
+                           <div className="border-t border-black w-24 text-center pt-1">STAFF</div>
+                        </div>
+                     </div>
+                     <div className="flex gap-4 no-print">
+                        <button className="secondary-button" onClick={() => window.print()}><Printer size={18} /> Print Receipt</button>
+                        <button className="primary-button" onClick={() => addToast('Receipt sent via WhatsApp')}><Smartphone size={18} /> Send via WhatsApp</button>
+                     </div>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- Toasts --- */}
+      <div className="fixed bottom-6 right-6 z-[2000] flex flex-col gap-3">
+        <AnimatePresence>
+          {toasts.map(t => (
+            <motion.div 
+              key={t.id}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 50 }}
+              className="p-4 bg-slate-900 text-white rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10"
+            >
+              <CheckCircle2 size={18} className="text-emerald-400" />
+              <span className="text-xs font-bold">{t.message}</span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
-
-      {/* Create Modal */}
-      {isCreateModalOpen && (
-         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-8">
-            <Motion.div className="bg-white rounded-[56px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-               <div className="p-12 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                  <div className="flex items-center gap-8">
-                     <div className="w-16 h-16 bg-indigo-600 text-white rounded-[24px] flex items-center justify-center shadow-xl"><Plus size={32} strokeWidth={3} /></div>
-                     <div><h3 className="text-2xl font-black text-slate-900 tracking-tighter">Initialize Job Card</h3><p className="text-xs font-medium text-slate-500 mt-1">Quick intake workflow for new service requests.</p></div>
-                  </div>
-                  <button onClick={closeCrudModals} className="w-12 h-12 flex items-center justify-center bg-white rounded-full shadow-lg text-slate-400"><X size={24} /></button>
-               </div>
-               <form onSubmit={handleQuickEntrySubmit} className="p-14 space-y-8">
-                  <div className="grid grid-cols-2 gap-6">
-                     <div className="form-group">
-                        <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Customer Name</label>
-                        <input className="h-14 rounded-2xl border-slate-200" placeholder="Full Name" value={quickEntry.name} onChange={e => setQuickEntry({...quickEntry, name: e.target.value})} required />
-                     </div>
-                     <div className="form-group">
-                        <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Phone Number</label>
-                        <input className="h-14 rounded-2xl border-slate-200" placeholder="10-digit mobile" value={quickEntry.phoneNumber} onChange={e => setQuickEntry({...quickEntry, phoneNumber: e.target.value})} required />
-                     </div>
-                  </div>
-                  <div className="p-6 bg-slate-900 rounded-[32px] text-white flex items-center justify-between">
-                     <div><p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Identity Shield</p><p className="text-[9px] text-slate-400 font-bold uppercase mt-1">OTP Sync Engine</p></div>
-                     <div className="flex gap-2">
-                        {!quickEntry.otpSent ? (
-                           <button type="button" className="h-10 px-6 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase" onClick={handleSendOtp}>Send OTP</button>
-                        ) : (
-                           <div className="flex gap-2">
-                              <input className="w-24 h-10 bg-white/10 border-white/20 rounded-xl text-center font-black" placeholder="OTP" />
-                              <button type="button" className="h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase" onClick={handleVerifyOtp}>Verify</button>
-                           </div>
-                        )}
-                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-6">
-                     <div className="form-group">
-                        <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Hardware Class</label>
-                        <select className="h-14 rounded-2xl border-slate-200 font-black text-xs" value={quickEntry.deviceType} onChange={e => setQuickEntry({...quickEntry, deviceType: e.target.value})}>
-                           {deviceTypes.map(t => <option key={t}>{t}</option>)}
-                        </select>
-                     </div>
-                     <div className="form-group">
-                        <label className="text-[10px] font-black uppercase text-indigo-600 tracking-widest ml-1">Diagnosis Focus</label>
-                        <select className="h-14 rounded-2xl border-slate-200 font-black text-xs" value={quickEntry.problem} onChange={e => setQuickEntry({...quickEntry, problem: e.target.value})}>
-                           {pricingTemplates.map(t => <option key={t.issue}>{t.issue}</option>)}
-                        </select>
-                     </div>
-                  </div>
-                  <div className="flex justify-end gap-6 pt-6">
-                     <button type="button" className="h-14 px-8 rounded-2xl text-[10px] font-black uppercase text-slate-400" onClick={closeCrudModals}>Discard</button>
-                     <button type="submit" className="h-14 px-12 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl" disabled={busy}>{busy ? 'Ingesting...' : 'Create Job Card'}</button>
-                  </div>
-               </form>
-            </Motion.div>
-         </div>
-      )}
-
-      {/* Edit Modal / Cockpit */}
-      {isEditModalOpen && (
-         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-8">
-            <Motion.div className="bg-white rounded-[56px] w-full max-w-5xl h-[90vh] overflow-hidden shadow-2xl flex flex-col" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
-               <div className="p-12 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                  <div className="flex items-center gap-8">
-                     <div className="w-16 h-16 bg-indigo-600 text-white rounded-[24px] flex items-center justify-center shadow-xl"><Settings size={32} /></div>
-                     <div><h3 className="text-2xl font-black text-slate-900 tracking-tighter">Service Cockpit - {selectedJob?.id}</h3><p className="text-xs font-medium text-slate-500 mt-1">Lifecycle control center for repair and logistics execution.</p></div>
-                  </div>
-                  <button onClick={closeCrudModals} className="w-12 h-12 flex items-center justify-center bg-white rounded-full shadow-lg text-slate-400"><X size={24} /></button>
-               </div>
-               
-               <div className="flex-1 flex flex-col overflow-hidden">
-                  <div className="p-4 bg-slate-50 border-b border-slate-100 flex gap-2 overflow-x-auto no-scrollbar">
-                     {['Walk-in', 'Estimate Flow', 'Device Intake', 'Restoration', 'Logistics', 'Finalize'].map(tab => (
-                        <button key={tab} className={`h-11 px-8 rounded-xl text-[9px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${editWorkflowSection === tab ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`} onClick={() => setEditWorkflowSection(tab)}>{tab}</button>
-                     ))}
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-12 cmc-custom-scroll bg-white">
-                     {editWorkflowSection === 'Walk-in' && renderWalkIn()}
-                     {editWorkflowSection === 'Estimate Flow' && renderQuote()}
-                     {editWorkflowSection === 'Device Intake' && renderIntake()}
-                     {editWorkflowSection === 'Restoration' && renderRepair()}
-                     {editWorkflowSection === 'Logistics' && renderLogistics()}
-                     {editWorkflowSection === 'Finalize' && renderFinalize()}
-                  </div>
-               </div>
-            </Motion.div>
-         </div>
-      )}
-
-      {notice && (
-        <Motion.div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 z-[200]" initial={{ y: 100 }} animate={{ y: 0 }}>
-           <span className="text-xs font-black uppercase tracking-widest">{notice}</span>
-           <button onClick={() => setNotice('')}><X size={16} /></button>
-        </Motion.div>
-      )}
-    </Motion.div>
+    </div>
   );
 };
-
-const KPIItem = ({ title, value, icon, color, bg, trend, negative }) => (
-  <div className="dash-kpi-card group hover:border-indigo-200 transition-all">
-    <div className="dash-kpi-header">
-      <div className="dash-kpi-icon" style={{ backgroundColor: bg, color: color }}>
-        {React.cloneElement(icon, { size: 20 })}
-      </div>
-      <div className={`dash-kpi-trend ${negative ? 'negative' : ''}`}>
-        {trend}
-      </div>
-    </div>
-    <div>
-      <p className="dash-kpi-label">{title}</p>
-      <h3 className="dash-kpi-value">{value}</h3>
-    </div>
-    <div className="dash-kpi-sparkline">
-       <svg viewBox="0 0 100 40" className="w-full h-full">
-          <path d="M0,35 Q15,10 30,25 T60,15 T100,5" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" opacity="0.3" />
-       </svg>
-    </div>
-  </div>
-);
 
 export default CampaignJobsPage;

@@ -1,163 +1,410 @@
 import React, { useState } from 'react';
 import { 
-  BarChart3, 
-  PieChart, 
-  TrendingUp, 
-  Calendar, 
-  Download, 
-  Filter, 
-  FileText, 
-  ChevronDown, 
-  Printer, 
-  IndianRupee,
-  Activity,
-  ArrowUpRight,
-  ArrowDownRight,
-  Users,
-  Wrench,
-  CheckCircle2,
-  Package,
-  AlertCircle
+  Search, Calendar, Download, FileText, ChevronDown, RefreshCw, 
+  IndianRupee, Activity, PieChart, ArrowUpRight, BarChart3, 
+  TrendingUp, CheckCircle2, AlertTriangle, MoreVertical, X,
+  MapPin, UserCheck, Settings, Bell, Moon, User
 } from 'lucide-react';
-import './AMCPremiumStyles.css';
+import './Reports.css';
 
 const AMCReportsPage = () => {
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [tableSearch, setTableSearch] = useState('');
   const [dateRange, setDateRange] = useState('Last 30 Days');
+  const [reportType, setReportType] = useState('All Reports');
+  const [chartType, setChartType] = useState('Bar');
+  const [activeReport, setActiveReport] = useState('Revenue Trend');
+  const [toasts, setToasts] = useState([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [activeMenuId, setActiveMenuId] = useState(null);
+
+  const showToast = (msg, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, msg, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      showToast('Reports refreshed');
+    }, 500);
+  };
+
+  const handleExport = () => {
+    showToast('Exporting All Data as CSV...');
+  };
+
+  const handleDownloadPDF = () => {
+    showToast('PDF report download started');
+  };
 
   const reportCategories = [
-    { title: 'Financial Performance', icon: IndianRupee, metrics: ['Revenue Trend', 'Cost vs Profit', 'Parts Cost Analysis', 'Unpaid Invoices'] },
-    { title: 'Operational Health', icon: Activity, metrics: ['Missed Visits', 'SLA Breach Report', 'Technician Efficiency', 'Visit Volume'] },
-    { title: 'Portfolio Insights', icon: PieChart, metrics: ['Plan Distribution', 'Renewal Conversion', 'High Cost Customers', 'Location-wise Analysis'] }
+    { 
+      title: 'Financial Performance', 
+      icon: IndianRupee, 
+      desc: 'Track revenue, costs, and unpaid invoices.',
+      metrics: ['Revenue Trend', 'Cost vs Profit', 'Parts Cost Analysis', 'Unpaid Invoices'] 
+    },
+    { 
+      title: 'Operational Health', 
+      icon: Activity, 
+      desc: 'Monitor SLAs, visits, and efficiency.',
+      metrics: ['Missed Visits', 'SLA Breach Report', 'Technician Efficiency', 'Visit Volume'] 
+    },
+    { 
+      title: 'Portfolio Insights', 
+      icon: PieChart, 
+      desc: 'Analyze customers and contract types.',
+      metrics: ['Plan Distribution', 'Renewal Conversion', 'High Cost Customers', 'Location-wise Analysis'] 
+    }
   ];
 
+  const tableData = [
+    { id: 'RPT-101', customer: 'Global Tech', location: 'Mumbai', revenue: '₹45,000', cost: '₹12,000', profit: '₹33,000', status: 'Healthy' },
+    { id: 'RPT-102', customer: 'Stellar Bank', location: 'Delhi', revenue: '₹82,000', cost: '₹50,000', profit: '₹32,000', status: 'Warning' },
+    { id: 'RPT-103', customer: 'Modern School', location: 'Pune', revenue: '₹15,000', cost: '₹18,000', profit: '-₹3,000', status: 'Risk' },
+    { id: 'RPT-104', customer: 'Apex Retail', location: 'Bangalore', revenue: '₹56,000', cost: '₹20,000', profit: '₹36,000', status: 'Healthy' },
+  ];
+
+  const getStatusClass = (status) => {
+    if(status === 'Healthy') return 'green';
+    if(status === 'Warning') return 'amber';
+    if(status === 'Risk') return 'red';
+    return 'blue';
+  };
+
   return (
-    <div className="admin-module-page amc-reports-page p-8">
-      <div className="flex justify-between items-center mb-10">
-        
-        <div className="flex gap-4">
-           <div className="relative">
-              <button className="px-6 py-3 bg-white border border-slate-100 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
-                 <Calendar size={14} className="text-primary" /> {dateRange} <ChevronDown size={14} />
-              </button>
-           </div>
-           <button className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-800 transition-all shadow-xl">
-              <Download size={14} /> Export All Data
-           </button>
+    <div className="reports-page">
+      
+      {/* HEADER */}
+      <div className="reports-header">
+        <div className="reports-header-left">
+          <h1>AMC Reports</h1>
+          <p>Detailed analytics on profitability, conversion, renewals, and service ticket volume.</p>
+        </div>
+        <div className="reports-header-actions">
+          <div className="reports-search">
+            <Search size={16} />
+            <input 
+              type="text" 
+              placeholder="Search AMC reports..." 
+              value={globalSearch}
+              onChange={e => setGlobalSearch(e.target.value)}
+            />
+          </div>
+          <button className="icon-button"><Moon size={18} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 16px 6px 6px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: '9999px', fontWeight: '600', fontSize: '14px', cursor: 'pointer' }}>
+            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <User size={14} />
+            </div>
+            Admin
+          </div>
         </div>
       </div>
 
-      {/* Analytical Summary */}
-      <div className="grid grid-cols-3 gap-8 mb-12">
+      {/* TOP FILTER TOOLBAR */}
+      <div className="reports-toolbar">
+        <div className="toolbar-left">
+          <button className="filter-button">
+            <Calendar size={16} className="text-slate-400" />
+            <select value={dateRange} onChange={e => setDateRange(e.target.value)}>
+              <option value="Last 7 Days">Last 7 Days</option>
+              <option value="Last 30 Days">Last 30 Days</option>
+              <option value="This Month">This Month</option>
+              <option value="Last Month">Last Month</option>
+              <option value="This Quarter">This Quarter</option>
+              <option value="Custom Range">Custom Range</option>
+            </select>
+          </button>
+          <button className="filter-button">
+            <FileText size={16} className="text-slate-400" />
+            <select value={reportType} onChange={e => setReportType(e.target.value)}>
+              <option value="All Reports">All Reports</option>
+              <option value="Financial">Financial</option>
+              <option value="Operational">Operational</option>
+              <option value="Portfolio">Portfolio</option>
+              <option value="Technician">Technician</option>
+              <option value="Invoice">Invoice</option>
+            </select>
+          </button>
+        </div>
+        <div className="toolbar-right">
+          <button className="secondary-button" onClick={handleDownloadPDF}>
+            <Download size={16} /> Download PDF
+          </button>
+          <button className="secondary-button" onClick={handleRefresh}>
+            <RefreshCw size={16} className={isRefreshing ? 'spin' : ''} /> {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <button className="primary-button" onClick={handleExport}>
+            <FileText size={16} /> Export All Data
+          </button>
+        </div>
+      </div>
+
+      {/* SUMMARY METRIC CARDS */}
+      <div className="metrics-grid">
+        <div className="metric-card">
+           <div className="metric-icon-wrapper" style={{ background: '#e0e7ff', color: '#6366f1' }}><IndianRupee size={24} /></div>
+           <div className="metric-details">
+             <span className="metric-label">Revenue</span>
+             <span className="metric-value">₹12.5L</span>
+             <span className="metric-trend text-green-600">+12% vs last month</span>
+           </div>
+        </div>
+        <div className="metric-card">
+           <div className="metric-icon-wrapper" style={{ background: '#dcfce7', color: '#16a34a' }}><TrendingUp size={24} /></div>
+           <div className="metric-details">
+             <span className="metric-label">Renewal Conversion</span>
+             <span className="metric-value">82%</span>
+             <span className="metric-trend text-green-600">+5% vs last month</span>
+           </div>
+        </div>
+        <div className="metric-card">
+           <div className="metric-icon-wrapper" style={{ background: '#fef3c7', color: '#d97706' }}><AlertTriangle size={24} /></div>
+           <div className="metric-details">
+             <span className="metric-label">Open Tickets</span>
+             <span className="metric-value">26</span>
+             <span className="metric-trend text-red-600">+4 vs last month</span>
+           </div>
+        </div>
+        <div className="metric-card">
+           <div className="metric-icon-wrapper" style={{ background: '#fee2e2', color: '#dc2626' }}><FileText size={24} /></div>
+           <div className="metric-details">
+             <span className="metric-label">Unpaid Invoices</span>
+             <span className="metric-value">₹2.4L</span>
+             <span className="metric-trend text-green-600">-₹0.5L vs last month</span>
+           </div>
+        </div>
+      </div>
+
+      {/* REPORT CATEGORY CARDS */}
+      <div className="reports-category-grid">
         {reportCategories.map(cat => (
-          <div key={cat.title} className="card p-8 bg-white shadow-xl border-none group hover:-translate-y-1 transition-all">
-             <div className="flex items-center gap-4 mb-8">
-                <div className="p-3 bg-slate-50 rounded-2xl text-primary group-hover:bg-primary group-hover:text-white transition-all"><cat.icon size={20} /></div>
-                <h3 className="text-xs font-black uppercase tracking-widest text-main">{cat.title}</h3>
-             </div>
-             <div className="space-y-4">
-                {cat.metrics.map(m => (
-                  <button key={m} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-2xl transition-all group/item">
-                     <span className="text-xs font-bold text-muted group-hover/item:text-main">{m}</span>
-                     <ArrowUpRight size={14} className="opacity-0 group-hover/item:opacity-100 transition-opacity text-primary" />
-                  </button>
-                ))}
-             </div>
+          <div key={cat.title} className="report-category-card">
+            <div className="report-card-header">
+              <div className="report-card-icon"><cat.icon size={20} /></div>
+              <div>
+                <h3>{cat.title}</h3>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: 0, marginTop: '2px' }}>{cat.desc}</p>
+              </div>
+            </div>
+            <div className="report-link-list">
+              {cat.metrics.map(m => (
+                <button 
+                  key={m} 
+                  className={`report-link-item ${activeReport === m ? 'active' : ''}`}
+                  onClick={() => setActiveReport(m)}
+                >
+                  {m} <ArrowUpRight size={14} />
+                </button>
+              ))}
+            </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-12 gap-8">
-        {/* Main Chart Placeholder / Visual Section */}
-        <div className="col-span-8">
-           <div className="card p-10 bg-main text-white relative overflow-hidden shadow-2xl border-none">
-              <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-primary/10 to-transparent"></div>
-              <div className="relative z-10">
-                 <div className="flex justify-between items-center mb-10">
-                    <div>
-                       <h3 className="text-xl font-extrabold tracking-tight">Visit Conversion vs Target</h3>
-                       <p className="text-xs opacity-40 font-bold uppercase tracking-widest mt-1">Planned vs Actual Service Delivery</p>
-                    </div>
-                    <div className="p-3 bg-white/10 rounded-xl"><TrendingUp size={20} className="text-primary-light" /></div>
-                 </div>
-                 
-                 <div className="flex items-end gap-3 h-48 mb-8">
-                    {[40, 65, 55, 85, 75, 95, 80, 60, 90, 70, 85, 98].map((h, i) => (
-                      <div key={i} className="flex-1 bg-white/10 rounded-lg relative overflow-hidden group">
-                         <div className="absolute bottom-0 left-0 w-full bg-primary transition-all duration-1000 shadow-glow" style={{ height: `${h}%` }}></div>
-                         <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
-                      </div>
-                    ))}
-                 </div>
-                 <div className="flex justify-between text-[9px] font-black uppercase opacity-30 tracking-[0.2em] px-1">
-                    <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
-                 </div>
+      {/* MAIN CHART SECTION */}
+      <div className="reports-chart-grid">
+        <div className="chart-card">
+          <div className="chart-header">
+            <div>
+              <h3>{activeReport}</h3>
+              <p>Performance analysis for {dateRange.toLowerCase()}</p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: '8px', padding: '4px' }}>
+                <button 
+                  style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: chartType === 'Bar' ? '#fff' : 'transparent', boxShadow: chartType === 'Bar' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', fontWeight: '600', fontSize: '13px', cursor: 'pointer', color: chartType === 'Bar' ? '#0f172a' : '#64748b' }}
+                  onClick={() => setChartType('Bar')}
+                >Bar</button>
+                <button 
+                  style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: chartType === 'Line' ? '#fff' : 'transparent', boxShadow: chartType === 'Line' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none', fontWeight: '600', fontSize: '13px', cursor: 'pointer', color: chartType === 'Line' ? '#0f172a' : '#64748b' }}
+                  onClick={() => setChartType('Line')}
+                >Line</button>
               </div>
-           </div>
-        </div>
-
-        {/* Top Performers Widget */}
-        <div className="col-span-4">
-           <div className="card p-8 bg-white shadow-xl border-none flex flex-col h-full">
-              <h4 className="text-xs font-black uppercase tracking-widest text-main mb-8 flex justify-between">
-                 Top Technicians <CheckCircle2 size={14} className="text-success" />
-              </h4>
-              <div className="space-y-6 flex-1">
-                 {[
-                   { name: 'Rahul Kumar', score: 98, visits: 45, color: 'text-success' },
-                   { name: 'Amit Singh', score: 94, visits: 38, color: 'text-primary' },
-                   { name: 'Vikram Sahni', score: 91, visits: 42, color: 'text-info' },
-                   { name: 'Arun K.', score: 88, visits: 31, color: 'text-warning' }
-                 ].map(tech => (
-                   <div key={tech.name} className="flex items-center gap-4 group">
-                      <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center font-black text-xs text-muted group-hover:bg-primary group-hover:text-white transition-all">
-                         {tech.name[0]}
-                      </div>
-                      <div className="flex-1">
-                         <div className="flex justify-between text-xs font-black mb-1">
-                            <span>{tech.name}</span>
-                            <span className={tech.color}>{tech.score}%</span>
-                         </div>
-                         <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full bg-current ${tech.color} opacity-70`} style={{ width: `${tech.score}%` }}></div>
-                         </div>
-                      </div>
-                   </div>
-                 ))}
-              </div>
-              <div className="mt-8 pt-6 border-t border-slate-50 text-center">
-                 <button className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline">Full Performance Report</button>
-              </div>
-           </div>
+              <button className="secondary-button" onClick={() => setShowModal(true)}>View Details</button>
+            </div>
+          </div>
+          <div className="chart-area">
+            {[40, 65, 55, 85, 75, 95, 80, 60, 90, 70, 85, 98].map((h, i) => (
+              <div key={i} className="placeholder-bar" style={{ height: `${h}%`, width: chartType === 'Line' ? '2px' : 'auto', background: chartType === 'Line' ? 'transparent' : '#6366f1', borderLeft: chartType === 'Line' ? '2px dashed #6366f1' : 'none' }}></div>
+            ))}
+            <div className="chart-labels">
+              <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Detailed Data View Placeholder */}
-      <div className="mt-12 card p-10 bg-white shadow-2xl border-none">
-         <div className="flex justify-between items-center mb-10">
-            <div>
-               <h3 className="text-lg font-black text-main">Parts Consumption Analytics</h3>
-               <p className="text-[10px] text-muted font-bold uppercase mt-1">Stock deduction vs AMC Service Tickets</p>
-            </div>
-            <div className="flex gap-3">
-               <button className="p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-all"><Printer size={16} /></button>
-               <button className="p-3 bg-slate-50 rounded-xl hover:bg-slate-100 transition-all"><Download size={16} /></button>
-            </div>
-         </div>
-         <div className="grid grid-cols-4 gap-8">
+      {/* INSIGHTS GRID */}
+      <div className="insights-grid">
+        {/* Top Technicians */}
+        <div className="insight-card">
+          <h3>Top Technicians</h3>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {[
-              { label: 'Total Parts Cost', val: '₹45,200', icon: Package, tone: 'primary' },
-              { label: 'Inventory Deducted', val: '142 Items', icon: CheckCircle2, tone: 'success' },
-              { label: 'Efficiency Loss', val: '₹1,200', icon: ArrowDownRight, tone: 'danger' },
-              { label: 'Stock Warning', val: '8 Items Low', icon: AlertCircle, tone: 'warning' }
-            ].map(item => (
-              <div key={item.label} className="p-6 rounded-[28px] bg-slate-50 border border-slate-100 hover:shadow-lg transition-all cursor-default">
-                 <item.icon size={20} className={`mb-4 text-${item.tone}`} />
-                 <p className="text-[9px] font-black text-muted uppercase tracking-widest">{item.label}</p>
-                 <p className="text-xl font-black text-main mt-1">{item.val}</p>
+              { name: 'Rahul Kumar', visits: 48, score: 98 },
+              { name: 'Amit Singh', visits: 42, score: 94 },
+              { name: 'Priya Sharma', visits: 39, score: 91 }
+            ].map(tech => (
+              <div key={tech.name} className="tech-row">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', color: '#64748b' }}>
+                    {tech.name[0]}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '600' }}>{tech.name}</div>
+                    <div style={{ fontSize: '12px', color: '#64748b' }}>{tech.visits} visits completed</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ width: '100px', height: '6px', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${tech.score}%`, background: '#16a34a' }}></div>
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#16a34a' }}>{tech.score}%</div>
+                </div>
               </div>
             ))}
-         </div>
+          </div>
+        </div>
+
+        {/* Key Insights */}
+        <div className="insight-card">
+          <h3>Key Insights</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ padding: '8px', borderRadius: '8px', background: '#e0e7ff', color: '#6366f1' }}><MapPin size={16} /></div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Highest Revenue Location</div>
+                <div style={{ fontSize: '14px', fontWeight: '700' }}>Mumbai Central</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ padding: '8px', borderRadius: '8px', background: '#dcfce7', color: '#16a34a' }}><UserCheck size={16} /></div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Most Profitable Customer</div>
+                <div style={{ fontSize: '14px', fontWeight: '700' }}>Global Tech Ltd.</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ padding: '8px', borderRadius: '8px', background: '#fef3c7', color: '#d97706' }}><Settings size={16} /></div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Highest Cost Contract</div>
+                <div style={{ fontSize: '14px', fontWeight: '700' }}>Stellar Bank (Comprehensive)</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ padding: '8px', borderRadius: '8px', background: '#fee2e2', color: '#dc2626' }}><Bell size={16} /></div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>SLA Risk Count</div>
+                <div style={{ fontSize: '14px', fontWeight: '700' }}>4 Contracts at Risk</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* DETAILED TABLE SECTION */}
+      <div className="reports-table-card">
+        <div className="table-header-toolbar">
+          <h3>Detailed Report Data</h3>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div className="reports-search" style={{ width: '240px' }}>
+              <Search size={16} />
+              <input 
+                type="text" 
+                placeholder="Search rows..." 
+                value={tableSearch}
+                onChange={e => setTableSearch(e.target.value)}
+                style={{ width: '100%' }}
+              />
+            </div>
+            <button className="filter-button">
+              <select>
+                <option value="All">All Status</option>
+                <option value="Healthy">Healthy</option>
+                <option value="Warning">Warning</option>
+                <option value="Risk">Risk</option>
+              </select>
+            </button>
+            <button className="secondary-button" onClick={() => showToast('Exporting table CSV...')}>
+              <Download size={16} /> Export CSV
+            </button>
+          </div>
+        </div>
+        <div className="reports-table-wrapper">
+          <table className="reports-table">
+            <thead>
+              <tr>
+                <th>Report ID</th>
+                <th>Customer / Contract</th>
+                <th>Location</th>
+                <th>Revenue</th>
+                <th>Cost</th>
+                <th>Profit</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableData.filter(r => r.customer.toLowerCase().includes(tableSearch.toLowerCase()) || r.id.toLowerCase().includes(tableSearch.toLowerCase())).map(row => (
+                <tr key={row.id}>
+                  <td style={{ fontWeight: '700', color: '#6366f1' }}>{row.id}</td>
+                  <td style={{ fontWeight: '700' }}>{row.customer}</td>
+                  <td>{row.location}</td>
+                  <td>{row.revenue}</td>
+                  <td>{row.cost}</td>
+                  <td style={{ color: row.profit.startsWith('-') ? '#dc2626' : '#16a34a', fontWeight: '700' }}>{row.profit}</td>
+                  <td><span className={`status-badge ${getStatusClass(row.status)}`}>{row.status}</span></td>
+                  <td>
+                    <div className="three-dot-menu">
+                      <button className="action-button" style={{ width: '32px', height: '32px', padding: '0', display: 'flex', justifyContent: 'center' }} onClick={() => setActiveMenuId(activeMenuId === row.id ? null : row.id)}>
+                        <MoreVertical size={16} />
+                      </button>
+                      {activeMenuId === row.id && (
+                        <div className="menu-dropdown">
+                          <button className="menu-item" onClick={() => { setShowModal(true); setActiveMenuId(null); }}><FileText size={14} /> View Details</button>
+                          <button className="menu-item" onClick={() => { showToast('Downloading ' + row.id); setActiveMenuId(null); }}><Download size={14} /> Download Report</button>
+                          <button className="menu-item" onClick={() => { showToast('Emailing report...'); setActiveMenuId(null); }}><Calendar size={14} /> Send Email</button>
+                          <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { showToast('Flagged for review'); setActiveMenuId(null); }}><AlertTriangle size={14} /> Flag for Review</button>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODALS / TOASTS */}
+      {showModal && (
+        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Report Details</h3>
+              <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8' }} onClick={() => setShowModal(false)}><X size={20} /></button>
+            </div>
+            <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.6' }}>Detailed view for {activeReport}. Currently displaying aggregated analytics based on your selected date range and filter parameters.</p>
+            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="primary-button" onClick={() => setShowModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="toast-container">
+        {toasts.map(t => (
+          <div key={t.id} className="toast" style={{ background: t.type === 'error' ? '#dc2626' : '#10b981' }}>
+            <CheckCircle2 size={16} /> {t.msg}
+          </div>
+        ))}
+      </div>
+
     </div>
   );
 };

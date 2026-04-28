@@ -1,401 +1,491 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion as Motion } from 'framer-motion';
+import React, { useState, useMemo } from 'react';
 import { 
-  Search, 
-  IndianRupee, 
-  Calendar, 
-  FileText, 
-  RefreshCcw, 
-  Send, 
-  Printer, 
-  Download, 
-  MoreVertical, 
-  AlertCircle, 
-  X,
-  CheckCircle2,
-  Clock,
-  Plus,
-  ArrowRight,
-  TrendingUp,
-  CreditCard,
-  ShieldCheck,
-  Zap,
-  Sparkles,
-  PieChart,
-  FileCheck,
-  Filter,
-  ArrowUpRight,
-  Target,
-  Activity,
-  Box,
-  ChevronRight,
-  Lock,
-  Wallet
+  Search, Calendar, Download, Plus, Target, CheckCircle2, AlertCircle, IndianRupee,
+  Phone, Mail, CalendarDays, Check, FileText, Bell, Trash2, ChevronRight, PieChart,
+  X, Filter, Moon, User
 } from 'lucide-react';
-import { cmcBillingService } from '../../services/cmcServices';
-import './DashboardPremiumStyles.css';
+import './BillingRenewals.css';
+
+const initialRenewals = [
+  { id: 'CMC-2026-0003', customer: 'Stellar Bank', expiry: '2026-05-19', value: 30000, risk: 'Medium Risk' },
+  { id: 'CMC-2026-0004', customer: 'Modern School', expiry: '2026-05-28', value: 15000, risk: 'Low Risk' },
+  { id: 'CMC-2026-0005', customer: 'Apex Retail', expiry: '2026-06-02', value: 42000, risk: 'High Risk' },
+];
+
+const initialInvoices = [
+  { id: 'INV-CMC-501', cmcId: 'CMC-2026-0001', customer: 'Global Tech', date: '2026-01-15', amount: 45000, status: 'Paid' },
+  { id: 'INV-CMC-502', cmcId: 'CMC-2026-0003', customer: 'Stellar Bank', date: '2025-05-20', amount: 28000, status: 'Overdue' },
+  { id: 'INV-CMC-503', cmcId: 'CMC-2026-0004', customer: 'Modern School', date: '2025-06-01', amount: 15000, status: 'Pending' },
+  { id: 'INV-CMC-504', cmcId: 'CMC-2026-0005', customer: 'Apex Retail', date: '2025-06-12', amount: 42000, status: 'Paid' },
+];
 
 const CMCBillingRenewalsPage = () => {
-  const [activeTab, setActiveTab] = useState('invoices');
-  const [invoices, setInvoices] = useState(cmcBillingService.getInvoices());
-  const [showBillingModal, setShowBillingModal] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [renewals, setRenewals] = useState(initialRenewals);
+  const [invoices, setInvoices] = useState(initialInvoices);
+  const [toasts, setToasts] = useState([]);
+  const [activeTab, setActiveTab] = useState('ALL');
+  
+  // Search & Filters
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [invStatusFilter, setInvStatusFilter] = useState('All');
 
-  const stats = useMemo(() => {
-    return {
-      totalInvoiced: '₹12.4L',
-      receivables: '₹2.8L',
-      velocity: 18,
-      pipeline: '₹8.5L',
-      overdue: 4,
-      collected: '₹9.6L',
-      growth: '+14%'
-    };
-  }, []);
+  // Modals
+  const [showAddRenewal, setShowAddRenewal] = useState(false);
+  const [showCreateInvoice, setShowCreateInvoice] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
 
-  const openBillingModal = (invoice = null) => {
-    setSelectedInvoice(invoice);
-    setShowBillingModal(true);
+  // Forms
+  const [renewalForm, setRenewalForm] = useState({ customer: '', id: '', expiry: '', value: '', risk: 'Low Risk', notes: '' });
+  const [invoiceForm, setInvoiceForm] = useState({ id: `INV-CMC-${Math.floor(Math.random()*1000)}`, customer: '', cmcId: '', date: '', amount: '', status: 'Pending' });
+
+  const showToast = (msg) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, msg }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+  const handleExport = () => {
+    showToast('Exporting CSV...');
   };
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
+  // Renewal Actions
+  const handleMarkRenewed = (id) => {
+    setRenewals(prev => prev.map(r => r.id === id ? { ...r, risk: 'Renewed' } : r));
+    showToast('Contract marked as Renewed!');
+  };
+
+  const saveRenewal = () => {
+    if(!renewalForm.customer || !renewalForm.expiry) return alert('Fill required fields');
+    setRenewals(prev => [...prev, { ...renewalForm, value: Number(renewalForm.value) }]);
+    setShowAddRenewal(false);
+    showToast('Renewal opportunity added!');
+  };
+
+  // Invoice Actions
+  const handleMarkPaid = (id) => {
+    setInvoices(prev => prev.map(inv => inv.id === id ? { ...inv, status: 'Paid' } : inv));
+    showToast('Invoice marked as Paid!');
+  };
+
+  const handleDeleteInvoice = (id) => {
+    if(window.confirm('Delete this invoice?')) {
+      setInvoices(prev => prev.filter(inv => inv.id !== id));
+      showToast('Invoice deleted');
+    }
+  };
+
+  const saveInvoice = () => {
+    if(!invoiceForm.customer || !invoiceForm.amount) return alert('Fill required fields');
+    setInvoices(prev => [...prev, { ...invoiceForm, amount: Number(invoiceForm.amount) }]);
+    setShowCreateInvoice(false);
+    showToast('Invoice created!');
+  };
+
+  // Filtering
+  const filteredRenewals = useMemo(() => {
+    return renewals.filter(r => {
+      if(activeTab !== 'ALL' && r.risk.toUpperCase() !== activeTab) return false;
+      if(globalSearch) {
+        const s = globalSearch.toLowerCase();
+        if(!r.customer.toLowerCase().includes(s) && !r.id.toLowerCase().includes(s)) return false;
+      }
+      if(dateRange.start && r.expiry < dateRange.start) return false;
+      if(dateRange.end && r.expiry > dateRange.end) return false;
+      return true;
+    });
+  }, [renewals, globalSearch, dateRange]);
+
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter(inv => {
+      const s = (globalSearch + ' ' + invoiceSearch).toLowerCase().trim();
+      if(s) {
+        if(!inv.customer.toLowerCase().includes(s) && !inv.id.toLowerCase().includes(s) && !inv.cmcId.toLowerCase().includes(s)) return false;
+      }
+      if(invStatusFilter !== 'All' && inv.status !== invStatusFilter) return false;
+      if(dateRange.start && inv.date < dateRange.start) return false;
+      if(dateRange.end && inv.date > dateRange.end) return false;
+      return true;
+    });
+  }, [invoices, globalSearch, invoiceSearch, invStatusFilter, dateRange]);
+
+  const getRiskClass = (risk) => {
+    if(risk === 'Low Risk' || risk === 'Renewed') return 'low';
+    if(risk === 'Medium Risk') return 'medium';
+    if(risk === 'High Risk') return 'high';
+    return 'medium';
+  };
+
+  const getStatusClass = (status) => {
+    if(status === 'Paid') return 'paid';
+    if(status === 'Pending') return 'pending';
+    if(status === 'Overdue') return 'overdue';
+    return 'pending';
   };
 
   return (
-    <Motion.div 
-      className="premium-dashboard"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
-      {/* CMC Header */}
-      <div className="flex justify-between items-center mb-10">
+    <div className="billing-page">
+      
+      {/* Summary Cards */}
+      <div className="stats-grid">
+        <StatCard title="Renewal Pipeline" value="3 Contracts" icon={<Target />} color="indigo" />
+        <StatCard title="Target Retention" value="95%" icon={<CheckCircle2 />} color="emerald" />
+        <StatCard title="Collection Health" value="₹12.5L" subtitle="/ ₹15L" icon={<IndianRupee />} color="blue" />
+        <StatCard title="Overdue Amount" value="₹2.4L" icon={<AlertCircle />} color="rose" />
+      </div>
+
+      {/* Main Grid */}
+      <div className="main-billing-grid">
         
-        <div className="flex gap-4">
-           <div className="flex bg-slate-100 p-1 rounded-2xl">
-              <button 
-                 className={`h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'invoices' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
-                 onClick={() => setActiveTab('invoices')}
-              >
-                 Invoices
+        {/* Left Col: Pipeline */}
+        <div className="card">
+          <div className="table-toolbar">
+            <div className="billing-search">
+              <Search />
+              <input type="text" placeholder="Filter pipeline..." style={{ width: '200px' }} value={globalSearch} onChange={e => setGlobalSearch(e.target.value)} />
+            </div>
+            <div className="tabs">
+              {['ALL', 'LOW RISK', 'MEDIUM RISK', 'HIGH RISK'].map(t => (
+                <div key={t} className={`tab ${activeTab === t ? 'active' : ''}`} onClick={() => setActiveTab(t)}>
+                  {t}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="secondary-button" onClick={handleExport}>
+                <Download size={16} /> Export
               </button>
-              <button 
-                 className={`h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'renewals' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-indigo-600'}`}
-                 onClick={() => setActiveTab('renewals')}
-              >
-                 Renewals
+              <button className="primary-button" onClick={() => setShowAddRenewal(true)} style={{ background: '#10b981' }}>
+                <Plus size={16} /> Add Renewal
               </button>
-           </div>
-          <button 
-            className="h-12 px-8 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20"
-            onClick={() => openBillingModal()}
-          >
-            <Plus size={18} strokeWidth={3} /> {activeTab === 'invoices' ? 'Create Invoice' : 'New Framework'}
-          </button>
+            </div>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>CMC ID / Client</th>
+                  <th>Expiry Date</th>
+                  <th>Contract Value</th>
+                  <th>Risk Status</th>
+                  <th style={{ textAlign: 'right' }}>Retention Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRenewals.map(r => (
+                  <tr key={r.id}>
+                    <td>
+                      <div className="td-main-text">{r.customer}</div>
+                      <div className="td-sub-text">{r.id}</div>
+                    </td>
+                    <td>
+                      <div className="date-cell">
+                        <CalendarDays /> {r.expiry}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="value-cell">₹{r.value.toLocaleString()}</span>
+                    </td>
+                    <td>
+                      <span className={`risk-badge ${getRiskClass(r.risk)}`}>
+                        {r.risk}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="actions-cell">
+                        <div className="actions-container">
+                          <ActionIcon icon={<Phone size={14} />} onClick={() => showToast(`Calling ${r.customer}...`)} title="Call" />
+                          <ActionIcon icon={<Mail size={14} />} onClick={() => showToast(`Emailing ${r.customer}...`)} title="Email" />
+                          <ActionIcon icon={<CalendarDays size={14} />} onClick={() => setShowFollowUpModal(true)} title="Create Follow-up" />
+                          <ActionIcon icon={<Check size={14} />} onClick={() => handleMarkRenewed(r.id)} title="Mark Renewed" success />
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredRenewals.length === 0 && (
+                  <tr><td colSpan="5" style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: '500' }}>No renewals match filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Right Col: Health & Upcoming */}
+        <div className="side-cards">
+          
+          {/* Collection Health */}
+          <div className="card collection-health-card">
+            <h2 className="card-title" style={{ marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '12px', color: '#64748b' }}>Collection Health</h2>
+            <div className="collection-health-header">
+              <span className="big-value">₹12.5L</span>
+              <span className="small-value">/ ₹15L</span>
+            </div>
+            
+            <div className="progress-bar">
+              <div className="progress-segment collected"></div>
+              <div className="progress-segment remaining"></div>
+              <div className="progress-segment overdue"></div>
+            </div>
+
+            <div className="health-metrics">
+              <div className="metric-item">
+                <div className="metric-label"><div className="metric-dot collected"></div>Collected</div>
+                <div className="metric-value">₹10.1L</div>
+              </div>
+              <div className="metric-item">
+                <div className="metric-label"><div className="metric-dot remaining"></div>Remaining</div>
+                <div className="metric-value">₹2.5L</div>
+              </div>
+              <div className="metric-item">
+                <div className="metric-label"><div className="metric-dot overdue"></div>Overdue</div>
+                <div className="metric-value">₹2.4L</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Upcoming Renewals List */}
+          <div className="card" style={{ flex: 1 }}>
+            <div className="card-header">
+              <h2 className="card-title" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '12px', color: '#64748b' }}>Upcoming Renewals</h2>
+            </div>
+            <div className="upcoming-renewals-list">
+              {renewals.slice(0,3).map(r => (
+                <div key={r.id} className="renewal-list-item" onClick={() => { setSelectedRecord(r); setShowDetailsModal(true); }}>
+                  <div className="renewal-list-left">
+                    <div className="name">{r.customer}</div>
+                    <div className="days">12 days remaining</div>
+                  </div>
+                  <div className="renewal-list-right">
+                    <span className="renewal-list-amount">₹{(r.value/1000).toFixed(0)}k</span>
+                    <span className={`risk-badge ${getRiskClass(r.risk)}`}>{r.risk}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
 
-      {/* Financial KPI Grid (7-Columns) */}
-      <div className="dash-kpi-grid">
-        <KPIItem title="Net Invoiced" value={stats.totalInvoiced} icon={<FileCheck />} color="#6366f1" bg="#e0e7ff" trend="Quarterly" />
-        <KPIItem title="Receivables" value={stats.receivables} icon={<Wallet />} color="#8b5cf6" bg="#ede9fe" trend="Pending" negative={true} />
-        <KPIItem title="Collected" value={stats.collected} icon={<CheckCircle2 />} color="#10b981" bg="#dcfce7" trend="Synced" />
-        <KPIItem title="Pipeline" value={stats.pipeline} icon={<TrendingUp />} color="#06b6d4" bg="#cffafe" trend="Projected" />
-        <KPIItem title="Renewal Vol" value={stats.velocity} icon={<RefreshCcw />} color="#f59e0b" bg="#fef3c7" trend="Active" />
-        <KPIItem title="Growth" value={stats.growth} icon={<Zap />} color="#ec4899" bg="#fdf2f8" trend="YoY" />
-        <KPIItem title="Overdue" value={stats.overdue} icon={<AlertCircle />} color="#ef4444" bg="#fef2f2" trend="Action Required" negative={true} />
-      </div>
-
-      <div className="dash-ops-grid">
-        <Motion.div className="dash-card col-span-3" variants={itemVariants}>
-          <div className="dash-card-header">
-             <div className="flex gap-4 items-center flex-1">
-                <div className="relative w-96">
-                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                   <input 
-                      type="text" 
-                      placeholder="Search Billing Records..." 
-                      className="h-12 w-full pl-12 pr-6 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium focus:ring-4 focus:ring-indigo-600/10 transition-all"
-                   />
-                </div>
-                <button className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-indigo-600 transition-all">
-                   <Filter size={18} />
-                </button>
-             </div>
+      {/* Bottom Section: Invoices */}
+      <div className="card invoice-section">
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: '16px' }}>
+          <h2 className="card-title">Recent CMC Invoices</h2>
+          <div className="invoice-filters">
+            <div className="billing-search">
+              <Search />
+              <input type="text" placeholder="Search invoices..." value={invoiceSearch} onChange={e => setInvoiceSearch(e.target.value)} />
+            </div>
+            <select className="filter-select" value={invStatusFilter} onChange={e => setInvStatusFilter(e.target.value)}>
+              <option value="All">All Status</option>
+              <option value="Paid">Paid</option>
+              <option value="Pending">Pending</option>
+              <option value="Overdue">Overdue</option>
+            </select>
+            <button className="secondary-button" onClick={() => setShowCreateInvoice(true)}>
+              <Plus size={16} /> Create Invoice
+            </button>
           </div>
-          
-          <div className="p-2">
-            {activeTab === 'invoices' ? (
-              <InvoicesTable invoices={invoices} onEdit={openBillingModal} />
-            ) : (
-              <RenewalsPipeline />
-            )}
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Invoice No</th>
+                <th>Client / CMC ID</th>
+                <th>Date</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredInvoices.map(inv => (
+                <tr key={inv.id}>
+                  <td><span className="td-main-text" style={{ color: '#4f46e5' }}>{inv.id}</span></td>
+                  <td>
+                    <div className="td-main-text">{inv.customer}</div>
+                    <div className="td-sub-text">{inv.cmcId}</div>
+                  </td>
+                  <td><span className="date-cell">{inv.date}</span></td>
+                  <td><span className="value-cell">₹{inv.amount.toLocaleString()}</span></td>
+                  <td>
+                    <span className={`status-badge ${getStatusClass(inv.status)}`}>
+                      {inv.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="actions-cell">
+                      <button className="three-dot-btn" onClick={() => { if(window.confirm('Mark Invoice ' + inv.id + ' as Paid?')) handleMarkPaid(inv.id) }}>
+                        <div className="three-dots"><span></span><span></span><span></span></div>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredInvoices.length === 0 && (
+                <tr><td colSpan="6" style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: '500' }}>No invoices match filters.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {showAddRenewal && (
+        <Modal title="Add Renewal Opportunity" onClose={() => setShowAddRenewal(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <Input label="Client Name" value={renewalForm.customer} onChange={v => setRenewalForm({...renewalForm, customer: v})} />
+              <Input label="CMC ID" value={renewalForm.id} onChange={v => setRenewalForm({...renewalForm, id: v})} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <Input type="date" label="Expiry Date" value={renewalForm.expiry} onChange={v => setRenewalForm({...renewalForm, expiry: v})} />
+              <Input type="number" label="Contract Value (₹)" value={renewalForm.value} onChange={v => setRenewalForm({...renewalForm, value: v})} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Risk Status</label>
+              <select style={{ width: '100%', height: '42px', padding: '0 16px', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '14px', outline: 'none', background: '#fff' }} value={renewalForm.risk} onChange={e => setRenewalForm({...renewalForm, risk: e.target.value})}>
+                <option value="Low Risk">Low Risk</option>
+                <option value="Medium Risk">Medium Risk</option>
+                <option value="High Risk">High Risk</option>
+              </select>
+            </div>
+            <Input label="Notes" value={renewalForm.notes} onChange={v => setRenewalForm({...renewalForm, notes: v})} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+              <button className="secondary-button" onClick={() => setShowAddRenewal(false)}>Cancel</button>
+              <button className="primary-button" onClick={saveRenewal}>Save Renewal</button>
+            </div>
           </div>
-        </Motion.div>
-      </div>
+        </Modal>
+      )}
 
-      {showBillingModal && <BillingModal invoice={selectedInvoice} onClose={() => setShowBillingModal(false)} />}
-    </Motion.div>
-  );
-};
-
-const KPIItem = ({ title, value, icon, color, bg, trend, negative }) => (
-  <div className="dash-kpi-card group hover:border-indigo-200 transition-all">
-    <div className="dash-kpi-header">
-      <div className="dash-kpi-icon" style={{ backgroundColor: bg, color: color }}>
-        {React.cloneElement(icon, { size: 20 })}
-      </div>
-      <div className={`dash-kpi-trend ${negative ? 'negative' : ''}`}>
-        {trend}
-      </div>
-    </div>
-    <div>
-      <p className="dash-kpi-label">{title}</p>
-      <h3 className="dash-kpi-value">{value}</h3>
-    </div>
-    <div className="dash-kpi-sparkline">
-       <svg viewBox="0 0 100 40" className="w-full h-full">
-          <path d="M0,35 Q15,10 30,25 T60,15 T100,5" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" opacity="0.3" />
-       </svg>
-    </div>
-  </div>
-);
-
-const InvoicesTable = ({ invoices, onEdit }) => (
-  <div className="overflow-x-auto cmc-custom-scroll">
-    <table className="cmc-table">
-      <thead>
-        <tr>
-          <th className="pl-8">Reference</th>
-          <th>Client & Identity</th>
-          <th>Service Plan</th>
-          <th>Net Amount</th>
-          <th>Settlement Status</th>
-          <th>Date</th>
-          <th className="pr-8 text-right">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {invoices.map(inv => (
-          <tr key={inv.id}>
-            <td className="pl-8">
-              <span className="text-xs font-black uppercase tracking-tight text-indigo-600">{inv.id}</span>
-            </td>
-            <td>
-              <div className="flex flex-col">
-                <span className="text-xs font-black uppercase tracking-tight">{inv.customer}</span>
-                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{inv.contractId}</span>
+      {showCreateInvoice && (
+        <Modal title="Create CMC Invoice" onClose={() => setShowCreateInvoice(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <Input label="Invoice No" value={invoiceForm.id} onChange={v => setInvoiceForm({...invoiceForm, id: v})} />
+              <Input label="Date" type="date" value={invoiceForm.date} onChange={v => setInvoiceForm({...invoiceForm, date: v})} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <Input label="Client Name" value={invoiceForm.customer} onChange={v => setInvoiceForm({...invoiceForm, customer: v})} />
+              <Input label="CMC ID" value={invoiceForm.cmcId} onChange={v => setInvoiceForm({...invoiceForm, cmcId: v})} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <Input label="Amount (₹)" type="number" value={invoiceForm.amount} onChange={v => setInvoiceForm({...invoiceForm, amount: v})} />
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Status</label>
+                <select style={{ width: '100%', height: '42px', padding: '0 16px', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '14px', outline: 'none', background: '#fff' }} value={invoiceForm.status} onChange={e => setInvoiceForm({...invoiceForm, status: e.target.value})}>
+                  <option value="Pending">Pending</option>
+                  <option value="Paid">Paid</option>
+                  <option value="Overdue">Overdue</option>
+                </select>
               </div>
-            </td>
-            <td><span className="px-3 py-1 bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-600">{inv.plan}</span></td>
-            <td>
-               <div className="flex flex-col">
-                  <span className="text-sm font-black">₹{inv.total.toLocaleString()}</span>
-                  <span className="text-[9px] text-slate-400 font-bold">Inc. Tax</span>
-               </div>
-            </td>
-            <td>
-               <span className={`dash-tag dash-tag-${inv.status === 'Paid' ? 'success' : inv.status === 'Overdue' ? 'danger' : 'warning'}`}>
-                  {inv.status}
-               </span>
-            </td>
-            <td><span className="text-xs font-bold text-slate-500">{inv.date}</span></td>
-            <td className="pr-8 text-right">
-               <button className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-indigo-600 transition-all" onClick={() => onEdit(inv)}><ArrowRight size={14} /></button>
-            </td>
-          </tr>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+              <button className="secondary-button" onClick={() => setShowCreateInvoice(false)}>Cancel</button>
+              <button className="primary-button" onClick={saveInvoice}>Create Invoice</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {showDetailsModal && selectedRecord && (
+        <Modal title="Record Details" onClose={() => setShowDetailsModal(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {Object.entries(selectedRecord).map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid #e5e7eb' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', color: '#64748b' }}>{k}</span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
+            <button className="secondary-button" onClick={() => setShowDetailsModal(false)}>Close</button>
+          </div>
+        </Modal>
+      )}
+
+      {showFollowUpModal && (
+        <Modal title="Create Follow-up" onClose={() => setShowFollowUpModal(false)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <Input type="date" label="Follow-up Date" />
+            <Input label="Assign To" />
+            <Input label="Notes" />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+              <button className="secondary-button" onClick={() => setShowFollowUpModal(false)}>Cancel</button>
+              <button className="primary-button" onClick={() => { showToast('Follow-up scheduled!'); setShowFollowUpModal(false); }}>Save</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Toast Container */}
+      <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 50, display: 'flex', flexDirection: 'column', gap: '12px', pointerEvents: 'none' }}>
+        {toasts.map(t => (
+          <div key={t.id} style={{ background: '#fff', border: '1px solid #e5e7eb', padding: '12px 20px', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <CheckCircle2 size={18} color="#10b981" />
+            <span style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>{t.msg}</span>
+          </div>
         ))}
-      </tbody>
-    </table>
-  </div>
-);
-
-const RenewalsPipeline = () => (
-  <div className="p-24 text-center space-y-10">
-     <div className="w-24 h-24 bg-slate-50 rounded-[40px] flex items-center justify-center mx-auto border border-slate-100 shadow-sm">
-        <RefreshCcw size={48} className="text-indigo-600" />
-     </div>
-     <div>
-        <h4 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Renewal Engine Syncing</h4>
-        <p className="text-sm text-slate-400 font-medium max-w-sm mx-auto mt-2">Analyzing upcoming contract expirations and calculating renewal valuations for the next cycle.</p>
-     </div>
-     <button className="px-10 h-14 bg-white border border-slate-200 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
-        View Expiring Contracts
-     </button>
-  </div>
-);
-
-const BillingModal = ({ invoice, onClose }) => {
-  const [activeTab, setActiveTab] = useState('preview');
-
-  return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-8">
-      <div className="bg-white rounded-[56px] w-full max-w-[1500px] h-[95vh] overflow-hidden shadow-2xl flex flex-col">
-         <div className="p-12 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-            <div className="flex items-center gap-8">
-               <div className="w-20 h-20 bg-indigo-600 text-white rounded-[32px] flex items-center justify-center shadow-xl">
-                  <CreditCard size={36} />
-               </div>
-               <div>
-                  <div className="flex items-center gap-2 mb-2">
-                     <span className="px-3 py-1 bg-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-widest rounded-full">Financial Operation</span>
-                  </div>
-                  <h3 className="text-3xl font-black text-slate-900 tracking-tighter">{invoice ? `Reference: ${invoice.id}` : 'Draft New CMC Invoice'}</h3>
-                  <p className="text-xs font-medium text-slate-500 mt-1">Process tax-compliant billing and subscription settlements.</p>
-               </div>
-            </div>
-            <button onClick={onClose} className="w-12 h-12 flex items-center justify-center bg-white rounded-full shadow-lg text-slate-400 hover:text-slate-900 transition-all"><X size={24} /></button>
-         </div>
-
-         <div className="flex-1 overflow-hidden flex">
-            <div className="w-[420px] border-r border-slate-100 p-10 flex flex-col bg-slate-50/30">
-               <div className="flex-1 space-y-6">
-                  <h4 className="text-[10px] font-black uppercase text-indigo-600 tracking-[0.2em] mb-4">Operations Cockpit</h4>
-                  <BillingActionBtn icon={<CheckCircle2 />} label="Authorize Settlement" sub="Mark as fully collected" color="emerald" />
-                  <BillingActionBtn icon={<Send />} label="WhatsApp Dispatch" sub="Send digital copy to client" color="indigo" />
-                  <BillingActionBtn icon={<RefreshCcw />} label="Dispute Ledger" sub="Flag for manual audit" color="rose" />
-                  <BillingActionBtn icon={<ShieldCheck />} label="Compliance Check" sub="Verify GST/TAX logic" color="violet" />
-               </div>
-
-               <div className="p-10 bg-slate-900 rounded-[40px] text-white">
-                  <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-6">Financial Summary</h5>
-                  <div className="space-y-4">
-                     <div className="flex justify-between text-xs font-bold text-slate-400">
-                        <span>Service Revenue</span>
-                        <span>₹125,000</span>
-                     </div>
-                     <div className="flex justify-between text-xs font-bold text-slate-400">
-                        <span>Statutory GST (18%)</span>
-                        <span>₹22,500</span>
-                     </div>
-                     <div className="pt-6 border-t border-white/10 flex justify-between items-end">
-                        <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Total Position</span>
-                        <span className="text-3xl font-black">₹147,500</span>
-                     </div>
-                  </div>
-               </div>
-            </div>
-
-            <div className="flex-1 bg-slate-200 overflow-y-auto p-20 flex flex-col items-center">
-               <div className="w-full max-w-[850px] flex justify-end mb-10 gap-3">
-                  <DocBtn icon={<Printer />} />
-                  <DocBtn icon={<Download />} />
-                  <DocBtn icon={<X />} onClick={onClose} />
-               </div>
-               
-               {/* High-Fidelity A4 Invoice Preview */}
-               <div className="w-full max-w-[850px] bg-white p-24 shadow-2xl rounded-[4px] min-h-[1100px] flex flex-col font-sans">
-                  <div className="flex justify-between items-start mb-24">
-                     <div>
-                        <div className="w-20 h-20 bg-slate-900 text-white rounded-3xl mb-8 flex items-center justify-center font-black text-2xl">RB</div>
-                        <h1 className="text-4xl font-black text-slate-900 tracking-tighter">TAX INVOICE</h1>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-3">ID: {invoice?.id || 'CMC-INV-001'}</p>
-                     </div>
-                     <div className="text-right space-y-1">
-                        <p className="font-black text-lg">REPAIRBOY TECHNOLOGIES</p>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-tight">Enterprise Infrastructure Support</p>
-                        <p className="text-xs font-black text-indigo-600 pt-3 uppercase tracking-widest">GSTIN: 23AAAAA0000A1Z5</p>
-                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-20 mb-20">
-                     <div className="p-8 bg-slate-50 rounded-[32px] space-y-4">
-                        <h6 className="text-[9px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-200 pb-2">Billed To</h6>
-                        <p className="font-black text-slate-900 uppercase">{invoice?.customer || 'Corporate Client'}</p>
-                        <p className="text-xs text-slate-500 leading-relaxed">Central Business District, Towers B,<br />4th Floor, Mumbai, MH</p>
-                     </div>
-                     <div className="p-8 bg-slate-50 rounded-[32px] flex flex-col justify-between">
-                        <div className="flex justify-between">
-                           <div>
-                              <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Invoice Date</p>
-                              <p className="font-black text-xs">{invoice?.date || 'Apr 26, 2026'}</p>
-                           </div>
-                           <div className="text-right">
-                              <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Due Date</p>
-                              <p className="font-black text-xs text-rose-600">May 10, 2026</p>
-                           </div>
-                        </div>
-                        <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
-                           <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Payment Cycle</p>
-                           <p className="text-[9px] font-black uppercase">Net 15 Days</p>
-                        </div>
-                     </div>
-                  </div>
-
-                  <table className="w-full mb-20">
-                     <thead className="border-b-2 border-slate-900">
-                        <tr>
-                           <th className="py-6 text-left text-[10px] font-black uppercase tracking-widest">Service Description</th>
-                           <th className="py-6 text-right text-[10px] font-black uppercase tracking-widest">Amount (₹)</th>
-                        </tr>
-                     </thead>
-                     <tbody className="divide-y divide-slate-100">
-                        <tr>
-                           <td className="py-10">
-                              <p className="font-black text-base">CMC Renewal - {invoice?.plan || 'Enterprise Portfolio'}</p>
-                              <p className="text-xs text-slate-500 mt-2 leading-relaxed">Comprehensive annual maintenance framework for registered assets. Includes labor, internal hardware parts coverage, and priority response.</p>
-                           </td>
-                           <td className="py-10 text-right font-black text-lg">125,000.00</td>
-                        </tr>
-                     </tbody>
-                  </table>
-
-                  <div className="mt-auto flex justify-end">
-                     <div className="w-[300px] space-y-4">
-                        <div className="flex justify-between text-xs font-bold text-slate-400">
-                           <span>Subtotal</span>
-                           <span>₹125,000.00</span>
-                        </div>
-                        <div className="flex justify-between text-xs font-bold text-slate-400">
-                           <span>Statutory GST (18%)</span>
-                           <span>₹22,500.00</span>
-                        </div>
-                        <div className="pt-6 border-t-4 border-slate-900 flex justify-between items-end">
-                           <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">Final Total</span>
-                           <span className="text-3xl font-black">₹147,500</span>
-                        </div>
-                     </div>
-                  </div>
-               </div>
-            </div>
-         </div>
-
-         <div className="p-10 bg-white border-t border-slate-100 flex justify-end gap-4">
-            <button className="h-14 px-8 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400" onClick={onClose}>Discard Draft</button>
-            <button className="h-14 px-12 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">Dispatch & Close</button>
-         </div>
       </div>
+
     </div>
   );
 };
 
-const BillingActionBtn = ({ icon, label, sub, color, onClick }) => (
-  <button 
-    className="w-full flex items-center gap-5 p-5 bg-white border border-slate-100 rounded-[32px] hover:border-indigo-600/30 hover:shadow-xl transition-all group text-left shadow-sm"
-    onClick={onClick}
-  >
-     <div className={`w-12 h-12 bg-${color}-50 text-${color}-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
-        {React.cloneElement(icon, { size: 20, strokeWidth: 3 })}
-     </div>
-     <div className="flex-1">
-        <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{label}</p>
-        <p className="text-[9px] text-slate-400 font-bold uppercase">{sub}</p>
-     </div>
-     <ChevronRight size={18} className="text-slate-200 group-hover:text-indigo-600 transition-colors" />
+// Reusable Components
+const StatCard = ({ title, value, subtitle, icon, color }) => (
+  <div className="stat-card">
+    <div className={`stat-icon ${color}`}>
+      {React.cloneElement(icon, { size: 24 })}
+    </div>
+    <div className="stat-content">
+      <div className="label">{title}</div>
+      <div className="value-wrapper">
+        <div className="value">{value}</div>
+        {subtitle && <div className="subtitle">{subtitle}</div>}
+      </div>
+    </div>
+  </div>
+);
+
+const ActionIcon = ({ icon, onClick, title, success }) => (
+  <button onClick={onClick} title={title} className={`icon-button ${success ? 'success' : ''}`}>
+    {icon}
   </button>
 );
 
-const DocBtn = ({ icon, onClick }) => (
-  <button className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:shadow-xl transition-all shadow-lg" onClick={onClick}>
-     {React.cloneElement(icon, { size: 20 })}
-  </button>
+const Input = ({ label, value, onChange, type = 'text' }) => (
+  <div>
+    <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>{label}</label>
+    <input 
+      type={type} 
+      value={value} 
+      onChange={e => onChange && onChange(e.target.value)} 
+      style={{ width: '100%', height: '42px', padding: '0 16px', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '14px', outline: 'none', background: '#fff' }}
+    />
+  </div>
+);
+
+const Modal = ({ title, onClose, children }) => (
+  <div className="modal-overlay">
+    <div className="modal-content">
+      <div style={{ padding: '20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>{title}</h3>
+        <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px', borderRadius: '8px' }}>
+          <X size={20} />
+        </button>
+      </div>
+      <div style={{ padding: '24px', overflowY: 'auto' }}>
+        {children}
+      </div>
+    </div>
+  </div>
 );
 
 export default CMCBillingRenewalsPage;
