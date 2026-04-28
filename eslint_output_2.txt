@@ -1,0 +1,57 @@
+
+/home/ganesh/Desktop/BYV/repair-tech/freelancing-applcation-frontend/src/pages/admin/AMCDeviceRegistryPage.jsx
+  41:16  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  39 |   // --- Handlers ---
+  40 |   const addToast = (msg) => {
+> 41 |     const id = Date.now();
+     |                ^^^^^^^^^^ Cannot call impure function
+  42 |     setToasts([...toasts, { id, msg }]);
+  43 |     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  44 |   };               react-hooks/purity
+  61:49  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  59 |
+  60 |   const handleAddDevice = (newDevice) => {
+> 61 |     setDevices([...devices, { ...newDevice, id: Date.now() }]);
+     |                                                 ^^^^^^^^^^ Cannot call impure function
+  62 |     setShowAddModal(false);
+  63 |     addToast("Device added successfully");
+  64 |   };  react-hooks/purity
+
+/home/ganesh/Desktop/BYV/repair-tech/freelancing-applcation-frontend/src/pages/admin/AMCPlansCustomersPage.jsx
+  1:27  error  'useMemo' is defined but never used. Allowed unused vars must match /^[A-Z_]/u  no-unused-vars
+
+/home/ganesh/Desktop/BYV/repair-tech/freelancing-applcation-frontend/src/pages/admin/CMCBillingRenewalsPage.jsx
+   31:21  error    'setDateRange' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             no-unused-vars
+   43:78  error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  41 |   // Forms
+  42 |   const [renewalForm, setRenewalForm] = useState({ customer: '', id: '', expiry: '', value: '', risk: 'Low Risk', notes: '' });
+> 43 |   const [invoiceForm, setInvoiceForm] = useState({ id: `INV-CMC-${Math.floor(Math.random()*1000)}`, customer: '', cmcId: '', date: '', amount: '', status: 'Pending' });
+     |                                                                              ^^^^^^^^^^^^^ Cannot call impure function
+  44 |
+  45 |   const showToast = (msg) => {
+  46 |     const id = Date.now();  react-hooks/purity
+   46:16  error    Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+  44 |
+  45 |   const showToast = (msg) => {
+> 46 |     const id = Date.now();
+     |                ^^^^^^^^^^ Cannot call impure function
+  47 |     setToasts(prev => [...prev, { id, msg }]);
+  48 |     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  49 |   };                                                                                                                                                                                                                                                        react-hooks/purity
+   74:9   error    'handleDeleteInvoice' is assigned a value but never used. Allowed unused vars must match /^[A-Z_]/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      no-unused-vars
+  100:6   warning  React Hook useMemo has a missing dependency: 'activeTab'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               react-hooks/exhaustive-deps
+
+✖ 8 problems (7 errors, 1 warning)
+
