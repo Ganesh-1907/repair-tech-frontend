@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { motion as Motion } from 'framer-motion';
 import { 
@@ -20,23 +20,26 @@ import {
   Search,
   Monitor,
   HardDrive,
+  Hash,
   Settings,
   ChevronRight,
   User,
   Truck,
   Box
 } from 'lucide-react';
-import { adminAssetInventory } from '../../data/adminAssetsMock';
+import { assetManagementService } from '../../services/assetManagementService';
 import './DashboardPremiumStyles.css';
 
 const AssetDetailPage = () => {
   const { assetId } = useParams();
   const [notice, setNotice] = useState('');
-  
-  const asset = useMemo(
-    () => adminAssetInventory.find((entry) => entry.id === assetId),
-    [assetId]
-  );
+  const [asset, setAsset] = useState(undefined);
+
+  useEffect(() => {
+    assetManagementService.getAssetById(assetId)
+      .then(setAsset)
+      .catch(() => setAsset(null));
+  }, [assetId]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -47,6 +50,8 @@ const AssetDetailPage = () => {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1 }
   };
+
+  if (asset === undefined) return null;
 
   if (!asset) {
     return (
@@ -93,7 +98,7 @@ const AssetDetailPage = () => {
         <KPIItem title="Usage Velocity" value="High" icon={<TrendingUp />} color="#06b6d4" bg="#cffafe" trend="24h" />
         <KPIItem title="Total Transfers" value={asset.movementHistory?.length || 0} icon={<Truck />} color="#8b5cf6" bg="#ede9fe" trend="History" />
         <KPIItem title="Service Depth" value="03" icon={<ClipboardList />} color="#ec4899" bg="#fdf2f8" trend="Notes" />
-        <KPIItem title="Node Value" value="₹45k" icon={<Database />} color="#6366f1" bg="#e0e7ff" trend="ROI" />
+        <KPIItem title="Node Value" value={`₹${Number(asset.currentValue || 0).toLocaleString('en-IN')}`} icon={<Database />} color="#6366f1" bg="#e0e7ff" trend="ROI" />
       </div>
 
       <div className="dash-ops-grid grid-cols-3">
@@ -110,7 +115,7 @@ const AssetDetailPage = () => {
              <DNARow label="Node Model" value={asset.model} icon={<HardDrive />} />
              <div className="p-6 bg-slate-50 rounded-3xl mt-4">
                 <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest mb-2">Specifications</p>
-                <p className="text-xs font-bold text-slate-600 leading-relaxed">{asset.configurations}</p>
+                <p className="text-xs font-bold text-slate-600 leading-relaxed">{asset.configurations || asset.configuration}</p>
              </div>
              <div className="p-6 bg-slate-900 rounded-3xl text-white relative overflow-hidden">
                 <div className="relative z-10">

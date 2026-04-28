@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import {
@@ -37,6 +37,7 @@ import {
   Target
 } from 'lucide-react';
 import { usePrivacy } from '../../context/PrivacyContext';
+import { amcDashboardService } from '../../services/amcServices';
 import './DashboardPremiumStyles.css';
 
 ChartJS.register(
@@ -54,6 +55,16 @@ ChartJS.register(
 
 const AMCDashboardPage = () => {
   const { formatCurrency } = usePrivacy();
+  const [analytics, setAnalytics] = useState({
+    kpis: {},
+    revenueTrend: [],
+    planDistribution: [],
+    widgets: { expiringSoon: [], upcomingVisits: [], lowProfitAmcs: [] },
+  });
+
+  useEffect(() => {
+    amcDashboardService.getAnalytics().then(setAnalytics);
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -97,13 +108,13 @@ const AMCDashboardPage = () => {
 
       {/* 3. KPI Grid */}
       <div className="ref-kpi-grid">
-         <KPIBox title="AMC Revenue" value="₹12,50,000" trend="+18.5%" trendUp icon={<IndianRupee />} color="#6366f1" bg="#e0e7ff" />
+         <KPIBox title="AMC Revenue" value={formatCurrency(analytics.kpis.totalRevenue)} trend="+18.5%" trendUp icon={<IndianRupee />} color="#6366f1" bg="#e0e7ff" />
          <KPIBox title="Renewal Rate" value="94%" trend="+3%" trendUp icon={<ShieldCheck />} color="#0ea5e9" bg="#e0f2fe" />
-         <KPIBox title="Active Plans" value="842" trend="+124" trendUp icon={<Briefcase />} color="#8b5cf6" bg="#ede9fe" />
-         <KPIBox title="Expiring Soon" value="28" trend="-5" trendUp={false} icon={<Clock />} color="#f59e0b" bg="#fef3c7" />
-         <KPIBox title="Missed Visits" value="4" trend="-2" trendUp={false} icon={<AlertTriangle />} color="#ef4444" bg="#fef2f2" />
+         <KPIBox title="Active Plans" value={analytics.kpis.activeAmcs || 0} trend="+124" trendUp icon={<Briefcase />} color="#8b5cf6" bg="#ede9fe" />
+         <KPIBox title="Expiring Soon" value={analytics.kpis.expiringSoon || 0} trend="-5" trendUp={false} icon={<Clock />} color="#f59e0b" bg="#fef3c7" />
+         <KPIBox title="Open Visits" value={analytics.kpis.openTickets || 0} trend="-2" trendUp={false} icon={<AlertTriangle />} color="#ef4444" bg="#fef2f2" />
          <KPIBox title="SLA Adherence" value="98%" trend="+1%" trendUp icon={<Activity />} color="#10b981" bg="#dcfce7" />
-         <KPIBox title="Pipeline" value="₹4.2L" trend="+22%" trendUp icon={<Target />} color="#6366f1" bg="#e0e7ff" />
+         <KPIBox title="Pipeline" value={formatCurrency((analytics.widgets.expiringSoon || []).reduce((sum, row) => sum + Number(row.revenue || 0), 0))} trend="+22%" trendUp icon={<Target />} color="#6366f1" bg="#e0e7ff" />
       </div>
 
       {/* 4. Main Charts Grid */}
@@ -119,10 +130,10 @@ const AMCDashboardPage = () => {
             <div style={{ flex: 1, minHeight: 0 }}>
                <Bar 
                  data={{
-                   labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                   labels: analytics.revenueTrend.map((row) => row.month),
                    datasets: [
-                     { label: 'New Plans', data: [45, 62, 58, 85, 74, 96], backgroundColor: '#6366f1', borderRadius: 8, barThickness: 20 },
-                     { label: 'Target', data: [50, 50, 60, 70, 70, 80], backgroundColor: '#e2e8f0', borderRadius: 8, barThickness: 20 }
+                     { label: 'Revenue', data: analytics.revenueTrend.map((row) => row.revenue), backgroundColor: '#6366f1', borderRadius: 8, barThickness: 20 },
+                     { label: 'Cost', data: analytics.revenueTrend.map((row) => row.cost), backgroundColor: '#e2e8f0', borderRadius: 8, barThickness: 20 }
                    ]
                  }}
                  options={commonBarOptions}
@@ -140,10 +151,10 @@ const AMCDashboardPage = () => {
             <div style={{ height: '140px', marginBottom: '16px' }}>
                <Pie 
                  data={{
-                   labels: ['Premium', 'Standard', 'Basic', 'Custom'],
+                   labels: analytics.planDistribution.map((row) => row.name),
                    datasets: [{
-                     data: [40, 35, 15, 10],
-                     backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444'],
+                     data: analytics.planDistribution.map((row) => row.value),
+                     backgroundColor: analytics.planDistribution.map((row) => row.color),
                      borderWidth: 0
                    }]
                  }}
@@ -151,10 +162,7 @@ const AMCDashboardPage = () => {
                />
             </div>
             <div className="legend-grid">
-               <LegendItem label="Premium" color="#6366f1" />
-               <LegendItem label="Standard" color="#10b981" />
-               <LegendItem label="Basic" color="#f59e0b" />
-               <LegendItem label="Custom" color="#ef4444" />
+               {analytics.planDistribution.map((row) => <LegendItem key={row.name} label={row.name} color={row.color} />)}
             </div>
          </Motion.div>
 
@@ -198,8 +206,9 @@ const AMCDashboardPage = () => {
                <span className="ref-badge ref-badge-pending">12 Pending</span>
             </div>
             <div className="space-y-4">
-               <OpListItem label="Global Industries" detail="Premium Plan Expiring" badge="3 DAYS" color="indigo" />
-               <OpListItem label="Tech Park" detail="Standard Bundle Renewal" badge="5 DAYS" color="emerald" />
+               {(analytics.widgets.expiringSoon || []).slice(0, 2).map((row) => (
+                 <OpListItem key={row.id} label={row.customerName} detail={`${row.planName} plan expiring`} badge={row.expiryDate} color="indigo" />
+               ))}
             </div>
          </Motion.div>
 
@@ -215,8 +224,9 @@ const AMCDashboardPage = () => {
                <span className="ref-badge ref-badge-critical">4 Critical</span>
             </div>
             <div className="space-y-4">
-               <OpListItem label="Riverside Apts" detail="Monthly HVAC Service" badge="OVERDUE" color="rose" />
-               <OpListItem label="City Hospital" detail="Medical System Check" badge="OVERDUE" color="rose" />
+               {(analytics.widgets.upcomingVisits || []).slice(0, 2).map((row) => (
+                 <OpListItem key={row.id} label={row.customer} detail={`${row.status} visit`} badge={row.date} color="rose" />
+               ))}
             </div>
          </Motion.div>
 
@@ -226,9 +236,9 @@ const AMCDashboardPage = () => {
                <p className="text-[9px] text-slate-400 font-medium">Revenue split by AMC category.</p>
             </div>
             <div className="space-y-6">
-               <StreamItem name="Corporate Premium" value="₹6,45,000" percentage={55} color="indigo" />
-               <StreamItem name="SME Standard" value="₹3,12,000" percentage={30} color="purple" />
-               <StreamItem name="Residential Basic" value="₹1,24,000" percentage={15} color="blue" />
+               {(analytics.widgets.lowProfitAmcs || []).slice(0, 3).map((row) => (
+                 <StreamItem key={row.id} name={row.customerName} value={formatCurrency(row.revenue)} percentage={Math.max(10, Math.min(95, ((row.revenue - row.cost) / (row.revenue || 1)) * 100))} color="indigo" />
+               ))}
             </div>
          </Motion.div>
       </div>
@@ -255,22 +265,24 @@ const AMCDashboardPage = () => {
                </tr>
             </thead>
             <tbody>
-               <tr className="group hover:bg-slate-50/50 transition-all">
-                  <td><span className="text-xs font-black text-slate-900">#AMC-5021</span></td>
-                  <td>
-                     <div>
-                        <p className="text-xs font-black text-slate-900">Global Industries</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase">Enterprise Account</p>
-                     </div>
-                  </td>
-                  <td><span className="text-[10px] font-black uppercase text-slate-500">Premium Plus</span></td>
-                  <td><span className="text-xs font-bold text-slate-600">2026-04-01</span></td>
-                  <td><span className="text-xs font-black text-slate-900">2027-03-31</span></td>
-                  <td><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase">Active</span></td>
-                  <td className="text-right">
-                     <button className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 shadow-sm transition-all"><ChevronRight size={14} /></button>
-                  </td>
-               </tr>
+               {(analytics.widgets.expiringSoon || []).map((row) => (
+                  <tr key={row.id} className="group hover:bg-slate-50/50 transition-all">
+                     <td><span className="text-xs font-black text-slate-900">#{row.id}</span></td>
+                     <td>
+                        <div>
+                           <p className="text-xs font-black text-slate-900">{row.customerName}</p>
+                           <p className="text-[9px] font-bold text-slate-400 uppercase">{row.customerType}</p>
+                        </div>
+                     </td>
+                     <td><span className="text-[10px] font-black uppercase text-slate-500">{row.planName}</span></td>
+                     <td><span className="text-xs font-bold text-slate-600">{row.startDate}</span></td>
+                     <td><span className="text-xs font-black text-slate-900">{row.expiryDate}</span></td>
+                     <td><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase">{row.status}</span></td>
+                     <td className="text-right">
+                        <button className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 shadow-sm transition-all"><ChevronRight size={14} /></button>
+                     </td>
+                  </tr>
+               ))}
             </tbody>
          </table>
       </Motion.div>
@@ -318,9 +330,9 @@ const OpListItem = ({ label, detail, badge, color }) => (
    </div>
 );
 
-const StreamItem = ({ name, value, percentage }) => (
-   <div style={{ marginBottom: '16px' }}>
-      <div className="flex justify-between items-end mb-2">
+const StreamItem = ({ name, value, percentage, color: _color }) => (
+   <div className="space-y-3">
+      <div className="flex justify-between items-end">
          <p className="text-xs font-black text-slate-900">{name}</p>
          <p className="text-xs font-black text-slate-900">{value}</p>
       </div>

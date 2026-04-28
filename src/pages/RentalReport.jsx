@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Save,
   Printer,
@@ -6,16 +6,35 @@ import {
   Trash2,
   X
 } from 'lucide-react';
+import { inventoryService } from '../services/inventoryService';
+import { rentalAssetService } from '../services/rentalAssetService';
 
 const RentalReport = () => {
   const [notice, setNotice] = useState('');
-  const [devices, setDevices] = useState([
-    { id: 1, type: 'Printer', model: 'HP', serial: 'XXXXX', qty: 2 }
-  ]);
+  const [devices, setDevices] = useState([]);
 
-  const [parts, setParts] = useState([
-    { id: 1, name: 'Toner Powder', qty: 1, charge: 0 }
-  ]);
+  const [parts, setParts] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      rentalAssetService.listAssets(),
+      inventoryService.getItems(),
+    ]).then(([assets, inventory]) => {
+      setDevices(assets.slice(0, 5).map((asset) => ({
+        id: asset.id,
+        type: asset.deviceType,
+        model: asset.model,
+        serial: asset.serialNumber,
+        qty: 1,
+      })));
+      setParts(inventory.filter((item) => item.type === 'Sales').slice(0, 3).map((item) => ({
+        id: item.id,
+        name: item.name,
+        qty: 1,
+        charge: item.sellingPrice || 0,
+      })));
+    });
+  }, []);
 
   const updateDevice = (id, field, value) => {
     setDevices((current) => current.map((device) => device.id === id ? { ...device, [field]: value } : device));

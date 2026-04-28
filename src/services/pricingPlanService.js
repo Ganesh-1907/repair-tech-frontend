@@ -1,9 +1,5 @@
-import { rentalStore } from './rentalDataStore';
+import { api } from './apiClient';
 
 export const pricingPlanService = {
-  async listPlans() {
-    await rentalStore.sleep();
-    return rentalStore.listPricingPlans();
-  },
+  listPlans: () => api.list('rentalPricingPlans'),
 };
-

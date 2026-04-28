@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import {
@@ -37,6 +37,7 @@ import {
   Target
 } from 'lucide-react';
 import { usePrivacy } from '../../context/PrivacyContext';
+import { cmcCustomerService, cmcDashboardService, cmcDeviceRegistryService } from '../../services/cmcServices';
 import './DashboardPremiumStyles.css';
 
 ChartJS.register(
@@ -54,6 +55,36 @@ ChartJS.register(
 
 const CMCDashboardPage = () => {
   const { formatCurrency } = usePrivacy();
+  const [stats, setStats] = useState({});
+  const [revenueTrend, setRevenueTrend] = useState([]);
+  const [partsTrend, setPartsTrend] = useState([]);
+  const [contracts, setContracts] = useState([]);
+  const [devices, setDevices] = useState([]);
+  const [expiring, setExpiring] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      cmcDashboardService.getStats(),
+      cmcDashboardService.getRevenueTrend(),
+      cmcDashboardService.getPartsUsageTrend(),
+      cmcDashboardService.getExpiringContracts(),
+      cmcCustomerService.getCustomers(),
+      cmcDeviceRegistryService.getDevices(),
+    ]).then(([nextStats, nextRevenueTrend, nextPartsTrend, nextExpiring, nextContracts, nextDevices]) => {
+      setStats(nextStats);
+      setRevenueTrend(nextRevenueTrend);
+      setPartsTrend(nextPartsTrend);
+      setExpiring(nextExpiring);
+      setContracts(nextContracts);
+      setDevices(nextDevices);
+    });
+  }, []);
+
+  const deviceHealth = useMemo(() => Object.values(devices.reduce((acc, device) => {
+    acc[device.status] = acc[device.status] || { name: device.status, value: 0 };
+    acc[device.status].value += 1;
+    return acc;
+  }, {})), [devices]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -97,13 +128,13 @@ const CMCDashboardPage = () => {
 
       {/* 3. KPI Grid */}
       <div className="ref-kpi-grid">
-         <KPIBox title="CMC Revenue" value="₹18,20,000" trend="+22.5%" trendUp icon={<IndianRupee />} color="#6366f1" bg="#e0e7ff" />
-         <KPIBox title="Part Replacement" value="1,240" trend="+15%" trendUp icon={<Zap />} color="#0ea5e9" bg="#e0f2fe" />
-         <KPIBox title="Active Devices" value="2,452" trend="+342" trendUp icon={<ShieldCheck />} color="#8b5cf6" bg="#ede9fe" />
-         <KPIBox title="Critical Failure" value="3" trend="-2" trendUp={false} icon={<AlertTriangle />} color="#ef4444" bg="#fef2f2" />
-         <KPIBox title="SLA Violation" value="0" trend="0%" trendUp icon={<Clock />} color="#f59e0b" bg="#fef3c7" />
-         <KPIBox title="Avg Fix Time" value="4.2h" trend="-0.5h" trendUp={false} icon={<Activity />} color="#10b981" bg="#dcfce7" />
-         <KPIBox title="Net Profit" value="₹8.4L" trend="+12%" trendUp icon={<TrendingUp />} color="#6366f1" bg="#e0e7ff" />
+         <KPIBox title="CMC Revenue" value={formatCurrency(stats.revenue)} trend="+22.5%" trendUp icon={<IndianRupee />} color="#6366f1" bg="#e0e7ff" />
+         <KPIBox title="Part Cost" value={formatCurrency(stats.partsCost)} trend="+15%" trendUp icon={<Zap />} color="#0ea5e9" bg="#e0f2fe" />
+         <KPIBox title="Active Devices" value={devices.length} trend="+342" trendUp icon={<ShieldCheck />} color="#8b5cf6" bg="#ede9fe" />
+         <KPIBox title="Critical Failure" value={devices.filter((device) => device.status === 'Critical').length} trend="-2" trendUp={false} icon={<AlertTriangle />} color="#ef4444" bg="#fef2f2" />
+         <KPIBox title="Open Visits" value={stats.openTickets || 0} trend="0%" trendUp icon={<Clock />} color="#f59e0b" bg="#fef3c7" />
+         <KPIBox title="Profit Margin" value={`${stats.profitMargin || 0}%`} trend="-0.5h" trendUp={false} icon={<Activity />} color="#10b981" bg="#dcfce7" />
+         <KPIBox title="Net Profit" value={formatCurrency(stats.netProfit)} trend="+12%" trendUp icon={<TrendingUp />} color="#6366f1" bg="#e0e7ff" />
       </div>
 
       {/* 4. Main Charts Grid */}
@@ -119,10 +150,10 @@ const CMCDashboardPage = () => {
             <div style={{ flex: 1, minHeight: 0 }}>
                <Bar 
                  data={{
-                   labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                   labels: revenueTrend.map((row) => row.month),
                    datasets: [
-                     { label: 'Profit', data: [120, 145, 138, 162, 158, 180], backgroundColor: '#6366f1', borderRadius: 8, barThickness: 20 },
-                     { label: 'Parts', data: [80, 75, 90, 110, 95, 105], backgroundColor: '#e2e8f0', borderRadius: 8, barThickness: 20 }
+                     { label: 'Profit', data: revenueTrend.map((row) => row.profit), backgroundColor: '#6366f1', borderRadius: 12, barThickness: 24 },
+                     { label: 'Parts', data: partsTrend.map((row) => row.cost), backgroundColor: '#e2e8f0', borderRadius: 12, barThickness: 24 }
                    ]
                  }}
                  options={commonBarOptions}
@@ -140,9 +171,9 @@ const CMCDashboardPage = () => {
             <div style={{ height: '140px', marginBottom: '16px' }}>
                <Pie 
                  data={{
-                   labels: ['Healthy', 'Serviced', 'Critical', 'Idle'],
+                   labels: deviceHealth.map((row) => row.name),
                    datasets: [{
-                     data: [75, 15, 5, 5],
+                     data: deviceHealth.map((row) => row.value),
                      backgroundColor: ['#6366f1', '#10b981', '#ef4444', '#f59e0b'],
                      borderWidth: 0
                    }]
@@ -151,10 +182,7 @@ const CMCDashboardPage = () => {
                />
             </div>
             <div className="legend-grid">
-               <LegendItem label="Healthy" color="#6366f1" />
-               <LegendItem label="Serviced" color="#10b981" />
-               <LegendItem label="Critical" color="#ef4444" />
-               <LegendItem label="Idle" color="#f59e0b" />
+               {deviceHealth.map((row, index) => <LegendItem key={row.name} label={row.name} color={['#6366f1', '#10b981', '#ef4444', '#f59e0b'][index % 4]} />)}
             </div>
          </Motion.div>
 
@@ -198,8 +226,9 @@ const CMCDashboardPage = () => {
                <span className="ref-badge ref-badge-pending">5 Devices</span>
             </div>
             <div className="space-y-4">
-               <OpListItem label="Alpha MRI-201" detail="Cooling System" badge="URGENT" color="indigo" />
-               <OpListItem label="City Scan-102" detail="Voltage Instability" badge="URGENT" color="emerald" />
+               {devices.filter((device) => device.status !== 'Healthy').slice(0, 2).map((device) => (
+                 <OpListItem key={device.id} label={device.model} detail={device.customerName} badge={device.status.toUpperCase()} color="indigo" />
+               ))}
             </div>
          </Motion.div>
 
@@ -215,8 +244,9 @@ const CMCDashboardPage = () => {
                <span className="ref-badge ref-badge-critical">3 Critical</span>
             </div>
             <div className="space-y-4">
-               <OpListItem label="Zeta Medical" detail="Enterprise CMC" badge="EXPIRED" color="rose" />
-               <OpListItem label="Public Health" detail="Annual Billing" badge="OVERDUE" color="rose" />
+               {expiring.slice(0, 2).map((row) => (
+                 <OpListItem key={row.id} label={row.customer} detail="Contract renewal due" badge={row.expiry} color="rose" />
+               ))}
             </div>
          </Motion.div>
 
@@ -226,8 +256,9 @@ const CMCDashboardPage = () => {
                <p className="text-[9px] text-slate-400 font-medium">Revenue split by CMC category.</p>
             </div>
             <div className="space-y-6">
-               <StreamItem name="Medical Grade" value="₹12.4L" percentage={75} />
-               <StreamItem name="Industrial Grade" value="₹4.1L" percentage={20} />
+               {contracts.slice(0, 3).map((row) => (
+                 <StreamItem key={row.id} name={row.customerName} value={formatCurrency(row.revenue)} percentage={Math.max(5, Math.min(95, Number(row.profit || 0) / (Number(row.revenue || 1)) * 100))} color="indigo" />
+               ))}
             </div>
          </Motion.div>
       </div>
@@ -253,21 +284,23 @@ const CMCDashboardPage = () => {
                </tr>
             </thead>
             <tbody>
-               <tr className="group hover:bg-slate-50/50 transition-all">
-                  <td><span className="text-xs font-black text-slate-900">#CMC-8029</span></td>
-                  <td>
-                     <div>
-                        <p className="text-xs font-black text-slate-900">Alpha Medical</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase">Enterprise Contract</p>
-                     </div>
-                  </td>
-                  <td><span className="text-xs font-bold text-slate-600">42 Devices</span></td>
-                  <td><span className="text-xs font-bold text-slate-600">2026-04-15</span></td>
-                  <td><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase">Active</span></td>
-                  <td className="text-right">
-                     <button className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 shadow-sm transition-all"><ChevronRight size={14} /></button>
-                  </td>
-               </tr>
+               {contracts.map((row) => (
+                  <tr key={row.id} className="group hover:bg-slate-50/50 transition-all">
+                     <td><span className="text-xs font-black text-slate-900">#{row.id}</span></td>
+                     <td>
+                        <div>
+                           <p className="text-xs font-black text-slate-900">{row.customerName}</p>
+                           <p className="text-[9px] font-bold text-slate-400 uppercase">{row.customerType}</p>
+                        </div>
+                     </td>
+                     <td><span className="text-xs font-bold text-slate-600">{row.devicesCount} Devices</span></td>
+                     <td><span className="text-xs font-bold text-slate-600">{row.startDate}</span></td>
+                     <td><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase">{row.status}</span></td>
+                     <td className="text-right">
+                        <button className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 shadow-sm transition-all"><ChevronRight size={14} /></button>
+                     </td>
+                  </tr>
+               ))}
             </tbody>
          </table>
       </Motion.div>
@@ -314,9 +347,9 @@ const OpListItem = ({ label, detail, badge, color }) => (
    </div>
 );
 
-const StreamItem = ({ name, value, percentage }) => (
-   <div style={{ marginBottom: '16px' }}>
-      <div className="flex justify-between items-end mb-2">
+const StreamItem = ({ name, value, percentage, color: _color }) => (
+   <div className="space-y-3">
+      <div className="flex justify-between items-end">
          <p className="text-xs font-black text-slate-900">{name}</p>
          <p className="text-xs font-black text-slate-900">{value}</p>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   Calendar, 
   Search, 
@@ -14,22 +14,15 @@ import {
   X,
   Edit
 } from 'lucide-react';
+import { cmcMaintenanceService } from '../../services/cmcServices';
 import './CMCScheduledMaintenanceStyles.css';
 
-const initialSchedules = [
-  { id: 'SCH-CMC-9001', customer: 'Global Tech', cmcId: 'CMC-2026-0001', location: 'Andheri West', visitNo: 1, date: '2026-05-15', tech: 'Rahul Kumar', status: 'Scheduled', notes: '' },
-  { id: 'SCH-CMC-9002', customer: 'Stellar Bank', cmcId: 'CMC-2026-0002', location: 'BKC Branch', visitNo: 4, date: '2026-05-10', tech: 'Amit Singh', status: 'Technician Assigned', notes: '' },
-  { id: 'SCH-CMC-9003', customer: 'Nova Systems', cmcId: 'CMC-2026-0003', location: 'Powai', visitNo: 2, date: '2026-05-08', tech: 'Priya Sharma', status: 'In Progress', notes: '' },
-  { id: 'SCH-CMC-9004', customer: 'Metro Hospital', cmcId: 'CMC-2026-0004', location: 'Thane', visitNo: 3, date: '2026-05-06', tech: 'Karan Mehta', status: 'Completed', notes: '' },
-  { id: 'SCH-CMC-9005', customer: 'Apex Retail', cmcId: 'CMC-2026-0005', location: 'Malad', visitNo: 1, date: '2026-05-03', tech: 'Unassigned', status: 'Missed', notes: '' }
-];
-
 const CMCScheduledMaintenancePage = () => {
-  const [schedules, setSchedules] = useState(initialSchedules);
+  const [schedules, setSchedules] = useState([]);
   const [activeTab, setActiveTab] = useState('All');
   
   // Filters & Search
-  const [globalSearch, setGlobalSearch] = useState('');
+  const [globalSearch] = useState('');
   const [tableSearch, setTableSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('All Dates');
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
@@ -44,13 +37,19 @@ const CMCScheduledMaintenancePage = () => {
   const [modalMode, setModalMode] = useState('create');
   const [formData, setFormData] = useState({});
 
-  const showToast = (message) => {
+  useEffect(() => {
+    cmcMaintenanceService.getSchedules()
+      .then(setSchedules)
+      .catch(() => showToast('Unable to load CMC schedules'));
+  }, []);
+
+  function showToast(message) {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 3000);
-  };
+  }
 
   const toggleDropdown = (name) => {
     setDropdownOpen(dropdownOpen === name ? null : name);
@@ -108,33 +107,35 @@ const CMCScheduledMaintenancePage = () => {
     closeDropdowns();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.customer || !formData.date) {
       alert("Please fill required fields (Customer, Date)");
       return;
     }
-    
+    const saved = await cmcMaintenanceService.saveSchedule(formData);
     if (modalMode === 'create') {
-      setSchedules(prev => [formData, ...prev]);
+      setSchedules(prev => [saved, ...prev]);
       showToast('CMC Schedule created successfully');
     } else {
-      setSchedules(prev => prev.map(s => s.id === formData.id ? formData : s));
+      setSchedules(prev => prev.map(s => s.id === saved.id ? saved : s));
       showToast('CMC Schedule updated successfully');
     }
     setIsModalOpen(false);
   };
 
-  const handleRowAction = (action, sch) => {
+  const handleRowAction = async (action, sch) => {
     closeDropdowns();
     if (action === 'view') {
       openModal('view', sch);
     } else if (action === 'edit' || action === 'assign') {
       openModal('edit', sch);
     } else if (action === 'complete') {
-      setSchedules(prev => prev.map(s => s.id === sch.id ? { ...s, status: 'Completed' } : s));
+      const saved = await cmcMaintenanceService.saveSchedule({ ...sch, status: 'Completed' });
+      setSchedules(prev => prev.map(s => s.id === sch.id ? saved : s));
       showToast(`Schedule ${sch.id} marked as Completed`);
     } else if (action === 'delete') {
       if (window.confirm('Are you sure you want to delete this schedule?')) {
+        await cmcMaintenanceService.deleteSchedule(sch.id);
         setSchedules(prev => prev.filter(s => s.id !== sch.id));
         showToast('Schedule deleted');
       }
@@ -178,13 +179,11 @@ const CMCScheduledMaintenancePage = () => {
   const techOptions = ['All Technicians', 'Rahul Kumar', 'Amit Singh', 'Priya Sharma', 'Karan Mehta', 'Unassigned'];
   const dateOptions = ['All Dates', 'Today', 'This Week', 'This Month', 'Custom Date'];
 
-  // Stats calculation matches requested exact numbers but uses dynamic if lengths match
-  // 42, 8, 6, 2 were specifically requested by user.
   const stats = [
-    { label: 'Total CMC Visits', val: '42', icon: CalendarDays, colorClass: 'cmc-stat-blue' },
-    { label: 'Pending Assignment', val: '8', icon: User, colorClass: 'cmc-stat-amber' },
-    { label: 'Completed Today', val: '6', icon: CheckCircle2, colorClass: 'cmc-stat-emerald' },
-    { label: 'Missed Visits', val: '2', icon: AlertCircle, colorClass: 'cmc-stat-red' }
+    { label: 'Total CMC Visits', val: schedules.length, icon: CalendarDays, colorClass: 'cmc-stat-blue' },
+    { label: 'Pending Assignment', val: schedules.filter(s => s.tech === 'Unassigned').length, icon: User, colorClass: 'cmc-stat-amber' },
+    { label: 'Completed Today', val: schedules.filter(s => s.status === 'Completed').length, icon: CheckCircle2, colorClass: 'cmc-stat-emerald' },
+    { label: 'Missed Visits', val: schedules.filter(s => s.status === 'Missed').length, icon: AlertCircle, colorClass: 'cmc-stat-red' }
   ];
 
   return (

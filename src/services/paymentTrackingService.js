@@ -1,26 +1,20 @@
-import { rentalStore } from './rentalDataStore';
+import { api, apiClient } from './apiClient';
 
 export const paymentTrackingService = {
-  async listPayments() {
-    await rentalStore.sleep();
-    return rentalStore.listPayments();
-  },
+  listPayments: () => api.list('rentalPayments'),
 
   async collectPayment(payload) {
-    await rentalStore.sleep();
     if (!payload?.invoiceId) throw new Error('Invoice is required.');
     const amount = Number(payload?.amount || 0);
     if (amount <= 0) throw new Error('Payment amount must be greater than 0.');
-    const invoices = rentalStore.listInvoices();
-    const invoice = invoices.find((row) => row.id === payload.invoiceId);
+    const invoice = await api.get('rentalInvoices', payload.invoiceId);
     if (!invoice) throw new Error('Invoice not found.');
     if (amount > Number(invoice.outstanding || 0)) throw new Error('Payment amount cannot exceed pending amount.');
-    return rentalStore.addPayment(payload);
+    const { data } = await apiClient.post('/rental/payments', payload);
+    return data;
   },
 
   async sendPaymentReminder(invoiceId) {
-    await rentalStore.sleep();
     return { ok: true, invoiceId, message: 'Payment reminder sent via WhatsApp/Email placeholder.' };
   },
 };
-

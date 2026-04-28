@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Search,
@@ -7,7 +7,7 @@ import {
   Phone,
   X
 } from 'lucide-react';
-import { mockDashboardData } from '../data/mockData';
+import { leadManagementService } from '../services/leadManagementService';
 
 const initialLeadForm = {
   customerName: '',
@@ -150,9 +150,15 @@ const LeadFormModal = ({ onClose, onCreate }) => {
 
 const Leads = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [leads, setLeads] = useState(mockDashboardData.leads);
+  const [leads, setLeads] = useState([]);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    leadManagementService.listLeads()
+      .then(setLeads)
+      .catch((error) => setNotice(error.response?.data?.message || error.message || 'Leads failed to load.'));
+  }, []);
 
   const statusParam = searchParams.get('status');
   const searchTerm = searchParams.get('q') || '';
@@ -197,10 +203,15 @@ const Leads = () => {
     setSearchParams(nextParams);
   };
 
-  const handleCreateLead = (lead) => {
-    setLeads((current) => [lead, ...current]);
-    setNotice(`Lead created for ${lead.customerName}.`);
-    closeLeadModal();
+  const handleCreateLead = async (lead) => {
+    try {
+      const created = await leadManagementService.createLead(lead);
+      setLeads((current) => [created, ...current]);
+      setNotice(`Lead created for ${created.customerName}.`);
+      closeLeadModal();
+    } catch (error) {
+      setNotice(error.response?.data?.message || error.message || 'Lead creation failed.');
+    }
   };
 
   const getStatusColor = (status) => {

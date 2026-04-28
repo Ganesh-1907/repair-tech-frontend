@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import {
@@ -52,9 +52,12 @@ ChartJS.register(
 );
 
 const ExpensesManagementPage = () => {
-  const { formatCurrency, isPrivacyOn } = usePrivacy();
-  const [notice, setNotice] = useState('');
-  const dashboardData = useMemo(() => getExpensesDashboardData(), []);
+  const { formatCurrency } = usePrivacy();
+  const [dashboardData, setDashboardData] = useState({ recentTransactions: [] });
+
+  useEffect(() => {
+    getExpensesDashboardData().then(setDashboardData);
+  }, []);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -325,7 +328,7 @@ const OpListItem = ({ label, detail, badge, color }) => (
    </div>
 );
 
-const StreamItem = ({ name, value, percentage, color }) => (
+const StreamItem = ({ name, value, percentage, color: _color }) => (
    <div className="space-y-3">
       <div className="flex justify-between items-end">
          <p className="text-xs font-black text-slate-900">{name}</p>

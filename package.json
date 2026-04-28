@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.11.2",
     "axios": "^1.15.0",
     "chart.js": "^4.5.1",
     "framer-motion": "^12.38.0",
@@ -17,6 +18,7 @@
     "react": "^19.2.4",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.4",
+    "react-redux": "^9.2.0",
     "react-router-dom": "^7.14.0",
     "recharts": "^3.8.1"
   },

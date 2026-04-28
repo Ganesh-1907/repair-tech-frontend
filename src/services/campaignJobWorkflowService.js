@@ -6,7 +6,7 @@ import {
   jobService,
   leadService,
   messageService,
-  pricingTemplates as campaignPricingTemplates,
+  pricingTemplateService,
   qrBarcodeService,
   quoteService,
 } from './campaignServices';
@@ -364,6 +364,7 @@ export const campaignJobWorkflowService = {
   },
 
   async getPricingTemplates() {
+    const campaignPricingTemplates = await pricingTemplateService.listTemplates();
     const base = campaignPricingTemplates.map((item) => ({
       issue: item.issue
         .replace('issue', 'Issue')

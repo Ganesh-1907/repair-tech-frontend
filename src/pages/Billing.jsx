@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { billingInvoiceService } from '../services/billingInvoiceService';
 import { inventoryService } from '../services/inventoryService';
 import {
   AlertCircle,
@@ -33,104 +34,8 @@ const addDays = (value, days) => {
 const defaultTerms = `1. Goods once sold will not be taken back.
 2. Subject to local jurisdiction.`;
 
-const initialUsedParts = [
-  { id: 1, name: 'Toner Powder', qty: '50g', selected: true, visible: true },
-  { id: 2, name: 'Drum', qty: '1', selected: true, visible: true },
-  { id: 3, name: 'Wiper', qty: '1', selected: false, visible: true },
-];
-
 const initialItems = [
   { id: 1, name: 'Cartridge Refilling', qty: 1, rate: 350, amount: 350 },
-];
-
-const initialInvoices = [
-  {
-    id: 260401,
-    invoiceNumber: 'INV-260401',
-    customerName: 'Global Tech Solutions Pvt Ltd',
-    customerCompany: 'Global Tech Solutions Pvt Ltd',
-    issueDate: '2026-04-01',
-    dueDate: '2026-04-08',
-    status: 'Paid',
-    paymentStatus: 'Paid',
-    subtotal: 12800,
-    gstAmount: 2304,
-    total: 15104,
-    gstEnabled: true,
-    gstOption: 'extra',
-    customer: { name: 'Rahul Sharma', company: 'Global Tech Solutions Pvt Ltd', mobile: '9876543210', email: 'rahul@globaltech.com' },
-    billToSelf: true,
-    sendTo: { name: '', mobile: '', email: '' },
-    items: [
-      { id: 1, name: 'Printer Cartridge Refill', qty: 2, rate: 2400, amount: 4800 },
-      { id: 2, name: 'Maintenance Visit', qty: 1, rate: 8000, amount: 8000 },
-    ],
-    usedParts: [{ name: 'Toner Powder', qty: '50g', visible: true }],
-    terms: defaultTerms,
-  },
-  {
-    id: 260402,
-    invoiceNumber: 'INV-260402',
-    customerName: 'Spark Solutions',
-    customerCompany: 'Spark Solutions',
-    issueDate: '2026-04-10',
-    dueDate: '2026-04-18',
-    status: 'Pending',
-    paymentStatus: 'Partially Paid',
-    subtotal: 6800,
-    gstAmount: 0,
-    total: 6800,
-    gstEnabled: false,
-    gstOption: 'extra',
-    customer: { name: 'Priya Verma', company: 'Spark Solutions', mobile: '9988776655', email: 'priya@sparksol.com' },
-    billToSelf: true,
-    sendTo: { name: '', mobile: '', email: '' },
-    items: [{ id: 1, name: 'Onsite Service Call', qty: 1, rate: 6800, amount: 6800 }],
-    usedParts: [{ name: 'Drum', qty: '1', visible: true }],
-    terms: defaultTerms,
-  },
-  {
-    id: 260403,
-    invoiceNumber: 'INV-260403',
-    customerName: 'Oceanic Industries',
-    customerCompany: 'Oceanic Industries',
-    issueDate: '2026-03-25',
-    dueDate: '2026-04-02',
-    status: 'Overdue',
-    paymentStatus: 'Unpaid',
-    subtotal: 5200,
-    gstAmount: 936,
-    total: 6136,
-    gstEnabled: true,
-    gstOption: 'included',
-    customer: { name: 'Amit Singh', company: 'Oceanic Industries', mobile: '8877665544', email: 'amit@oceanic.in' },
-    billToSelf: false,
-    sendTo: { name: 'Accounts Team', mobile: '7788996655', email: 'accounts@oceanic.in' },
-    items: [{ id: 1, name: 'Replacement Kit', qty: 1, rate: 5200, amount: 5200 }],
-    usedParts: [{ name: 'Wiper', qty: '1', visible: false }],
-    terms: defaultTerms,
-  },
-  {
-    id: 260404,
-    invoiceNumber: 'INV-260404',
-    customerName: 'Creative Ads',
-    customerCompany: 'Creative Ads',
-    issueDate: '2026-04-20',
-    dueDate: '2026-04-27',
-    status: 'Draft',
-    paymentStatus: 'Unpaid',
-    subtotal: 3500,
-    gstAmount: 0,
-    total: 3500,
-    gstEnabled: false,
-    gstOption: 'extra',
-    customer: { name: 'Sneha Kapur', company: 'Creative Ads', mobile: '7766554433', email: 'sneha@creativeads.in' },
-    billToSelf: true,
-    sendTo: { name: '', mobile: '', email: '' },
-    items: [{ id: 1, name: 'Draft Service Estimate', qty: 1, rate: 3500, amount: 3500 }],
-    usedParts: [],
-    terms: defaultTerms,
-  },
 ];
 
 const getInvoiceStatusClass = (status) => {
@@ -180,10 +85,10 @@ const Billing = () => {
   const [notice, setNotice] = useState('');
   const [invoiceTerms, setInvoiceTerms] = useState(defaultTerms);
   const [items, setItems] = useState(initialItems);
-  const [usedParts, setUsedParts] = useState(initialUsedParts);
-  const [invoices, setInvoices] = useState(initialInvoices);
+  const [usedParts, setUsedParts] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [nextItemId, setNextItemId] = useState(2);
-  const [nextInvoiceId, setNextInvoiceId] = useState(Math.max(...initialInvoices.map((invoice) => invoice.id)) + 1);
+  const [nextInvoiceId, setNextInvoiceId] = useState(Date.now());
   const [viewingInvoice, setViewingInvoice] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,6 +109,31 @@ const Billing = () => {
   );
 
   const isDateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+
+  useEffect(() => {
+    const loadBillingData = async () => {
+      try {
+        const [nextInvoices, inventoryItems] = await Promise.all([
+          billingInvoiceService.listInvoices(),
+          inventoryService.getItems(),
+        ]);
+        setInvoices(nextInvoices);
+        setUsedParts(inventoryItems
+          .filter((item) => item.type === 'Sales')
+          .slice(0, 6)
+          .map((item, index) => ({
+            id: item.id || index + 1,
+            name: item.name,
+            qty: item.unit === 'packs' ? '1 pack' : '1',
+            selected: index < 2,
+            visible: true,
+          })));
+      } catch (error) {
+        setNotice(error.response?.data?.message || error.message || 'Billing data failed to load.');
+      }
+    };
+    loadBillingData();
+  }, []);
 
   const filteredInvoices = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -324,13 +254,14 @@ const Billing = () => {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleGenerateInvoice = () => {
+  const handleGenerateInvoice = async () => {
     // Inventory Stock Check Logic
     try {
+      const inventoryItems = await inventoryService.getItems();
       items.forEach(billingItem => {
-        const invItem = inventoryService.getItems().find(i => 
+        const invItem = inventoryItems.find(i => 
           i.name.toLowerCase() === billingItem.name.toLowerCase() || 
-          i.sku.toLowerCase() === billingItem.name.toLowerCase()
+          (i.sku || '').toLowerCase() === billingItem.name.toLowerCase()
         );
         
         if (invItem && invItem.isStockDependent) {
@@ -348,8 +279,9 @@ const Billing = () => {
     if (!validateInvoice()) return;
     const seed = nextInvoiceId;
     const invoiceNumber = createInvoiceNumber(seed);
+    const issueDate = new Date().toISOString().slice(0, 10);
     const generatedInvoice = {
-      id: seed,
+      id: invoiceNumber,
       invoiceNumber,
       customerName: customer.name.trim(),
       customerCompany: customer.company.trim() || 'Individual',
@@ -374,9 +306,14 @@ const Billing = () => {
       terms: invoiceTerms,
     };
 
-    setInvoices((current) => [generatedInvoice, ...current]);
-    setNextInvoiceId((current) => current + 1);
-    setNotice(`Invoice ${invoiceNumber} generated successfully. Total: ${formatAmount(total)}.`);
+    try {
+      const created = await billingInvoiceService.createInvoice(generatedInvoice);
+      setInvoices((current) => [created, ...current]);
+      setNextInvoiceId(Date.now());
+      setNotice(`Invoice ${created.invoiceNumber} generated successfully. Total: ${formatAmount(created.total)}.`);
+    } catch (error) {
+      setNotice(error.response?.data?.message || error.message || 'Invoice generation failed.');
+    }
   };
 
   const handleEditInvoice = (invoice) => {
@@ -443,37 +380,22 @@ const Billing = () => {
     setNotice(`${invoice.invoiceNumber} downloaded.`);
   };
 
-  const handleMarkPaid = (invoice) => {
+  const handleMarkPaid = async (invoice) => {
     if (invoice.paymentStatus === 'Paid') return;
 
-    setInvoices((current) => current.map((entry) => (
-      entry.id === invoice.id
-        ? { ...entry, paymentStatus: 'Paid', status: 'Paid' }
-        : entry
-    )));
-    setNotice(`${invoice.invoiceNumber} marked as paid.`);
+    const updated = await billingInvoiceService.patchInvoice(invoice.id, { paymentStatus: 'Paid', status: 'Paid' });
+    setInvoices((current) => current.map((entry) => (entry.id === invoice.id ? updated : entry)));
+    setNotice(`${updated.invoiceNumber} marked as paid.`);
   };
 
-  const handlePaymentAction = (invoice) => {
+  const handlePaymentAction = async (invoice) => {
     if (invoice.paymentStatus === 'Paid') return;
 
-    setInvoices((current) => current.map((entry) => {
-      if (entry.id !== invoice.id) return entry;
-
-      if (entry.paymentStatus === 'Unpaid') {
-        return {
-          ...entry,
-          paymentStatus: 'Partially Paid',
-          status: entry.status === 'Draft' ? 'Pending' : entry.status,
-        };
-      }
-
-      return {
-        ...entry,
-        paymentStatus: 'Paid',
-        status: 'Paid',
-      };
-    }));
+    const patch = invoice.paymentStatus === 'Unpaid'
+      ? { paymentStatus: 'Partially Paid', status: invoice.status === 'Draft' ? 'Pending' : invoice.status }
+      : { paymentStatus: 'Paid', status: 'Paid' };
+    const updated = await billingInvoiceService.patchInvoice(invoice.id, patch);
+    setInvoices((current) => current.map((entry) => (entry.id === invoice.id ? updated : entry)));
 
     const actionMessage = invoice.paymentStatus === 'Unpaid'
       ? `Partial payment recorded for ${invoice.invoiceNumber}.`

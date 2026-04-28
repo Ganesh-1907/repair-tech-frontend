@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   FileText,
   Download,
@@ -14,10 +14,24 @@ import {
   X
 } from 'lucide-react';
 import { usePrivacy } from '../context/PrivacyContext';
+import { billingInvoiceService } from '../services/billingInvoiceService';
+import { expenseManagementService } from '../services/expenseManagementService';
 
 const CAPortal = () => {
   const { formatCurrency, isPrivacyOn } = usePrivacy();
   const [notice, setNotice] = useState('');
+  const [invoices, setInvoices] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      billingInvoiceService.listInvoices(),
+      expenseManagementService.getExpenses(),
+    ]).then(([nextInvoices, nextExpenses]) => {
+      setInvoices(nextInvoices);
+      setExpenses(nextExpenses);
+    });
+  }, []);
 
   const reportCategories = [
     { title: 'Tax & Compliance', icon: Calculator, reports: ['GST GSTR-3B Summary', 'TDS Deduction Report', 'Tax Audit Trail'] },
@@ -26,12 +40,17 @@ const CAPortal = () => {
     { title: 'Expenses & Payroll', icon: CreditCard, reports: ['Expense Analysis', 'Payroll Summary', 'Supplier Outstanding'] },
   ];
 
-  const financialSummary = [
-    { label: 'Total Sales (FY 2024)', value: 4500000, color: 'primary' },
-    { label: 'Total GST Collected', value: 810000, color: 'success' },
-    { label: 'Total Expenses', value: 1200000, color: 'danger' },
-    { label: 'Net Taxable Profit', value: 3300000, color: 'warning' },
-  ];
+  const financialSummary = useMemo(() => {
+    const sales = invoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
+    const gst = invoices.reduce((sum, invoice) => sum + Number(invoice.gstAmount || invoice.gst || 0), 0);
+    const outgoing = expenses.filter((row) => row.flowType !== 'Income').reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    return [
+      { label: 'Total Sales (FY 2026)', value: sales, color: 'primary' },
+      { label: 'Total GST Collected', value: gst, color: 'success' },
+      { label: 'Total Expenses', value: outgoing, color: 'danger' },
+      { label: 'Net Taxable Profit', value: sales - outgoing, color: 'warning' },
+    ];
+  }, [expenses, invoices]);
 
   const handleReportAction = (report, action) => {
     setNotice(`${report} ${action === 'preview' ? 'preview opened' : 'download prepared'}.`);

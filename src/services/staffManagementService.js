@@ -1,54 +1,11 @@
-import { getTechnicianDashboardData, permissionOptions } from './technicianDashboardService';
-
-const sleep = (duration = 140) => new Promise((resolve) => setTimeout(resolve, duration));
-const clone = (value) => JSON.parse(JSON.stringify(value));
-
-const source = getTechnicianDashboardData();
-
-const jobsPool = source.pendingJobs.map((job) => ({
-  id: job.id,
-  title: job.title,
-  customer: job.customer,
-  priority: job.priority || 'Medium',
-}));
-
-let staffRows = source.technicians.map((tech) => ({
-  id: tech.id,
-  name: tech.name,
-  phone: tech.phone,
-  email: `${tech.name.toLowerCase().replace(/\s+/g, '.')}@repairboy.in`,
-  role: tech.role || 'Technician',
-  departmentSkill: tech.skills?.join(', ') || 'General',
-  status: tech.jobStatus === 'Inactive' ? 'Inactive' : tech.jobStatus,
-  attendanceStatus: tech.attendance || 'Absent',
-  assignedJobs: Number(tech.assignedJobs || 0),
-  lastSeen: tech.lastSeen || 'Not available',
-  address: `${tech.branch}, ${tech.city}`,
-  notes: '',
-}));
-
-let permissionsByStaff = Object.fromEntries(
-  staffRows.map((staff) => [staff.id, {
-    role: staff.role,
-    permissions: clone(source.permissions[staff.role] || source.permissions.Technician || []),
-  }])
-);
+import { permissionOptions } from './technicianDashboardService';
+import { api, apiClient } from './apiClient';
 
 const normalizeStatus = (value) => {
   if (!value) return 'Inactive';
   const valid = ['Active', 'Inactive', 'Available', 'On Job', 'On Leave'];
   return valid.includes(value) ? value : 'Inactive';
 };
-
-const makeStaffId = () => `STF-${Date.now().toString().slice(-6)}`;
-
-const dashboardStats = (rows = staffRows) => ({
-  totalStaff: rows.length,
-  activeStaff: rows.filter((row) => ['Active', 'Available', 'On Job'].includes(row.status)).length,
-  onJob: rows.filter((row) => row.status === 'On Job').length,
-  onLeave: rows.filter((row) => row.status === 'On Leave').length,
-  inactive: rows.filter((row) => row.status === 'Inactive').length,
-});
 
 export const staffManagementService = {
   roleOptions: ['Admin', 'Manager', 'Technician', 'Support Staff', 'Delivery Person'],
@@ -57,24 +14,16 @@ export const staffManagementService = {
   permissionOptions,
 
   async getStaffDashboardStats() {
-    await sleep();
-    return dashboardStats();
+    const { data } = await apiClient.get('/staff/stats');
+    return data;
   },
 
-  async getStaffList() {
-    await sleep();
-    return clone(staffRows);
-  },
+  getStaffList: () => api.list('staff'),
 
-  async getStaffById(staffId) {
-    await sleep();
-    return clone(staffRows.find((row) => row.id === staffId) || null);
-  },
+  getStaffById: (staffId) => api.get('staff', staffId),
 
-  async createStaff(payload) {
-    await sleep();
-    const row = {
-      id: makeStaffId(),
+  createStaff(payload) {
+    return api.create('staff', {
       name: payload.name,
       phone: payload.phone,
       email: payload.email || '',
@@ -86,73 +35,31 @@ export const staffManagementService = {
       lastSeen: 'just now',
       address: payload.address || '',
       notes: payload.notes || '',
-    };
-    staffRows = [row, ...staffRows];
-    permissionsByStaff[row.id] = {
-      role: row.role,
-      permissions: clone(source.permissions[row.role] || source.permissions.Technician || []),
-    };
-    return clone(row);
-  },
-
-  async updateStaff(staffId, payload) {
-    await sleep();
-    let updated = null;
-    staffRows = staffRows.map((row) => {
-      if (row.id !== staffId) return row;
-      updated = {
-        ...row,
-        ...payload,
-        id: staffId,
-        status: normalizeStatus(payload.status || row.status),
-      };
-      return updated;
     });
-    if (updated && permissionsByStaff[staffId]) {
-      permissionsByStaff[staffId].role = updated.role;
-    }
-    return clone(updated);
   },
 
-  async getPendingJobs() {
-    await sleep();
-    return clone(jobsPool);
+  updateStaff(staffId, payload) {
+    return api.update('staff', staffId, {
+      ...payload,
+      id: staffId,
+      status: normalizeStatus(payload.status),
+    });
   },
+
+  getPendingJobs: () => api.list('pendingJobs'),
 
   async assignJob(payload) {
-    await sleep();
-    const { staffId, pendingJobId, priority, notes } = payload;
-    const job = jobsPool.find((entry) => entry.id === pendingJobId);
-    if (!job) throw new Error('Pending job not found.');
-    let updated = null;
-    staffRows = staffRows.map((row) => {
-      if (row.id !== staffId) return row;
-      updated = {
-        ...row,
-        assignedJobs: Number(row.assignedJobs || 0) + 1,
-        status: 'On Job',
-        lastSeen: 'just now',
-        notes: [row.notes, `Assigned ${job.id} (${priority})${notes ? ` - ${notes}` : ''}`].filter(Boolean).join(' | '),
-      };
-      return updated;
-    });
-    return clone(updated);
+    const { data } = await apiClient.post('/staff/assign-job', payload);
+    return data.staff;
   },
 
   async getPermissions(staffId) {
-    await sleep();
-    return clone(permissionsByStaff[staffId] || {
-      role: 'Technician',
-      permissions: clone(source.permissions.Technician || []),
-    });
+    const { data } = await apiClient.get(`/staff/${staffId}/permissions`);
+    return data;
   },
 
   async updatePermissions(staffId, payload) {
-    await sleep();
-    const role = payload.role || 'Technician';
-    const permissions = Array.isArray(payload.permissions) ? payload.permissions : [];
-    permissionsByStaff[staffId] = { role, permissions };
-    return clone(permissionsByStaff[staffId]);
+    const { data } = await apiClient.put(`/staff/${staffId}/permissions`, payload);
+    return data;
   },
 };
-

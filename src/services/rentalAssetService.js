@@ -1,36 +1,29 @@
-import { rentalStore } from './rentalDataStore';
+import { api } from './apiClient';
 
 export const rentalAssetService = {
-  async listAssets() {
-    await rentalStore.sleep();
-    return rentalStore.listAssets();
-  },
+  listAssets: () => api.list('rentalAssets'),
 
   async getAsset(assetId) {
-    await rentalStore.sleep();
-    const asset = rentalStore.getAsset(assetId);
+    const asset = await api.get('rentalAssets', assetId);
     if (!asset) throw new Error('Asset not found.');
     return asset;
   },
 
   async saveAsset(payload) {
-    await rentalStore.sleep();
     if (!payload?.customerId) throw new Error('Customer is required.');
     if (!payload?.customerLocation?.trim()) throw new Error('Customer location is required.');
     if (!payload?.technician?.trim()) throw new Error('Assigned technician is required.');
     if (payload?.installationDate && payload?.serialNumber !== undefined && !String(payload.serialNumber).trim()) {
       throw new Error('Serial number is required after installation.');
     }
-    return rentalStore.saveAsset(payload);
+    return payload.id ? api.update('rentalAssets', payload.id, payload) : api.create('rentalAssets', payload);
   },
 
   async generateDeliveryChallan(assetId) {
-    await rentalStore.sleep();
-    const asset = rentalStore.getAsset(assetId);
-    if (!asset) throw new Error('Asset not found.');
+    const asset = await this.getAsset(assetId);
     return {
-      challanNo: rentalStore.nextId('CHL'),
-      generatedAt: rentalStore.todayDate(),
+      challanNo: `CHL-${Date.now().toString().slice(-6)}`,
+      generatedAt: new Date().toISOString().slice(0, 10),
       customer: asset.customerName,
       location: asset.customerLocation,
       devices: [{ assetId: asset.assetId, serialNumber: asset.serialNumber, model: asset.model }],
@@ -41,4 +34,3 @@ export const rentalAssetService = {
     };
   },
 };
-

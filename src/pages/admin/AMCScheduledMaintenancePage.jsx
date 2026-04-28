@@ -19,27 +19,19 @@ import {
 import { amcScheduledMaintenanceService } from '../../services/amcServices';
 import './AMCScheduledMaintenanceStyles.css';
 
-const initialSchedules = [
-  { id: 'SCH-9001', customer: 'Global Tech', amcId: 'AMC-2026-0001', location: 'Andheri West', visitNo: 1, date: '2026-05-15', tech: 'Rahul Kumar', status: 'Scheduled', notes: '' },
-  { id: 'SCH-9002', customer: 'Stellar Bank', amcId: 'AMC-2026-0002', location: 'BKC Branch', visitNo: 4, date: '2026-05-10', tech: 'Amit Singh', status: 'Technician Assigned', notes: '' },
-  { id: 'SCH-9003', customer: 'Nova Systems', amcId: 'AMC-2026-0003', location: 'Powai', visitNo: 2, date: '2026-05-08', tech: 'Priya Sharma', status: 'In Progress', notes: '' },
-  { id: 'SCH-9004', customer: 'Metro Hospital', amcId: 'AMC-2026-0004', location: 'Thane', visitNo: 3, date: '2026-05-06', tech: 'Karan Mehta', status: 'Completed', notes: '' },
-  { id: 'SCH-9005', customer: 'Apex Retail', amcId: 'AMC-2026-0005', location: 'Malad', visitNo: 1, date: '2026-05-03', tech: 'Unassigned', status: 'Missed', notes: '' }
-];
-
 const AMCScheduledMaintenancePage = () => {
-  const [schedules, setSchedules] = useState(initialSchedules);
+  const [schedules, setSchedules] = useState([]);
   const [activeTab, setActiveTab] = useState('All');
   
   // Filters & Search
-  const [globalSearch, setGlobalSearch] = useState('');
+  const [globalSearch] = useState('');
   const [tableSearch, setTableSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('All Dates');
   const [customRange, setCustomRange] = useState({ start: '', end: '' });
   const [techFilter, setTechFilter] = useState('All Technicians');
 
   // UI State
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(null);
   const [toasts, setToasts] = useState([]);
 
@@ -49,24 +41,18 @@ const AMCScheduledMaintenancePage = () => {
   const [formData, setFormData] = useState({});
 
   useEffect(() => {
-    try {
-      const realData = amcScheduledMaintenanceService.getSchedules();
-      if (realData && realData.length > 0) {
-        // Uncomment to use real data
-        // setSchedules(realData);
-      }
-    } catch (e) {
-      console.warn("Using fallback data for schedules");
-    }
+    amcScheduledMaintenanceService.getSchedules()
+      .then(setSchedules)
+      .catch(() => showToast('Unable to load AMC schedules'));
   }, []);
 
-  const showToast = (message) => {
+  function showToast(message) {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 3000);
-  };
+  }
 
   const toggleDropdown = (name) => {
     setDropdownOpen(dropdownOpen === name ? null : name);
@@ -124,33 +110,35 @@ const AMCScheduledMaintenancePage = () => {
     closeDropdowns();
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.customer || !formData.date) {
       alert("Please fill required fields (Customer, Date)");
       return;
     }
-    
+    const saved = await amcScheduledMaintenanceService.saveSchedule(formData);
     if (modalMode === 'create') {
-      setSchedules(prev => [formData, ...prev]);
+      setSchedules(prev => [saved, ...prev]);
       showToast('Schedule created successfully');
     } else {
-      setSchedules(prev => prev.map(s => s.id === formData.id ? formData : s));
+      setSchedules(prev => prev.map(s => s.id === saved.id ? saved : s));
       showToast('Schedule updated successfully');
     }
     setIsModalOpen(false);
   };
 
-  const handleRowAction = (action, sch) => {
+  const handleRowAction = async (action, sch) => {
     closeDropdowns();
     if (action === 'view') {
       openModal('view', sch);
     } else if (action === 'edit' || action === 'assign') {
       openModal('edit', sch);
     } else if (action === 'complete') {
-      setSchedules(prev => prev.map(s => s.id === sch.id ? { ...s, status: 'Completed' } : s));
+      const saved = await amcScheduledMaintenanceService.saveSchedule({ ...sch, status: 'Completed' });
+      setSchedules(prev => prev.map(s => s.id === sch.id ? saved : s));
       showToast(`Schedule ${sch.id} marked as Completed`);
     } else if (action === 'delete') {
       if (window.confirm('Are you sure you want to delete this schedule?')) {
+        await amcScheduledMaintenanceService.deleteSchedule(sch.id);
         setSchedules(prev => prev.filter(s => s.id !== sch.id));
         showToast('Schedule deleted');
       }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Save,
   Printer,
@@ -7,17 +7,36 @@ import {
   ChevronDown,
   X
 } from 'lucide-react';
+import { amcDeviceRegistryService } from '../services/amcServices';
+import { inventoryService } from '../services/inventoryService';
 
 const AMCReport = () => {
   const [notice, setNotice] = useState('');
-  const [deviceList, setDeviceList] = useState([
-    { id: 1, type: 'Printer', model: 'HP 12A', serial: 'XXXXX', status: 'OK', remarks: 'Cleaned', workDone: { pm: true, cleaning: true, minor: true } }
-  ]);
+  const [deviceList, setDeviceList] = useState([]);
+  const [partsUsed, setPartsUsed] = useState([]);
 
-  const [partsUsed, setPartsUsed] = useState([
-    { id: 1, name: 'Toner Powder', qty: 1, amount: 0 },
-    { id: 2, name: 'Drum', qty: 1, amount: 0 }
-  ]);
+  useEffect(() => {
+    Promise.all([
+      amcDeviceRegistryService.getDevices(),
+      inventoryService.getItems(),
+    ]).then(([devices, inventory]) => {
+      setDeviceList(devices.slice(0, 5).map((device) => ({
+        id: device.id,
+        type: device.type,
+        model: device.model,
+        serial: device.serial,
+        status: device.status === 'Healthy' ? 'OK' : 'Issue',
+        remarks: `Last service ${device.lastService || '-'}`,
+        workDone: { pm: true, cleaning: true, minor: device.status !== 'Healthy' },
+      })));
+      setPartsUsed(inventory.filter((item) => item.type === 'Sales').slice(0, 3).map((item) => ({
+        id: item.id,
+        name: item.name,
+        qty: 1,
+        amount: item.sellingPrice || 0,
+      })));
+    });
+  }, []);
 
   const addDevice = () => {
     setDeviceList([...deviceList, { id: Date.now(), type: 'Printer', model: '', serial: '', status: 'OK', remarks: '', workDone: { pm: false, cleaning: false, minor: false } }]);

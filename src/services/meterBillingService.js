@@ -1,9 +1,7 @@
-import { rentalStore } from './rentalDataStore';
 import { pricingPlanService } from './pricingPlanService';
 
 export const meterBillingService = {
   async calculateMeterAmount(payload) {
-    await rentalStore.sleep();
     const previous = Number(payload?.previousReading || 0);
     const current = Number(payload?.currentReading || 0);
     if (!payload?.billingMonth) throw new Error('Billing month is required.');
@@ -17,4 +15,3 @@ export const meterBillingService = {
     return { usage, calculatedAmount };
   },
 };
-

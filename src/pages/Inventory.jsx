@@ -34,10 +34,14 @@ const InventoryManagement = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setItems(inventoryService.getItems());
-    setStats(inventoryService.getStats());
-  };
+  async function loadData() {
+    const [nextItems, nextStats] = await Promise.all([
+      inventoryService.getItems(),
+      inventoryService.getStats(),
+    ]);
+    setItems(nextItems);
+    setStats(nextStats);
+  }
 
   const filteredItems = useMemo(() => {
     return items.filter(item => {
@@ -49,23 +53,21 @@ const InventoryManagement = () => {
     });
   }, [items, searchTerm, filterType]);
 
-  const handleDeductStock = (itemId) => {
+  const handleDeductStock = async (itemId) => {
     try {
-      inventoryService.updateStock(itemId, -1, 'Billing Deduction');
+      await inventoryService.updateStock(itemId, -1, 'Billing Deduction');
       setBillingEffect(itemId);
       setTimeout(() => setBillingEffect(null), 1000);
-      loadData();
+      await loadData();
     } catch (err) {
-      alert(err.message);
+      alert(err.response?.data?.message || err.message);
     }
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this item?')) {
-      const currentItems = inventoryService.getItems();
-      const updatedItems = currentItems.filter(i => i.id !== id);
-      localStorage.setItem('repair_tech_inventory', JSON.stringify(updatedItems));
-      loadData();
+      await inventoryService.deleteItem(id);
+      await loadData();
     }
   };
 
@@ -98,10 +100,10 @@ const InventoryManagement = () => {
               />
            </div>
            <button 
-            onClick={() => {
+            onClick={async () => {
               if (window.confirm('Reset all inventory data to factory defaults?')) {
-                localStorage.removeItem('repair_tech_inventory');
-                window.location.reload();
+                await inventoryService.resetItems();
+                await loadData();
               }
             }}
             className="w-12 h-12 flex items-center justify-center bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-indigo-600 hover:border-indigo-600 transition-all active:scale-95"
@@ -297,7 +299,7 @@ const InventoryManagement = () => {
         {showAddModal && (
           <AddInventoryModal 
             onClose={() => setShowAddModal(false)} 
-            onSave={() => { loadData(); setShowAddModal(false); }} 
+            onSave={async () => { await loadData(); setShowAddModal(false); }} 
           />
         )}
       </AnimatePresence>
@@ -349,7 +351,7 @@ const AddInventoryModal = ({ onClose, onSave }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) return;
 
     const newItem = {
@@ -362,8 +364,8 @@ const AddInventoryModal = ({ onClose, onSave }) => {
       status: 'Active'
     };
 
-    inventoryService.addItem(newItem);
-    onSave();
+    await inventoryService.addItem(newItem);
+    await onSave();
   };
 
   return (

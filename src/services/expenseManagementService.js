@@ -1,27 +1,14 @@
-const sleep = (duration = 140) => new Promise((resolve) => setTimeout(resolve, duration));
+import { api } from './apiClient';
+
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
 const categories = ['Salaries', 'Purchases', 'Rent', 'Utilities', 'Travel', 'Others'];
 const paymentModes = ['Cash', 'UPI', 'Bank Transfer', 'Card', 'Other'];
 const flowTypes = ['Outgoing', 'Income'];
 const vendorPayeeOptionsByCategory = {
-  Salaries: [
-    'Technician Salary',
-    'Support Staff Salary',
-    'Admin Salary',
-    'Delivery Staff Salary',
-  ],
-  Purchases: [
-    'Device Purchase Vendor',
-    'Spare Parts Vendor',
-    'Consumables Vendor',
-    'Necessary Office Purchase Vendor',
-  ],
-  Rent: [
-    'Shop Rent Owner',
-    'Office Rent Owner',
-    'Warehouse Rent Owner',
-  ],
+  Salaries: ['Technician Salary', 'Support Staff Salary', 'Admin Salary', 'Delivery Staff Salary'],
+  Purchases: ['Device Purchase Vendor', 'Spare Parts Vendor', 'Consumables Vendor', 'Necessary Office Purchase Vendor'],
+  Rent: ['Shop Rent Owner', 'Office Rent Owner', 'Warehouse Rent Owner'],
   Utilities: ['Electricity Board', 'Internet Provider', 'Water Utility Provider', 'Cloud Service Provider'],
   Travel: ['Field Team Reimbursement', 'Fuel Station Vendor', 'Travel Agency', 'Local Transport Vendor'],
   Others: ['Miscellaneous Vendor', 'Service Partner', 'Other Payee'],
@@ -34,91 +21,6 @@ const vendorPayeeHintByCategory = {
   Travel: 'Use travel/fuel reimbursement payees.',
   Others: 'Use miscellaneous external payees.',
 };
-
-let expenses = [
-  {
-    id: 'EXP-260401',
-    flowType: 'Outgoing',
-    personName: 'Rakesh Malviya',
-    expenseDate: '2026-04-21',
-    category: 'Rent',
-    description: 'Main office monthly rent',
-    amount: 65000,
-    paymentMode: 'Bank Transfer',
-    vendorPayee: 'Metro Office Rentals',
-    referenceNumber: 'RTR-APR-2401',
-    notes: 'Paid for April 2026',
-    receiptName: '',
-    createdBy: 'Finance Admin',
-    createdDate: '2026-04-21',
-  },
-  {
-    id: 'EXP-260402',
-    flowType: 'Outgoing',
-    personName: 'Anjali Nair',
-    expenseDate: '2026-04-22',
-    category: 'Utilities',
-    description: 'Office internet and electricity',
-    amount: 17450,
-    paymentMode: 'UPI',
-    vendorPayee: 'Electricity Board',
-    referenceNumber: 'UTL-88211',
-    notes: '',
-    receiptName: '',
-    createdBy: 'Finance Admin',
-    createdDate: '2026-04-22',
-  },
-  {
-    id: 'EXP-260403',
-    flowType: 'Outgoing',
-    personName: 'Ravi Kumar',
-    expenseDate: '2026-04-23',
-    category: 'Purchases',
-    description: 'Printer roller kit and toner',
-    amount: 32990,
-    paymentMode: 'Card',
-    vendorPayee: 'Spare Parts Vendor',
-    referenceNumber: 'PCS-1092',
-    notes: 'Inventory restock',
-    receiptName: '',
-    createdBy: 'Store Manager',
-    createdDate: '2026-04-23',
-  },
-  {
-    id: 'EXP-260404',
-    flowType: 'Outgoing',
-    personName: 'Ops Lead',
-    expenseDate: '2026-04-24',
-    category: 'Travel',
-    description: 'Technician travel reimbursement',
-    amount: 5400,
-    paymentMode: 'Cash',
-    vendorPayee: 'Field Team Reimbursement',
-    referenceNumber: 'TRV-778',
-    notes: '',
-    receiptName: '',
-    createdBy: 'Ops Lead',
-    createdDate: '2026-04-24',
-  },
-  {
-    id: 'EXP-260405',
-    flowType: 'Income',
-    personName: 'Accounts Team',
-    expenseDate: '2026-04-25',
-    category: 'Others',
-    description: 'Service reimbursement received',
-    amount: 18500,
-    paymentMode: 'Bank Transfer',
-    vendorPayee: 'Other Payee',
-    referenceNumber: 'INC-5581',
-    notes: 'Against outstanding claim',
-    receiptName: '',
-    createdBy: 'Finance Admin',
-    createdDate: '2026-04-25',
-  },
-];
-
-const makeExpenseId = () => `EXP-${Date.now().toString().slice(-6)}`;
 
 const groupByCategory = (rows) => categories.map((category) => ({
   category,
@@ -154,10 +56,9 @@ export const expenseManagementService = {
   },
 
   async getDashboardStats() {
-    await sleep();
-    const rows = clone(expenses);
+    const rows = await this.getExpenses();
     return {
-      totalExpenses: rows.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+      totalExpenses: rows.filter((row) => row.flowType !== 'Income').reduce((sum, row) => sum + Number(row.amount || 0), 0),
       monthlyExpenses: monthlyTotal(rows),
       categorySummary: groupByCategory(rows),
       recentExpenses: rows.slice().sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate)).slice(0, 6),
@@ -166,35 +67,21 @@ export const expenseManagementService = {
   },
 
   async getExpenses() {
-    await sleep();
-    return clone(expenses).sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate));
+    const rows = await api.list('expenses');
+    return rows.sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate));
   },
 
-  async getExpenseById(expenseId) {
-    await sleep();
-    return clone(expenses.find((row) => row.id === expenseId) || null);
-  },
+  getExpenseById: (expenseId) => api.get('expenses', expenseId),
 
-  async createExpense(payload) {
-    await sleep();
-    const row = {
-      id: makeExpenseId(),
+  createExpense(payload) {
+    return api.create('expenses', {
       createdDate: new Date().toISOString().slice(0, 10),
       createdBy: payload.createdBy || 'Admin User',
       ...payload,
-    };
-    expenses = [row, ...expenses];
-    return clone(row);
+    });
   },
 
-  async updateExpense(expenseId, payload) {
-    await sleep();
-    let updated = null;
-    expenses = expenses.map((row) => {
-      if (row.id !== expenseId) return row;
-      updated = { ...row, ...payload, id: expenseId };
-      return updated;
-    });
-    return clone(updated);
+  updateExpense(expenseId, payload) {
+    return api.update('expenses', expenseId, payload);
   },
 };

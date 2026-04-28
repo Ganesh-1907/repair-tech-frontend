@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { Bar, Pie, Line, Doughnut } from 'react-chartjs-2';
 import {
@@ -8,6 +8,7 @@ import {
   Activity, AlertCircle, ArrowRight, Briefcase, Calendar, Clock, Download, Target, TrendingUp, Users, Wallet, X, Search, Filter, MoreVertical, ChevronRight, UserCheck, CreditCard, Building2, ChevronDown, CheckCircle2, Plus, ArrowUpRight, ArrowDownRight, IndianRupee
 } from 'lucide-react';
 import { usePrivacy } from '../context/PrivacyContext';
+import { expenseManagementService } from '../services/expenseManagementService';
 import './admin/DashboardPremiumStyles.css';
 
 ChartJS.register(
@@ -15,15 +16,27 @@ ChartJS.register(
 );
 
 const Expenses = () => {
-  const { isPrivacyOn, formatCurrency } = usePrivacy();
+  const { formatCurrency } = usePrivacy();
+  const [dashboard, setDashboard] = useState({ totalExpenses: 0, monthlyExpenses: 0, categorySummary: [], recentExpenses: [], expenseTrend: [] });
+  const [expenses, setExpenses] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      expenseManagementService.getDashboardStats(),
+      expenseManagementService.getExpenses(),
+    ]).then(([nextDashboard, nextExpenses]) => {
+      setDashboard(nextDashboard);
+      setExpenses(nextExpenses);
+    });
+  }, []);
   
   const stats = [
-    { label: 'Total Accounts', value: '₹34,87,000', icon: Wallet, color: '#6366f1', bg: '#e0e7ff', trend: 'Global' },
-    { label: 'Opex Spend', value: '₹5,59,000', icon: ArrowDownRight, color: '#f43f5e', bg: '#fff1f2', trend: '- 8.4%' },
-    { label: 'Capex Spend', value: '₹2,92,000', icon: Building2, color: '#0ea5e9', bg: '#e0f2fe', trend: '+ 12%' },
-    { label: 'Pending Bills', value: '14', icon: Clock, color: '#f59e0b', bg: '#fef3c7', trend: 'Urgent' },
-    { label: 'Avg Monthly Spend', value: '₹4,20,000', icon: TrendingUp, color: '#8b5cf6', bg: '#ede9fe', trend: 'Projected' },
-    { label: 'Budget Health', value: '94%', icon: Target, color: '#10b981', bg: '#dcfce7', trend: 'Good' },
+    { label: 'Total Accounts', value: formatCurrency(dashboard.totalExpenses), icon: Wallet, color: '#6366f1', bg: '#e0e7ff', trend: 'Live' },
+    { label: 'Opex Spend', value: formatCurrency(dashboard.monthlyExpenses), icon: ArrowDownRight, color: '#f43f5e', bg: '#fff1f2', trend: 'Current Month' },
+    { label: 'Capex Spend', value: formatCurrency(dashboard.categorySummary.find((row) => row.category === 'Purchases')?.amount || 0), icon: Building2, color: '#0ea5e9', bg: '#e0f2fe', trend: 'Purchases' },
+    { label: 'Pending Bills', value: expenses.filter((row) => row.flowType !== 'Income').length, icon: Clock, color: '#f59e0b', bg: '#fef3c7', trend: 'Open' },
+    { label: 'Avg Monthly Spend', value: formatCurrency(dashboard.monthlyExpenses), icon: TrendingUp, color: '#8b5cf6', bg: '#ede9fe', trend: 'Projected' },
+    { label: 'Budget Health', value: dashboard.totalExpenses ? 'Live' : 'No Data', icon: Target, color: '#10b981', bg: '#dcfce7', trend: 'Synced' },
   ];
 
   const containerVariants = {
@@ -160,10 +173,16 @@ const Expenses = () => {
                   </tr>
                </thead>
                <tbody>
-                  <ExpenseRow date="2026-04-24" category="SALARY" note="April payroll batch execution" entity="HDFC Payroll" amount="₹2,82,000" />
-                  <ExpenseRow date="2026-04-23" category="PURCHASE" note="Printer parts bulk inventory" entity="SBI Current" amount="₹79,000" />
-                  <ExpenseRow date="2026-04-22" category="PAYMENT" note="Vendor payment to AquaFlow" entity="HDFC Current" amount="₹85,000" />
-                  <ExpenseRow date="2026-04-21" category="EXPENSE" note="Utilities and office internet" entity="Cash Velocity" amount="₹17,000" />
+                  {expenses.slice(0, 6).map((row) => (
+                    <ExpenseRow
+                      key={row.id}
+                      date={row.expenseDate}
+                      category={row.category}
+                      note={row.description}
+                      entity={row.vendorPayee || row.paymentMode}
+                      amount={formatCurrency(row.amount)}
+                    />
+                  ))}
                </tbody>
             </table>
          </Motion.div>

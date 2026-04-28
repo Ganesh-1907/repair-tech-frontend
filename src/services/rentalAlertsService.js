@@ -1,14 +1,9 @@
-import { rentalStore } from './rentalDataStore';
+import { api } from './apiClient';
 
 export const rentalAlertsService = {
-  async listAlerts() {
-    await rentalStore.sleep();
-    return rentalStore.listAlerts();
-  },
+  listAlerts: () => api.list('rentalAlerts'),
 
-  async updateAlertStatus(alertId, status) {
-    await rentalStore.sleep();
-    return rentalStore.updateAlert(alertId, { status });
+  updateAlertStatus(alertId, status) {
+    return api.patch('rentalAlerts', alertId, { status });
   },
 };
-

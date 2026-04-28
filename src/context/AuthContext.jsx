@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
+import { apiClient } from '../services/apiClient';
 
 const AuthContext = createContext();
 
@@ -11,20 +12,22 @@ const getMockUser = () => ({
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const token = localStorage.getItem('token');
-    return token ? getMockUser() : null;
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
   });
   const loading = false;
 
-  const login = async (_email, _password) => {
-    // Mock login for now
-    localStorage.setItem('token', 'mock_token');
-    setUser(getMockUser());
+  const login = async (email, password) => {
+    const { data } = await apiClient.post('/auth/login', { email, password });
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user || getMockUser()));
+    setUser(data.user || getMockUser());
     return { success: true };
   };
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setUser(null);
   };
 

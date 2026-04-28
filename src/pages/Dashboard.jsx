@@ -37,7 +37,7 @@ import {
 import { usePrivacy } from '../context/PrivacyContext';
 import { useTheme } from '../context/ThemeContext';
 import AlertsSystem from '../components/dashboard/AlertsSystem';
-import { mockDashboardData } from '../data/mockData';
+import { dashboardService } from '../services/dashboardService';
 import { getDashboardAlerts } from '../services/alertsService';
 
 ChartJS.register(
@@ -89,6 +89,17 @@ const alertActionRoutes = {
 };
 
 const escapeCsvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+const emptyDashboardData = {
+  metrics: [],
+  staffPerformance: [],
+  charts: {
+    revenueVsTarget: { labels: [], revenue: [], target: [] },
+    leadStatus: { labels: [], data: [] },
+    responseTime: { labels: [], data: [] },
+  },
+  expiryReminders: [],
+  inventoryAlerts: [],
+};
 
 const MetricCard = ({ label, value, type, trend, onClick }) => {
   const { formatCurrency } = usePrivacy();
@@ -143,7 +154,25 @@ const Dashboard = () => {
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const [notice, setNotice] = React.useState('');
-  const dashboardAlerts = React.useMemo(() => getDashboardAlerts(), []);
+  const [dashboardData, setDashboardData] = React.useState(emptyDashboardData);
+  const [dashboardAlerts, setDashboardAlerts] = React.useState([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      dashboardService.getDashboardData(),
+      getDashboardAlerts(),
+    ]).then(([nextDashboard, nextAlerts]) => {
+      if (!mounted) return;
+      setDashboardData(nextDashboard);
+      setDashboardAlerts(nextAlerts);
+    }).catch((error) => {
+      if (mounted) setNotice(error.response?.data?.message || error.message || 'Dashboard data failed to load.');
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleMetricClick = (label) => {
     const route = metricRoutes[label];
@@ -166,19 +195,19 @@ const Dashboard = () => {
   const exportDashboardData = () => {
     const rows = [
       ['Section', 'Name', 'Value', 'Detail'],
-      ...mockDashboardData.metrics.map((metric) => [
+      ...dashboardData.metrics.map((metric) => [
         'Metric',
         metric.label,
         metric.value,
         metric.trend,
       ]),
-      ...mockDashboardData.expiryReminders.map((reminder) => [
+      ...dashboardData.expiryReminders.map((reminder) => [
         'Expiry Reminder',
         reminder.client,
         reminder.expiryDate,
         `${reminder.type} - ${reminder.daysLeft} days left`,
       ]),
-      ...mockDashboardData.inventoryAlerts.map((alert) => [
+      ...dashboardData.inventoryAlerts.map((alert) => [
         'Inventory Alert',
         alert.partName,
         `${alert.currentStock} ${alert.unit}`,
@@ -190,7 +219,7 @@ const Dashboard = () => {
         alert.type,
         `${alert.priority} priority - ${alert.status} - ${alert.recommendation}`,
       ]),
-      ...mockDashboardData.staffPerformance.map((staff) => [
+      ...dashboardData.staffPerformance.map((staff) => [
         'Staff Performance',
         staff.name,
         staff.revenue,
@@ -239,11 +268,11 @@ const Dashboard = () => {
   };
 
   const revenueData = {
-    labels: mockDashboardData.charts.revenueVsTarget.labels,
+    labels: dashboardData.charts.revenueVsTarget.labels,
     datasets: [
       {
         label: 'Revenue',
-        data: mockDashboardData.charts.revenueVsTarget.revenue,
+        data: dashboardData.charts.revenueVsTarget.revenue,
         backgroundColor: chartColors.revenue,
         hoverBackgroundColor: chartColors.revenueHover,
         borderRadius: 12,
@@ -252,7 +281,7 @@ const Dashboard = () => {
       },
       {
         label: 'Target',
-        data: mockDashboardData.charts.revenueVsTarget.target,
+        data: dashboardData.charts.revenueVsTarget.target,
         backgroundColor: chartColors.target,
         hoverBackgroundColor: chartColors.targetHover,
         borderRadius: 12,
@@ -263,9 +292,9 @@ const Dashboard = () => {
   };
 
   const leadStatusData = {
-    labels: mockDashboardData.charts.leadStatus.labels,
+    labels: dashboardData.charts.leadStatus.labels,
     datasets: [{
-      data: mockDashboardData.charts.leadStatus.data,
+      data: dashboardData.charts.leadStatus.data,
       backgroundColor: [chartColors.revenue, chartColors.success, chartColors.warning, chartColors.danger],
       borderColor: chartColors.surface,
       borderWidth: 3,
@@ -374,7 +403,7 @@ const Dashboard = () => {
       )}
 
       <div className="metrics-grid">
-        {mockDashboardData.metrics.map((metric) => (
+        {dashboardData.metrics.map((metric) => (
           <Motion.div key={metric.label} variants={itemVariants}>
             <MetricCard 
               {...metric} 
@@ -427,10 +456,10 @@ const Dashboard = () => {
           <div className={`chart-container ${isPrivacyOn ? 'privacy-blur' : ''}`}>
             <Line
               data={{
-                labels: mockDashboardData.charts.responseTime.labels,
+                labels: dashboardData.charts.responseTime.labels,
                 datasets: [{
                   label: 'Minutes',
-                  data: mockDashboardData.charts.responseTime.data,
+                  data: dashboardData.charts.responseTime.data,
                   borderColor: chartColors.revenue,
                   pointBackgroundColor: chartColors.revenue,
                   pointBorderColor: chartColors.surface,
@@ -458,10 +487,10 @@ const Dashboard = () => {
                 <p>Contracts and rentals that need attention soon.</p>
               </div>
             </div>
-            <span className="badge badge-warning">{mockDashboardData.expiryReminders.length} Pending</span>
+            <span className="badge badge-warning">{dashboardData.expiryReminders.length} Pending</span>
           </div>
           <div className="alert-list">
-            {mockDashboardData.expiryReminders.map((reminder) => (
+            {dashboardData.expiryReminders.map((reminder) => (
               <div key={reminder.id} className="alert-item">
                 <div className="alert-info">
                   <div className="alert-type-tag">{reminder.type}</div>
@@ -492,10 +521,10 @@ const Dashboard = () => {
                 <p>Parts below configured minimum stock.</p>
               </div>
             </div>
-            <span className="badge badge-danger">{mockDashboardData.inventoryAlerts.length} Critical</span>
+            <span className="badge badge-danger">{dashboardData.inventoryAlerts.length} Critical</span>
           </div>
           <div className="alert-list">
-            {mockDashboardData.inventoryAlerts.map((alert) => (
+            {dashboardData.inventoryAlerts.map((alert) => (
               <div key={alert.id} className="alert-item">
                 <div className="alert-info">
                   <div className="alert-icon-container danger">
@@ -522,7 +551,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="staff-list">
-            {mockDashboardData.staffPerformance.slice(0, 5).map((staff) => (
+            {dashboardData.staffPerformance.slice(0, 5).map((staff) => (
               <div key={staff.name} className="staff-item">
                 <div className="staff-info">
                   <div className="avatar">{staff.name[0]}</div>

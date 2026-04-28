@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Save,
   Printer,
@@ -6,19 +6,37 @@ import {
   Trash2,
   X
 } from 'lucide-react';
+import { cmcDeviceRegistryService, cmcInventoryService } from '../services/cmcServices';
 
 const CMCReport = () => {
   const [notice, setNotice] = useState('');
-  const [deviceList, setDeviceList] = useState([
-    { id: 1, type: 'Printer', model: 'HP', serial: 'XXXXX', status: 'OK', remarks: 'Serviced', workDone: { full: true, parts: true } }
-  ]);
+  const [deviceList, setDeviceList] = useState([]);
 
-  const [includedParts, setIncludedParts] = useState([
-    { id: 1, name: 'Toner Powder', qty: 1 },
-    { id: 2, name: 'Drum', qty: 1 }
-  ]);
+  const [includedParts, setIncludedParts] = useState([]);
 
   const [chargeableParts, setChargeableParts] = useState([]);
+
+  useEffect(() => {
+    Promise.all([
+      cmcDeviceRegistryService.getDevices(),
+      cmcInventoryService.getPartsUsage(),
+    ]).then(([devices, parts]) => {
+      setDeviceList(devices.slice(0, 5).map((device) => ({
+        id: device.id,
+        type: device.deviceType,
+        model: device.model,
+        serial: device.serial,
+        status: device.status,
+        remarks: `Next service ${device.nextService || '-'}`,
+        workDone: { full: true, parts: device.coverage === 'Full Parts' },
+      })));
+      setIncludedParts(parts.filter((part) => part.covered).map((part) => ({
+        id: part.id,
+        name: part.partName,
+        qty: part.qty,
+      })));
+    });
+  }, []);
 
   const updateDevice = (id, field, value) => {
     setDeviceList((current) => current.map((device) => device.id === id ? { ...device, [field]: value } : device));

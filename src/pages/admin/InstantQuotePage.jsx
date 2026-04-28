@@ -4,34 +4,7 @@ import { Link } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { sendQuoteNotification } from '../../services/communicationService';
 import { usePrivacy } from '../../context/PrivacyContext';
-
-const quoteTemplates = [
-  { id: 'TPL-ISSUE-01', issue: 'Screen issue', min: 2500, max: 8500, editable: true },
-  { id: 'TPL-ISSUE-02', issue: 'SSD upgrade', min: 3500, max: 3500, editable: true },
-  { id: 'TPL-ISSUE-03', issue: 'Keyboard issue', min: 1800, max: 4500, editable: true },
-  { id: 'TPL-ISSUE-04', issue: 'Printer service', min: 1200, max: 1200, editable: true },
-];
-
-const initialHistory = [
-  {
-    id: 'QTE-8001',
-    customerName: 'Rahul Sharma',
-    phoneNumber: '9876543210',
-    issue: 'Screen issue',
-    estimate: 4200,
-    status: 'Sent',
-    channel: 'WhatsApp',
-  },
-  {
-    id: 'QTE-8002',
-    customerName: 'Priya Verma',
-    phoneNumber: '9988776655',
-    issue: 'SSD upgrade',
-    estimate: 4800,
-    status: 'Approved',
-    channel: 'SMS',
-  },
-];
+import { jobService, pricingTemplateService } from '../../services/campaignServices';
 
 const statusClass = {
   Draft: 'status-pill status-draft',
@@ -49,15 +22,35 @@ const getSuggestionText = (template) => {
 
 const InstantQuotePage = () => {
   const { formatCurrency } = usePrivacy();
-  const [selectedTemplateId, setSelectedTemplateId] = useState(quoteTemplates[0].id);
+  const [quoteTemplates, setQuoteTemplates] = useState([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [channel, setChannel] = useState('WhatsApp');
   const [finalEstimate, setFinalEstimate] = useState('');
-  const [history, setHistory] = useState(initialHistory);
+  const [history, setHistory] = useState([]);
   const [notice, setNotice] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [activeDropdownId, setActiveDropdownId] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      pricingTemplateService.listTemplates(),
+      jobService.listJobs(),
+    ]).then(([templates, jobs]) => {
+      setQuoteTemplates(templates);
+      setSelectedTemplateId((current) => current || templates[0]?.id || '');
+      setHistory(jobs.flatMap((job) => (job.quoteHistory || []).map((quote) => ({
+        id: `${job.id}-${quote.version}`,
+        customerName: job.customerName,
+        phoneNumber: job.phoneNumber,
+        issue: quote.issue,
+        estimate: quote.estimate,
+        status: quote.status,
+        channel: quote.channel,
+      }))));
+    });
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -70,13 +63,13 @@ const InstantQuotePage = () => {
   }, []);
 
   const selectedTemplate = useMemo(
-    () => quoteTemplates.find((template) => template.id === selectedTemplateId) || quoteTemplates[0],
-    [selectedTemplateId]
+    () => quoteTemplates.find((template) => template.id === selectedTemplateId) || quoteTemplates[0] || null,
+    [quoteTemplates, selectedTemplateId]
   );
 
   const suggestionText = getSuggestionText(selectedTemplate);
   const previewApprovalLink = `/admin/campaign/instant-quote/approval/PREVIEW`;
-  const effectiveEstimate = Number(finalEstimate) || selectedTemplate.min;
+  const effectiveEstimate = Number(finalEstimate) || selectedTemplate?.min || 0;
 
   const quoteStats = useMemo(() => ({
     drafts: history.filter((quote) => quote.status === 'Draft').length,
@@ -97,6 +90,10 @@ const InstantQuotePage = () => {
 
     const quoteId = `QTE-${Date.now().toString().slice(-5)}`;
     const approvalUrl = `/admin/campaign/instant-quote/approval/${quoteId}`;
+    if (!selectedTemplate) {
+      setNotice('Select an issue template first.');
+      return;
+    }
     const estimate = Number(finalEstimate) || selectedTemplate.min;
 
     setIsSending(true);
@@ -235,7 +232,7 @@ const InstantQuotePage = () => {
                 id="quote-final-estimate"
                 type="number"
                 min="0"
-                placeholder={selectedTemplate.min}
+                placeholder={selectedTemplate?.min || 0}
                 value={finalEstimate}
                 onChange={(event) => setFinalEstimate(event.target.value)}
               />
@@ -262,7 +259,7 @@ const InstantQuotePage = () => {
             </div>
           </div>
           <div className="notification-stats">
-            <div className="stat-row"><span>Selected issue</span><span className="count">{selectedTemplate.issue}</span></div>
+            <div className="stat-row"><span>Selected issue</span><span className="count">{selectedTemplate?.issue || '-'}</span></div>
             <div className="stat-row"><span>Template estimate</span><span className="count">{suggestionText.replace('Suggested price: ', '')}</span></div>
             <div className="stat-row"><span>Final estimate</span><span className="count">{formatCurrency(effectiveEstimate)}</span></div>
             <div className="stat-row"><span>Channel</span><span className="count">{channel}</span></div>

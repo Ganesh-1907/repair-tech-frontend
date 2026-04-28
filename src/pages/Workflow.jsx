@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   CheckCircle2,
   ChevronRight,
@@ -11,6 +11,7 @@ import {
   Ticket,
   X
 } from 'lucide-react';
+import { campaignJobWorkflowService } from '../services/campaignJobWorkflowService';
 
 const steps = [
   { id: 1, label: 'Customer Details', icon: User },
@@ -24,6 +25,14 @@ const steps = [
   { id: 9, label: 'Handover Message', icon: Send },
   { id: 10, label: 'Review Message', icon: Star },
 ];
+
+const stepByStatus = {
+  'Received at office': 2,
+  'Diagnosis in progress': 4,
+  'Waiting for parts': 6,
+  'Repair completed': 7,
+  Closed: 10,
+};
 
 const JobItem = ({ job, onUpdateStep }) => {
   const isFirstStep = job.currentStep === 1;
@@ -85,11 +94,19 @@ const JobItem = ({ job, onUpdateStep }) => {
 
 const Workflow = () => {
   const [notice, setNotice] = useState('');
-  const [jobs, setJobs] = useState([
-    { id: 1, customerName: 'Raj Kumar', mobileNumber: '9876543210', ticketId: 'SRV-1001', currentStep: 4 },
-    { id: 2, customerName: 'Simran Jit', mobileNumber: '9988776655', ticketId: 'SRV-1002', currentStep: 6 },
-    { id: 3, customerName: 'Arjun Mehra', mobileNumber: '8877665544', ticketId: 'SRV-1003', currentStep: 2 },
-  ]);
+  const [jobs, setJobs] = useState([]);
+
+  useEffect(() => {
+    campaignJobWorkflowService.listJobs()
+      .then((rows) => setJobs(rows.map((job) => ({
+        id: job.id,
+        customerName: job.customerName,
+        mobileNumber: job.phoneNumber,
+        ticketId: job.ticketId,
+        currentStep: stepByStatus[job.jobStatus] || 1,
+      }))))
+      .catch((error) => setNotice(error.response?.data?.message || error.message || 'Workflow jobs failed to load.'));
+  }, []);
 
   const updateStep = (id, newStep) => {
     setJobs((current) => current.map((job) => job.id === id ? { ...job, currentStep: newStep } : job));

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { Edit2, FileText } from 'lucide-react';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { rentalCustomerService } from '../../services/rentalCustomerService';
-import { rentalStore } from '../../services/rentalDataStore';
+import { apiClient } from '../../services/apiClient';
 
 const tabs = ['Overview', 'Locations', 'Assets', 'Agreements', 'Invoices', 'Maintenance', 'Replacements', 'Notes'];
 
@@ -13,8 +14,15 @@ const RentalCustomerDetailPage = () => {
   const [snapshot, setSnapshot] = useState(null);
 
   useEffect(() => {
-    rentalCustomerService.getCustomer(customerId).then(setCustomer);
-    setSnapshot(rentalStore.getState());
+    const load = async () => {
+      const [customerRow, rentalState] = await Promise.all([
+        rentalCustomerService.getCustomer(customerId),
+        apiClient.get('/rental/state'),
+      ]);
+      setCustomer(customerRow);
+      setSnapshot(rentalState.data);
+    };
+    load();
   }, [customerId]);
 
   const customerAssets = useMemo(() => (snapshot?.assets || []).filter((row) => row.customerId === customerId), [snapshot, customerId]);
@@ -224,4 +232,3 @@ const RentalCustomerDetailPage = () => {
 };
 
 export default RentalCustomerDetailPage;
-

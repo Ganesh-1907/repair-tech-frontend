@@ -39,16 +39,19 @@ const AssetManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState(null);
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setAssets(assetManagementService.getAssets());
-    setStats(assetManagementService.getStats());
-  };
+  async function loadData() {
+    const [nextAssets, nextStats] = await Promise.all([
+      assetManagementService.getAssets(),
+      assetManagementService.getStats(),
+    ]);
+    setAssets(nextAssets);
+    setStats(nextStats);
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -209,7 +212,7 @@ const AssetManagementPage = () => {
         </Motion.div>
       </div>
 
-      {showAddModal && <AddAssetModal onClose={() => setShowAddModal(false)} onSave={() => { loadData(); setShowAddModal(false); }} />}
+      {showAddModal && <AddAssetModal onClose={() => setShowAddModal(false)} onSave={async () => { await loadData(); setShowAddModal(false); }} />}
     </Motion.div>
   );
 };
@@ -255,13 +258,13 @@ const AddAssetModal = ({ onClose, onSave }) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    assetManagementService.addAsset({
+  const handleSave = async () => {
+    await assetManagementService.addAsset({
       ...formData,
       purchasePrice: Number(formData.purchasePrice),
       currentValue: Number(formData.currentValue) || Number(formData.purchasePrice)
     });
-    onSave();
+    await onSave();
   };
 
   return (
