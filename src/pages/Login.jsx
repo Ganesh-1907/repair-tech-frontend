@@ -11,8 +11,8 @@ const Login = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    await login(email, password);
-    navigate('/');
+    const result = await login(email, password);
+    navigate(result.user?.role === 'staff' ? '/admin/staff-portal' : '/');
   };
 
   return (
@@ -32,7 +32,7 @@ const Login = () => {
               <input
                 id="login-email"
                 type="email"
-                placeholder="admin@enterprise.com"
+                placeholder="ganesh.bora@gmail.com"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required

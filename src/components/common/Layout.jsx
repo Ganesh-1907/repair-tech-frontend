@@ -41,6 +41,9 @@ const Layout = ({ children }) => {
 
   if (loading) return <div className="loading-container">Loading...</div>;
   if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.role === 'staff' && !location.pathname.startsWith('/admin/staff-portal')) {
+    return <Navigate to="/admin/staff-portal" replace />;
+  }
 
   const handlePrimaryAction = () => {
     if (!primaryAction?.to) return;
@@ -172,7 +175,7 @@ const Layout = ({ children }) => {
                 <div className="account-dropdown" role="menu" aria-label="Account menu">
                   <div className="account-summary">
                     <span className="account-name">{user?.name || 'User'}</span>
-                    <span className="account-email">{user?.email || 'admin@enterprise.com'}</span>
+                    <span className="account-email">{user?.email || 'ganesh.bora@gmail.com'}</span>
                   </div>
                   <button type="button" className="account-menu-item" role="menuitem" onClick={handleLogout}>
                     <LogOut size={16} />

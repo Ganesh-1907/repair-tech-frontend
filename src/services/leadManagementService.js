@@ -12,4 +12,8 @@ export const leadManagementService = {
       createdAt: payload.createdAt || new Date().toISOString().slice(0, 10),
     });
   },
+
+  updateLead(leadId, payload) {
+    return api.patch('leads', leadId, payload);
+  },
 };

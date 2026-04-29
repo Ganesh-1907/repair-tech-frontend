@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Edit, Eye, MoreVertical, Plus, ShieldCheck, UserRoundPlus, X } from 'lucide-react';
+import { Edit, Eye, MoreVertical, Plus, Search, UserRoundPlus, X } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { staffManagementService } from '../../services/staffManagementService';
 
@@ -7,7 +8,7 @@ const emptyForm = {
   name: '',
   phone: '',
   email: '',
-  role: 'Technician',
+  role: 'Staff',
   departmentSkill: '',
   address: '',
   status: 'Active',
@@ -15,33 +16,61 @@ const emptyForm = {
   notes: '',
 };
 
+const isAssignableJob = (job) => {
+  const status = String(job.status || job.jobStatus || '').toLowerCase();
+  return !['assigned', 'completed', 'closed', 'cancelled', 'canceled'].some((item) => status.includes(item));
+};
+
+const getPendingJobLabel = (job) => {
+  const title = job.title || [job.customerName, job.device, job.issue].filter(Boolean).join(' - ');
+  return title || job.id;
+};
+
 const StaffListingPage = () => {
+  const location = useLocation();
+  const initialMode = new URLSearchParams(location.search).get('mode') === 'add' || new URLSearchParams(location.search).get('add') === '1' ? 'add' : '';
   const [staff, setStaff] = useState([]);
   const [pendingJobs, setPendingJobs] = useState([]);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [departmentFilter, setDepartmentFilter] = useState('All');
   const [activeDropdownId, setActiveDropdownId] = useState(null);
-  const [modalMode, setModalMode] = useState('');
+  const [modalMode, setModalMode] = useState(initialMode);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [assignForm, setAssignForm] = useState({ staffId: '', pendingJobId: '', priority: 'Medium', notes: '' });
-  const [permissionForm, setPermissionForm] = useState({ role: 'Technician', permissions: [] });
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState('');
 
   const loadData = async () => {
-    const [staffRows, jobs] = await Promise.all([
-      staffManagementService.getStaffList(),
-      staffManagementService.getPendingJobs(),
-    ]);
-    setStaff(staffRows);
-    setPendingJobs(jobs);
+    try {
+      const [staffRows, jobs] = await Promise.all([
+        staffManagementService.getStaffList(),
+        staffManagementService.getPendingJobs(),
+      ]);
+      setStaff(Array.isArray(staffRows) ? staffRows : (staffRows?.data || []));
+      setPendingJobs(Array.isArray(jobs) ? jobs : (jobs?.data || []));
+    } catch (error) {
+      console.error('Reload error:', error);
+    }
   };
 
   useEffect(() => {
-    loadData();
+    let mounted = true;
+    Promise.all([
+      staffManagementService.getStaffList(),
+      staffManagementService.getPendingJobs(),
+    ]).then(([staffRows, jobs]) => {
+      if (!mounted) return;
+      setStaff(Array.isArray(staffRows) ? staffRows : (staffRows?.data || []));
+      setPendingJobs(Array.isArray(jobs) ? jobs : (jobs?.data || []));
+    }).catch((error) => {
+      console.error('Staff loading error:', error);
+      if (mounted) setNotice(error.response?.data?.message || error.message || 'Staff data failed to load.');
+    });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -55,20 +84,20 @@ const StaffListingPage = () => {
   }, []);
 
   const filteredStaff = useMemo(() => staff.filter((row) => {
-    const blob = `${row.id} ${row.name} ${row.phone} ${row.email} ${row.role} ${row.departmentSkill} ${row.status}`.toLowerCase();
+    const blob = `${row.id} ${row.name} ${row.phone} ${row.email} ${row.departmentSkill} ${row.status}`.toLowerCase();
     if (search.trim() && !blob.includes(search.toLowerCase())) return false;
-    if (roleFilter !== 'All' && row.role !== roleFilter) return false;
     if (statusFilter !== 'All' && row.status !== statusFilter) return false;
     if (departmentFilter !== 'All' && !String(row.departmentSkill || '').toLowerCase().includes(departmentFilter.toLowerCase())) return false;
     return true;
-  }), [staff, search, roleFilter, statusFilter, departmentFilter]);
+  }), [staff, search, statusFilter, departmentFilter]);
+
+  const assignableJobs = useMemo(() => pendingJobs.filter(isAssignableJob), [pendingJobs]);
 
   const closeModal = () => {
     setModalMode('');
     setSelectedStaff(null);
     setForm(emptyForm);
     setAssignForm({ staffId: '', pendingJobId: '', priority: 'Medium', notes: '' });
-    setPermissionForm({ role: 'Technician', permissions: [] });
     setErrors({});
   };
 
@@ -89,7 +118,7 @@ const StaffListingPage = () => {
       name: row.name || '',
       phone: row.phone || '',
       email: row.email || '',
-      role: row.role || 'Technician',
+      role: 'Staff',
       departmentSkill: row.departmentSkill || '',
       address: row.address || '',
       status: row.status || 'Active',
@@ -102,16 +131,8 @@ const StaffListingPage = () => {
 
   const openAssign = (row) => {
     setSelectedStaff(row);
-    setAssignForm({ staffId: row.id, pendingJobId: pendingJobs[0]?.id || '', priority: 'Medium', notes: '' });
+    setAssignForm({ staffId: row.id, pendingJobId: assignableJobs[0]?.id || '', priority: 'Medium', notes: '' });
     setModalMode('assign');
-    setErrors({});
-  };
-
-  const openPermissions = async (row) => {
-    setSelectedStaff(row);
-    const config = await staffManagementService.getPermissions(row.id);
-    setPermissionForm({ role: config.role, permissions: config.permissions || [] });
-    setModalMode('permissions');
     setErrors({});
   };
 
@@ -119,7 +140,7 @@ const StaffListingPage = () => {
     const next = {};
     if (!form.name.trim()) next.name = 'Name is required.';
     if (!form.phone.trim()) next.phone = 'Phone is required.';
-    if (!form.role.trim()) next.role = 'Role is required.';
+    if (!form.email.trim()) next.email = 'Email is required for staff login.';
     if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = 'Invalid email format.';
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -153,23 +174,6 @@ const StaffListingPage = () => {
     closeModal();
   };
 
-  const togglePermission = (permission) => {
-    setPermissionForm((current) => {
-      const has = current.permissions.includes(permission);
-      return {
-        ...current,
-        permissions: has ? current.permissions.filter((item) => item !== permission) : [...current.permissions, permission],
-      };
-    });
-  };
-
-  const savePermissions = async () => {
-    if (!selectedStaff) return;
-    await staffManagementService.updatePermissions(selectedStaff.id, permissionForm);
-    setNotice('Permissions updated.');
-    closeModal();
-  };
-
   return (
     <div className="admin-module-page staff-listing-page">
       {notice && (
@@ -181,31 +185,28 @@ const StaffListingPage = () => {
 
       <AdminPageHeader
         title="Staff Listing"
-        description="Search and manage staff with popup actions for view, edit, assignment, and permissions."
+        description="Search and manage staff with login access, job assignment, and attendance status."
         breadcrumbs={['Admin', 'Staff Management', 'Staff Listing']}
         actions={[{ label: 'Add Staff', icon: Plus, onClick: openAdd }]}
       />
 
-      <div className="card expenses-filter-strip">
-        <input className="table-input" placeholder="Search by id, name, phone, email, role..." value={search} onChange={(event) => setSearch(event.target.value)} />
-        <label className="expenses-control-select">
-          <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
-            <option value="All">All Roles</option>
-            {staffManagementService.roleOptions.map((role) => <option key={role}>{role}</option>)}
-          </select>
-        </label>
-        <label className="expenses-control-select">
+      <div className="card" style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 2fr) repeat(2, minmax(180px, 1fr))', gap: '16px', padding: '16px', marginBottom: '24px', alignItems: 'center' }}>
+        <div className="search-container" style={{ width: '100%' }}>
+          <Search size={18} className="search-icon" />
+          <input className="search-input" placeholder="Search staff by id, name, phone, email, skill..." value={search} onChange={(event) => setSearch(event.target.value)} />
+        </div>
+        <div className="expenses-control-select">
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
             <option value="All">All Status</option>
             {staffManagementService.statusOptions.map((status) => <option key={status}>{status}</option>)}
           </select>
-        </label>
-        <label className="expenses-control-select">
+        </div>
+        <div className="expenses-control-select">
           <select value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}>
             <option value="All">All Departments and Skills</option>
             {Array.from(new Set(staff.map((row) => row.departmentSkill).filter(Boolean))).map((skill) => <option key={skill}>{skill}</option>)}
           </select>
-        </label>
+        </div>
       </div>
 
       <div className="card overflow-hidden">
@@ -216,7 +217,6 @@ const StaffListingPage = () => {
               <th>Name</th>
               <th>Phone</th>
               <th>Email</th>
-              <th>Role</th>
               <th>Department / Skill</th>
               <th>Status</th>
               <th>Attendance Status</th>
@@ -232,10 +232,21 @@ const StaffListingPage = () => {
                 <td>{row.name}</td>
                 <td>{row.phone}</td>
                 <td>{row.email || '-'}</td>
-                <td>{row.role}</td>
                 <td>{row.departmentSkill || '-'}</td>
-                <td><span className="status-pill status-pending">{row.status}</span></td>
-                <td><span className="status-pill status-draft">{row.attendanceStatus || 'Absent'}</span></td>
+                <td>
+                  <span className={`status-pill status-${row.status === 'Active' ? 'success' : 'danger'}`}>
+                    {row.status}
+                  </span>
+                </td>
+                <td>
+                  <span className={`status-pill status-${
+                    row.attendanceStatus === 'Present' ? 'success' : 
+                    row.attendanceStatus === 'On Job' ? 'warning' : 
+                    row.attendanceStatus === 'On Leave' ? 'info' : 'danger'
+                  }`}>
+                    {row.attendanceStatus || 'Absent'}
+                  </span>
+                </td>
                 <td>{row.assignedJobs}</td>
                 <td>{row.lastSeen || '-'}</td>
                 <td>
@@ -259,9 +270,6 @@ const StaffListingPage = () => {
                         <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openAssign(row); }}>
                           <UserRoundPlus size={14} className="icon-muted" /> Assign Job
                         </button>
-                        <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openPermissions(row); }}>
-                          <ShieldCheck size={14} className="icon-muted" /> Edit Permissions
-                        </button>
                       </div>
                     )}
                   </div>
@@ -269,7 +277,7 @@ const StaffListingPage = () => {
               </tr>
             ))}
             {filteredStaff.length === 0 && (
-              <tr><td colSpan="11" className="text-muted">No staff found.</td></tr>
+              <tr><td colSpan="10" className="text-muted">No staff found.</td></tr>
             )}
           </tbody>
         </table>
@@ -277,30 +285,33 @@ const StaffListingPage = () => {
 
       {(modalMode === 'add' || modalMode === 'edit') && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-panel">
+          <div className="modal-panel modal-panel-wide">
             <div className="modal-header">
               <div>
-                <h2>{modalMode === 'edit' ? 'Edit Staff' : 'Add Staff'}</h2>
-                <p>{modalMode === 'edit' ? 'Update staff details.' : 'Create a staff record.'}</p>
+                <h2 className="text-2xl font-black text-slate-800">{modalMode === 'edit' ? 'Edit Staff Member' : 'Add New Staff'}</h2>
+                <p className="text-sm text-slate-500">{modalMode === 'edit' ? 'Update staff profile and login email.' : 'Create a staff record. Login password will be staff@123.'}</p>
               </div>
-              <button className="icon-btn" onClick={closeModal} aria-label="Close staff form"><X size={16} /></button>
+              <button className="icon-btn" onClick={closeModal} aria-label="Close staff form"><X size={20} /></button>
             </div>
             <div className="modal-form">
-              {modalMode === 'edit' && selectedStaff ? <div className="form-group"><label>Staff ID</label><input value={selectedStaff.id} disabled /></div> : null}
-              <div className="form-grid">
-                <div className="form-group"><label>Name</label><input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />{errors.name && <span className="form-error">{errors.name}</span>}</div>
-                <div className="form-group"><label>Phone</label><input value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} />{errors.phone && <span className="form-error">{errors.phone}</span>}</div>
-                <div className="form-group"><label>Email</label><input value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />{errors.email && <span className="form-error">{errors.email}</span>}</div>
-                <div className="form-group"><label>Role</label><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{staffManagementService.roleOptions.map((role) => <option key={role}>{role}</option>)}</select>{errors.role && <span className="form-error">{errors.role}</span>}</div>
-                <div className="form-group"><label>Department / Skill</label><input value={form.departmentSkill} onChange={(event) => setForm((current) => ({ ...current, departmentSkill: event.target.value }))} /></div>
-                <div className="form-group"><label>Status</label><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}><option>Active</option><option>Inactive</option></select></div>
+              {modalMode === 'edit' && selectedStaff && (
+                <div className="admin-mini-kpi mb-6">
+                  <span>Staff ID:</span> <strong>{selectedStaff.id}</strong>
+                </div>
+              )}
+              <div className="form-grid-premium">
+                <div className="form-group"><label>Full Name</label><input placeholder="e.g. John Doe" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />{errors.name && <span className="form-error">{errors.name}</span>}</div>
+                <div className="form-group"><label>Phone Number</label><input placeholder="e.g. 9876543210" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} />{errors.phone && <span className="form-error">{errors.phone}</span>}</div>
+                <div className="form-group"><label>Email Address</label><input placeholder="e.g. john@example.com" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />{errors.email && <span className="form-error">{errors.email}</span>}</div>
+                <div className="form-group"><label>Department / Primary Skill</label><input placeholder="e.g. Hardware Repair" value={form.departmentSkill} onChange={(event) => setForm((current) => ({ ...current, departmentSkill: event.target.value }))} /></div>
+                <div className="form-group"><label>Account Status</label><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}><option>Active</option><option>Inactive</option></select></div>
                 <div className="form-group"><label>Attendance Status</label><select value={form.attendanceStatus} onChange={(event) => setForm((current) => ({ ...current, attendanceStatus: event.target.value }))}>{staffManagementService.attendanceOptions.map((status) => <option key={status}>{status}</option>)}</select></div>
-                <div className="form-group"><label>Address</label><input value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} /></div>
-                <div className="form-group"><label>Notes</label><textarea rows={3} value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></div>
+                <div className="form-group"><label>Office / Residential Address</label><input placeholder="City, Area" value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} /></div>
+                <div className="form-group span-3"><label>Internal Notes (Optional)</label><textarea rows={3} placeholder="Add any specific details about the staff member..." value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></div>
               </div>
-              <div className="modal-actions">
+              <div className="modal-actions pt-6 border-t border-slate-100 mt-6">
                 <button className="btn btn-secondary" type="button" onClick={closeModal}>Cancel</button>
-                <button className="btn btn-primary" type="button" onClick={saveStaff}>{modalMode === 'edit' ? 'Update Staff' : 'Save Staff'}</button>
+                <button className="btn btn-primary px-8" type="button" onClick={saveStaff}>{modalMode === 'edit' ? 'Update Profile' : 'Create Staff Record'}</button>
               </div>
             </div>
           </div>
@@ -320,7 +331,6 @@ const StaffListingPage = () => {
                 <div><span>Name</span><strong>{selectedStaff.name}</strong></div>
                 <div><span>Phone</span><strong>{selectedStaff.phone}</strong></div>
                 <div><span>Email</span><strong>{selectedStaff.email || '-'}</strong></div>
-                <div><span>Role</span><strong>{selectedStaff.role}</strong></div>
                 <div><span>Department / Skill</span><strong>{selectedStaff.departmentSkill || '-'}</strong></div>
                 <div><span>Status</span><strong>{selectedStaff.status}</strong></div>
                 <div><span>Attendance Status</span><strong>{selectedStaff.attendanceStatus || '-'}</strong></div>
@@ -342,13 +352,13 @@ const StaffListingPage = () => {
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-panel">
             <div className="modal-header">
-              <div><h2>Assign Job</h2><p>Assign pending job to staff/technician.</p></div>
+              <div><h2>Assign Job</h2><p>Assign pending job to staff.</p></div>
               <button className="icon-btn" onClick={closeModal} aria-label="Close assign job modal"><X size={16} /></button>
             </div>
             <div className="modal-form">
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Staff / Technician</label>
+                  <label>Staff</label>
                   <select value={assignForm.staffId} onChange={(event) => setAssignForm((current) => ({ ...current, staffId: event.target.value }))}>
                     {staff.map((row) => <option key={row.id} value={row.id}>{row.name} ({row.id})</option>)}
                   </select>
@@ -357,7 +367,7 @@ const StaffListingPage = () => {
                   <label>Pending Job</label>
                   <select value={assignForm.pendingJobId} onChange={(event) => setAssignForm((current) => ({ ...current, pendingJobId: event.target.value }))}>
                     <option value="">Select job</option>
-                    {pendingJobs.map((job) => <option key={job.id} value={job.id}>{job.id} - {job.title}</option>)}
+                    {assignableJobs.map((job) => <option key={job.id} value={job.id}>{job.id} - {getPendingJobLabel(job)}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
@@ -384,37 +394,6 @@ const StaffListingPage = () => {
         </div>
       )}
 
-      {modalMode === 'permissions' && selectedStaff && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-panel">
-            <div className="modal-header">
-              <div><h2>Edit Permissions</h2><p>Manage role and permission access.</p></div>
-              <button className="icon-btn" onClick={closeModal} aria-label="Close permissions modal"><X size={16} /></button>
-            </div>
-            <div className="modal-form">
-              <div className="form-group">
-                <label>Role</label>
-                <select value={permissionForm.role} onChange={(event) => setPermissionForm((current) => ({ ...current, role: event.target.value }))}>
-                  {staffManagementService.roleOptions.map((role) => <option key={role}>{role}</option>)}
-                </select>
-              </div>
-              <div className="checklist-grid">
-                {staffManagementService.permissionOptions.map((permission) => (
-                  <label key={permission} className="checkbox-container">
-                    <input type="checkbox" checked={permissionForm.permissions.includes(permission)} onChange={() => togglePermission(permission)} />
-                    <span className="checkmark"></span>
-                    <span className="label-text">{permission}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="modal-actions">
-                <button className="btn btn-secondary" type="button" onClick={closeModal}>Cancel</button>
-                <button className="btn btn-primary" type="button" onClick={savePermissions}>Save Permissions</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

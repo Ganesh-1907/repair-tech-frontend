@@ -70,6 +70,7 @@ const collectActiveBranchIds = (items, pathname, collector = []) => {
 
 const filterItemsByRole = (items, role) => (
   items.reduce((accumulator, item) => {
+    if (role === 'staff' && !item.roles) return accumulator;
     if (item.roles && !item.roles.includes(role)) return accumulator;
 
     const nextItem = { ...item };
@@ -164,6 +165,7 @@ const Sidebar = ({ isOpen = false, onClose }) => {
       <NavLink
         key={item.id}
         to={item.path}
+        end={Boolean(item.exact)}
         className={({ isActive }) => `nav-item nav-leaf depth-${depth} ${isActive ? 'active' : ''}`}
         onClick={onClose}
       >

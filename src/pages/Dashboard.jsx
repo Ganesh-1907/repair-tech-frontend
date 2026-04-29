@@ -34,11 +34,11 @@ import {
   Wallet,
   X
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { usePrivacy } from '../context/PrivacyContext';
 import { useTheme } from '../context/ThemeContext';
 import AlertsSystem from '../components/dashboard/AlertsSystem';
 import { dashboardService } from '../services/dashboardService';
-import { getDashboardAlerts } from '../services/alertsService';
 
 ChartJS.register(
   CategoryScale,
@@ -99,11 +99,15 @@ const emptyDashboardData = {
   },
   expiryReminders: [],
   inventoryAlerts: [],
+  alerts: [],
+  notifications: [],
+  periodLabel: '',
 };
 
 const MetricCard = ({ label, value, type, trend, onClick }) => {
   const { formatCurrency } = usePrivacy();
-  const isPositive = trend.startsWith('+');
+  const trendText = trend || '0';
+  const isPositive = trendText.startsWith('+') || trendText === '0' || trendText === '0%';
   const visual = metricVisuals[label] || { icon: Activity, tone: 'indigo' };
   const Icon = visual.icon;
 
@@ -137,7 +141,7 @@ const MetricCard = ({ label, value, type, trend, onClick }) => {
         </div>
         <div className={`metric-trend ${isPositive ? 'positive' : 'negative'}`}>
           {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-          <span>{trend}</span>
+          <span>{trendText}</span>
         </div>
       </div>
       <div className="metric-copy">
@@ -150,22 +154,20 @@ const MetricCard = ({ label, value, type, trend, onClick }) => {
 };
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const { isPrivacyOn, formatCurrency } = usePrivacy();
   const { isDark } = useTheme();
   const navigate = useNavigate();
   const [notice, setNotice] = React.useState('');
   const [dashboardData, setDashboardData] = React.useState(emptyDashboardData);
-  const [dashboardAlerts, setDashboardAlerts] = React.useState([]);
+
+  const isStaff = user?.role === 'staff';
 
   React.useEffect(() => {
     let mounted = true;
-    Promise.all([
-      dashboardService.getDashboardData(),
-      getDashboardAlerts(),
-    ]).then(([nextDashboard, nextAlerts]) => {
+    dashboardService.getDashboardData().then((nextDashboard) => {
       if (!mounted) return;
-      setDashboardData(nextDashboard);
-      setDashboardAlerts(nextAlerts);
+      setDashboardData({ ...emptyDashboardData, ...nextDashboard });
     }).catch((error) => {
       if (mounted) setNotice(error.response?.data?.message || error.message || 'Dashboard data failed to load.');
     });
@@ -213,7 +215,7 @@ const Dashboard = () => {
         `${alert.currentStock} ${alert.unit}`,
         `Minimum ${alert.minLevel}`,
       ]),
-      ...dashboardAlerts.map((alert) => [
+      ...dashboardData.alerts.map((alert) => [
         'Dashboard Alert',
         alert.customerName,
         alert.type,
@@ -403,14 +405,16 @@ const Dashboard = () => {
       )}
 
       <div className="metrics-grid">
-        {dashboardData.metrics.map((metric) => (
-          <Motion.div key={metric.label} variants={itemVariants}>
-            <MetricCard 
-              {...metric} 
-              onClick={getMetricClickHandler(metric.label)}
-            />
-          </Motion.div>
-        ))}
+        {dashboardData.metrics
+          .filter((m) => !isStaff || ['Total Leads', 'Pending Leads', 'Active Jobs', 'Avg Response Time'].includes(m.label))
+          .map((metric) => (
+            <Motion.div key={metric.label} variants={itemVariants}>
+              <MetricCard 
+                {...metric} 
+                onClick={getMetricClickHandler(metric.label)}
+              />
+            </Motion.div>
+          ))}
       </div>
 
       <div className="chart-grid dashboard-chart-grid">
@@ -426,7 +430,7 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="card-actions">
-              <span className="period-badge">Jan - Jun</span>
+              <span className="period-badge">{dashboardData.periodLabel || 'Live'}</span>
             </div>
           </div>
           <div className={`chart-container revenue-chart ${isPrivacyOn ? 'privacy-blur' : ''}`}>
@@ -434,45 +438,49 @@ const Dashboard = () => {
           </div>
         </Motion.div>
 
-        <Motion.div className="card chart-card" variants={itemVariants}>
-          <div className="card-header">
-            <div>
-              <h3>Lead Distribution</h3>
-              <p>Current lead status mix.</p>
+        {!isStaff && (
+          <Motion.div className="card chart-card" variants={itemVariants}>
+            <div className="card-header">
+              <div>
+                <h3>Lead Distribution</h3>
+                <p>Current lead status mix.</p>
+              </div>
             </div>
-          </div>
-          <div className={`chart-container pie-chart ${isPrivacyOn ? 'privacy-blur' : ''}`}>
-            <Pie data={leadStatusData} options={smallChartOptions} />
-          </div>
-        </Motion.div>
+            <div className={`chart-container pie-chart ${isPrivacyOn ? 'privacy-blur' : ''}`}>
+              <Pie data={leadStatusData} options={smallChartOptions} />
+            </div>
+          </Motion.div>
+        )}
 
-        <Motion.div className="card chart-card" variants={itemVariants}>
-          <div className="card-header">
-            <div>
-              <h3>Response Time Trend</h3>
-              <p>Average first response time in minutes.</p>
+        {!isStaff && (
+          <Motion.div className="card chart-card" variants={itemVariants}>
+            <div className="card-header">
+              <div>
+                <h3>Response Time Trend</h3>
+                <p>Average first response time in minutes.</p>
+              </div>
             </div>
-          </div>
-          <div className={`chart-container ${isPrivacyOn ? 'privacy-blur' : ''}`}>
-            <Line
-              data={{
-                labels: dashboardData.charts.responseTime.labels,
-                datasets: [{
-                  label: 'Minutes',
-                  data: dashboardData.charts.responseTime.data,
-                  borderColor: chartColors.revenue,
-                  pointBackgroundColor: chartColors.revenue,
-                  pointBorderColor: chartColors.surface,
-                  pointBorderWidth: 2,
-                  tension: 0.4,
-                  fill: true,
-                  backgroundColor: isDark ? 'rgba(167, 139, 250, 0.16)' : 'rgba(109, 93, 252, 0.12)',
-                }]
-              }}
-              options={lineChartOptions}
-            />
-          </div>
-        </Motion.div>
+            <div className={`chart-container ${isPrivacyOn ? 'privacy-blur' : ''}`}>
+              <Line
+                data={{
+                  labels: dashboardData.charts.responseTime.labels,
+                  datasets: [{
+                    label: 'Minutes',
+                    data: dashboardData.charts.responseTime.data,
+                    borderColor: chartColors.revenue,
+                    pointBackgroundColor: chartColors.revenue,
+                    pointBorderColor: chartColors.surface,
+                    pointBorderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                    backgroundColor: isDark ? 'rgba(167, 139, 250, 0.16)' : 'rgba(109, 93, 252, 0.12)',
+                  }]
+                }}
+                options={lineChartOptions}
+              />
+            </div>
+          </Motion.div>
+        )}
       </div>
 
       <div className="dashboard-ops-grid">
@@ -510,38 +518,40 @@ const Dashboard = () => {
           </div>
         </Motion.div>
 
-        <Motion.div className="card alert-card inventory-alert-card" variants={itemVariants}>
-          <div className="card-header">
-            <div className="header-title-group">
-              <div className="section-icon section-icon-danger">
-                <Package size={20} />
+        {!isStaff && (
+          <Motion.div className="card alert-card inventory-alert-card" variants={itemVariants}>
+            <div className="card-header">
+              <div className="header-title-group">
+                <div className="section-icon section-icon-danger">
+                  <Package size={20} />
+                </div>
+                <div>
+                  <h3>Inventory Alerts</h3>
+                  <p>Parts below configured minimum stock.</p>
+                </div>
               </div>
-              <div>
-                <h3>Inventory Alerts</h3>
-                <p>Parts below configured minimum stock.</p>
-              </div>
+              <span className="badge badge-danger">{dashboardData.inventoryAlerts.length} Critical</span>
             </div>
-            <span className="badge badge-danger">{dashboardData.inventoryAlerts.length} Critical</span>
-          </div>
-          <div className="alert-list">
-            {dashboardData.inventoryAlerts.map((alert) => (
-              <div key={alert.id} className="alert-item">
-                <div className="alert-info">
-                  <div className="alert-icon-container danger">
-                    <AlertCircle size={16} />
+            <div className="alert-list">
+              {dashboardData.inventoryAlerts.map((alert) => (
+                <div key={alert.id} className="alert-item">
+                  <div className="alert-info">
+                    <div className="alert-icon-container danger">
+                      <AlertCircle size={16} />
+                    </div>
+                    <div>
+                      <h4 className="item-title">{alert.partName}</h4>
+                      <p className="item-subtitle">Stock: {alert.currentStock} {alert.unit} (Min: {alert.minLevel})</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="item-title">{alert.partName}</h4>
-                    <p className="item-subtitle">Stock: {alert.currentStock} {alert.unit} (Min: {alert.minLevel})</p>
+                  <div className="alert-action">
+                    <button className="btn btn-sm btn-outline-danger" onClick={() => navigate('/inventory')}>Open</button>
                   </div>
                 </div>
-                <div className="alert-action">
-                  <button className="btn btn-sm btn-outline-danger" onClick={() => navigate('/inventory')}>Open</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Motion.div>
+              ))}
+            </div>
+          </Motion.div>
+        )}
 
         <Motion.div className="card staff-ranking-card" variants={itemVariants}>
           <div className="card-header">
@@ -566,7 +576,7 @@ const Dashboard = () => {
 
       <div className="dashboard-bottom-grid">
         <Motion.div className="dashboard-alerts-wrap" variants={itemVariants}>
-          <AlertsSystem alerts={dashboardAlerts} onAction={handleAlertAction} />
+          <AlertsSystem alerts={dashboardData.alerts} onAction={handleAlertAction} />
         </Motion.div>
 
         <Motion.div className="card alert-card" variants={itemVariants}>
@@ -582,10 +592,17 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="notification-stats">
-            <div className="stat-row"><span>Desktop / Laptop Service</span><span className="count">5</span></div>
-            <div className="stat-row"><span>Printer Cartridge Refill</span><span className="count warning">10d</span></div>
-            <div className="stat-row"><span>AMC Expiry Sent</span><span className="count success">12</span></div>
-            <div className="stat-row"><span>Low Stock Internal Alert</span><span className="count danger">3</span></div>
+            {dashboardData.notifications.map((notification) => (
+              <div className="stat-row" key={notification.label}>
+                <span>{notification.label}</span>
+                <span className={`count ${notification.tone || ''}`}>{notification.value}</span>
+              </div>
+            ))}
+            {dashboardData.notifications.length === 0 && (
+              <div className="empty-state compact">
+                <p>No live notifications found.</p>
+              </div>
+            )}
           </div>
         </Motion.div>
       </div>

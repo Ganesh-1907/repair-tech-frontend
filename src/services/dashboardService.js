@@ -1,4 +1,4 @@
-import { api } from './apiClient';
+import { apiClient } from './apiClient';
 
 const emptyDashboard = {
   metrics: [],
@@ -10,11 +10,14 @@ const emptyDashboard = {
   },
   expiryReminders: [],
   inventoryAlerts: [],
+  alerts: [],
+  notifications: [],
+  periodLabel: '',
 };
 
 export const dashboardService = {
   async getDashboardData() {
-    const rows = await api.list('dashboardSnapshots');
-    return rows[0] ? { ...emptyDashboard, ...rows[0] } : emptyDashboard;
+    const { data } = await apiClient.get('/dashboard/summary');
+    return { ...emptyDashboard, ...data };
   },
 };

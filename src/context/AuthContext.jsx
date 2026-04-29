@@ -5,9 +5,10 @@ const AuthContext = createContext();
 
 const getMockUser = () => ({
   id: '1',
-  name: 'Admin User',
+  name: 'Ganesh Bora',
   role: 'admin',
-  email: 'admin@enterprise.com'
+  email: 'ganesh.bora@gmail.com',
+  staffId: undefined,
 });
 
 export const AuthProvider = ({ children }) => {
@@ -22,7 +23,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user || getMockUser()));
     setUser(data.user || getMockUser());
-    return { success: true };
+    return { success: true, user: data.user || getMockUser() };
   };
 
   const logout = () => {

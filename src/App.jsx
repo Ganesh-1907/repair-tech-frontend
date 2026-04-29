@@ -22,6 +22,7 @@ import ExpensesManagementPage from './pages/admin/ExpensesManagementPage';
 import ExpensesListPage from './pages/admin/ExpensesListPage';
 import StaffTechnicianManagementPage from './pages/admin/StaffTechnicianManagementPage';
 import StaffListingPage from './pages/admin/StaffListingPage';
+import StaffPortalTasksPage from './pages/admin/StaffPortalTasksPage';
 import InstantMessagePage from './pages/admin/InstantMessagePage';
 import AssetManagementPage from './pages/admin/AssetManagementPage';
 import AssetDetailPage from './pages/admin/AssetDetailPage';
@@ -103,6 +104,7 @@ const existingAdminRouteComponents = {
   '/admin/cmc/reports': CMCReportsPage,
   '/admin/cmc': CMCDashboardPage,
   '/admin/staff-portal': StaffManagement,
+  '/admin/staff-portal/tasks': StaffPortalTasksPage,
   '/admin/customer-portal': CAPortal,
 };
 

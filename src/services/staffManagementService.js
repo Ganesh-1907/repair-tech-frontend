@@ -1,4 +1,3 @@
-import { permissionOptions } from './technicianDashboardService';
 import { api, apiClient } from './apiClient';
 
 const normalizeStatus = (value) => {
@@ -8,10 +7,8 @@ const normalizeStatus = (value) => {
 };
 
 export const staffManagementService = {
-  roleOptions: ['Admin', 'Manager', 'Technician', 'Support Staff', 'Delivery Person'],
   statusOptions: ['Active', 'Inactive', 'Available', 'On Job', 'On Leave'],
   attendanceOptions: ['Present', 'Absent', 'On Leave'],
-  permissionOptions,
 
   async getStaffDashboardStats() {
     const { data } = await apiClient.get('/staff/stats');
@@ -27,12 +24,12 @@ export const staffManagementService = {
       name: payload.name,
       phone: payload.phone,
       email: payload.email || '',
-      role: payload.role,
+      role: 'Staff',
       departmentSkill: payload.departmentSkill || '',
       status: normalizeStatus(payload.status),
       attendanceStatus: payload.attendanceStatus || 'Absent',
       assignedJobs: 0,
-      lastSeen: 'just now',
+      lastSeen: new Date().toISOString(),
       address: payload.address || '',
       notes: payload.notes || '',
     });
@@ -42,24 +39,26 @@ export const staffManagementService = {
     return api.update('staff', staffId, {
       ...payload,
       id: staffId,
+      role: 'Staff',
       status: normalizeStatus(payload.status),
     });
   },
 
   getPendingJobs: () => api.list('pendingJobs'),
 
+  async getStaffTasks() {
+    const { data } = await apiClient.get('/staff/tasks');
+    return data;
+  },
+
   async assignJob(payload) {
     const { data } = await apiClient.post('/staff/assign-job', payload);
     return data.staff;
   },
 
-  async getPermissions(staffId) {
-    const { data } = await apiClient.get(`/staff/${staffId}/permissions`);
+  async updateTaskStatus(taskId, status, notes = '') {
+    const { data } = await apiClient.patch(`/jobs/${taskId}/status`, { status, notes });
     return data;
   },
 
-  async updatePermissions(staffId, payload) {
-    const { data } = await apiClient.put(`/staff/${staffId}/permissions`, payload);
-    return data;
-  },
 };
