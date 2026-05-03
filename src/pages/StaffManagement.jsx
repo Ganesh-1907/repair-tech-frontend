@@ -30,7 +30,9 @@ import {
   Zap,
 } from 'lucide-react';
 import { usePrivacy } from '../context/PrivacyContext';
+import { useAuth } from '../context/AuthContext';
 import { staffManagementService } from '../services/staffManagementService';
+import StaffPortalDashboard from './StaffPortalDashboard';
 import './admin/DashboardPremiumStyles.css';
 
 ChartJS.register(
@@ -96,6 +98,16 @@ const exportRows = (rows) => {
 };
 
 const StaffManagement = () => {
+  const { user } = useAuth();
+
+  if (user?.role === 'staff') {
+    return <StaffPortalDashboard />;
+  }
+
+  return <StaffManagementAdmin />;
+};
+
+const StaffManagementAdmin = () => {
   const [dashboard, setDashboard] = useState(emptyStaffDashboard);
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');

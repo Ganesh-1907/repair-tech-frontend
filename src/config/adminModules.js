@@ -288,6 +288,38 @@ const adminModules = [
     ],
   },
   {
+    id: 'staff-portal-account',
+    label: 'My Account',
+    icon: 'User',
+    roles: ['admin', 'staff'],
+    children: [
+      {
+        id: 'staff-portal-profile',
+        label: 'Profile',
+        path: '/admin/staff-portal/profile',
+        roles: ['admin', 'staff'],
+      },
+      {
+        id: 'staff-portal-attendance',
+        label: 'Attendance',
+        path: '/admin/staff-portal/attendance',
+        roles: ['admin', 'staff'],
+      },
+      {
+        id: 'staff-portal-payments',
+        label: 'Payments',
+        path: '/admin/staff-portal/payments',
+        roles: ['admin', 'staff'],
+      },
+      {
+        id: 'staff-portal-expenses',
+        label: 'Expenses',
+        path: '/admin/staff-portal/expenses',
+        roles: ['admin', 'staff'],
+      },
+    ],
+  },
+  {
     id: 'customer-portal',
     label: 'Customer Portal',
     icon: 'UserCircle',

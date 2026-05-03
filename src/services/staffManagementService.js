@@ -15,6 +15,11 @@ export const staffManagementService = {
     return data;
   },
 
+  async getStaffPortalSummary() {
+    const { data } = await apiClient.get('/staff/portal/summary');
+    return data;
+  },
+
   getStaffList: () => api.list('staff'),
 
   getStaffById: (staffId) => api.get('staff', staffId),
@@ -58,6 +63,26 @@ export const staffManagementService = {
 
   async updateTaskStatus(taskId, status, notes = '') {
     const { data } = await apiClient.patch(`/jobs/${taskId}/status`, { status, notes });
+    return data;
+  },
+
+  async markAttendance(payload) {
+    const { data } = await apiClient.post('/staff/attendance', payload);
+    return data;
+  },
+
+  async addStaffPayment(payload) {
+    const { data } = await apiClient.post('/staff/payments', payload);
+    return data;
+  },
+
+  async addStaffExpense(payload) {
+    const { data } = await apiClient.post('/staff/expenses', payload);
+    return data;
+  },
+
+  async closeJob(taskId, payload) {
+    const { data } = await apiClient.patch(`/jobs/${taskId}/close`, payload);
     return data;
   },
 
