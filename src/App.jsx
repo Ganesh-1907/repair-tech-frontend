@@ -11,11 +11,18 @@ import Workflow from './pages/Workflow';
 import Expenses from './pages/Expenses';
 import Billing from './pages/Billing';
 import Inventory from './pages/Inventory';
-import AMCReport from './pages/AMCReport';
-import CMCReport from './pages/CMCReport';
 import StaffManagement from './pages/StaffManagement';
 import CAPortal from './pages/CAPortal';
 import Login from './pages/Login';
+import CMCReport from './pages/CMCReport';
+import AMCReport from './pages/AMCReport';
+// AMC Module Pages
+import AMCDashboardPage from './pages/admin/AMCDashboardPage';
+import AMCPlansPage from './pages/admin/AMCPlansPage';
+import AMCReportsPage from './pages/admin/AMCReportsPage';
+import AMCAgreementsPage from './pages/admin/AMCAgreementsPage';
+import AMCQuotationPage from './pages/admin/AMCQuotationPage';
+import AMCInventoryPage from './pages/admin/AMCInventoryPage';
 
 // Admin Module Pages
 import ExpensesManagementPage from './pages/admin/ExpensesManagementPage';
@@ -45,15 +52,6 @@ import RentalAssetDetailPage from './pages/admin/RentalAssetDetailPage';
 import RentalBillingInvoicesPage from './pages/admin/RentalBillingInvoicesPage';
 import RentalBillingGeneratePage from './pages/admin/RentalBillingGeneratePage';
 import RentalMaintenanceAlertsPage from './pages/admin/RentalMaintenanceAlertsPage';
-
-// AMC Module Pages
-import AMCCorporateAgreementPage from './pages/admin/AMCCorporateAgreementPage';
-import AMCDashboardPage from './pages/admin/AMCDashboardPage';
-import AMCPlansCustomersPage from './pages/admin/AMCPlansCustomersPage';
-import AMCDeviceRegistryPage from './pages/admin/AMCDeviceRegistryPage';
-import AMCScheduledMaintenancePage from './pages/admin/AMCScheduledMaintenancePage';
-import AMCBillingRenewalsPage from './pages/admin/AMCBillingRenewalsPage';
-import AMCReportsPage from './pages/admin/AMCReportsPage';
 
 // CMC Module Pages
 import CMCDashboardPage from './pages/admin/CMCDashboardPage';
@@ -92,10 +90,10 @@ const existingAdminRouteComponents = {
   '/admin/rental/billing': RentalBillingInvoicesPage,
   '/admin/rental/maintenance-alerts': RentalMaintenanceAlertsPage,
   '/admin/amc/dashboard': AMCDashboardPage,
-  '/admin/amc/plans-customers': AMCPlansCustomersPage,
-  '/admin/amc/device-registry': AMCDeviceRegistryPage,
-  '/admin/amc/scheduled-maintenance': AMCScheduledMaintenancePage,
-  '/admin/amc/billing-renewals': AMCBillingRenewalsPage,
+  '/admin/amc/plans': AMCPlansPage,
+  '/admin/amc/quotations': AMCQuotationPage,
+  '/admin/amc/agreements': AMCAgreementsPage,
+  '/admin/amc/inventory': AMCInventoryPage,
   '/admin/amc/reports': AMCReportsPage,
   '/admin/cmc/dashboard': CMCDashboardPage,
   '/admin/cmc/plans-customers': CMCPlansCustomersPage,
@@ -145,10 +143,8 @@ function App() {
 
               {/* Explicit AMC Routes */}
               <Route path="/admin/amc/dashboard" element={<Layout><AMCDashboardPage /></Layout>} />
-              <Route path="/admin/amc/plans-customers" element={<Layout><AMCPlansCustomersPage /></Layout>} />
-              <Route path="/admin/amc/device-registry" element={<Layout><AMCDeviceRegistryPage /></Layout>} />
-              <Route path="/admin/amc/scheduled-maintenance" element={<Layout><AMCScheduledMaintenancePage /></Layout>} />
-              <Route path="/admin/amc/billing-renewals" element={<Layout><AMCBillingRenewalsPage /></Layout>} />
+              <Route path="/admin/amc/plans" element={<Layout><AMCPlansPage /></Layout>} />
+              <Route path="/admin/amc/inventory" element={<Layout><AMCInventoryPage /></Layout>} />
               <Route path="/admin/amc/reports" element={<Layout><AMCReportsPage /></Layout>} />
 
               {/* CMC Module Redirects & Explicit Routes */}

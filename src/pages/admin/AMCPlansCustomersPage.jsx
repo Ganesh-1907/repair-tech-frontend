@@ -10,11 +10,45 @@ import './PlansCustomers.css';
 const AMCPlansCustomersPage = () => {
   // --- State ---
   const [plans, setPlans] = useState([
-    { id: 1, name: 'Basic AMC', type: 'Preventive', price: '₹4,999', cycle: 'Yearly', customers: 32, coverage: '2 visits/year', status: 'Active' },
-    { id: 2, name: 'Standard AMC', type: 'Preventive + Support', price: '₹8,999', cycle: 'Yearly', customers: 46, coverage: '4 visits/year', status: 'Active' },
-    { id: 3, name: 'Premium AMC', type: 'Priority Support', price: '₹14,999', cycle: 'Yearly', customers: 28, coverage: '6 visits/year', status: 'Active' },
-    { id: 4, name: 'Enterprise AMC', type: 'Custom', price: '₹29,999', cycle: 'Yearly', customers: 12, coverage: 'Unlimited visits', status: 'Active' },
-    { id: 5, name: 'Legacy AMC', type: 'Old Plan', price: '₹3,999', cycle: 'Yearly', customers: 10, coverage: '1 visit/year', status: 'Inactive' },
+    { 
+      id: 1, 
+      name: 'Basic AMC', 
+      type: 'Preventive', 
+      price: '₹4,999', 
+      cycle: 'Yearly', 
+      customers: 32, 
+      visits: 2, 
+      services: ['Repair', 'Cleaning'], 
+      sla: '48 Hours',
+      duration: '12 Months',
+      status: 'Active' 
+    },
+    { 
+      id: 2, 
+      name: 'Standard AMC', 
+      type: 'Support+', 
+      price: '₹8,999', 
+      cycle: 'Yearly', 
+      customers: 46, 
+      visits: 4, 
+      services: ['Repair', 'Cleaning', 'OS Install'], 
+      sla: '24 Hours',
+      duration: '12 Months',
+      status: 'Active' 
+    },
+    { 
+      id: 3, 
+      name: 'Premium AMC', 
+      type: 'Priority', 
+      price: '₹14,999', 
+      cycle: 'Yearly', 
+      customers: 28, 
+      visits: 'Unlimited', 
+      services: ['Unlimited Support', 'Priority Visits', 'Cleaning', 'OS Install'], 
+      sla: '4 Hours',
+      duration: '12 Months',
+      status: 'Active' 
+    },
   ]);
 
   const [customers, setCustomers] = useState([
@@ -30,8 +64,16 @@ const AMCPlansCustomersPage = () => {
 
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showRenewModal, setShowRenewModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+
+  const handleOpenDetail = (cust) => {
+    setSelectedCustomer(cust);
+    setShowDetailModal(true);
+    setActiveMenu({ type: null, id: null });
+  };
   const [activeMenu, setActiveMenu] = useState({ type: null, id: null });
 
   // --- Calculations ---
@@ -192,9 +234,9 @@ const AMCPlansCustomersPage = () => {
                   <th>Plan Name</th>
                   <th>Plan Type</th>
                   <th>Price</th>
-                  <th>Billing Cycle</th>
-                  <th>Customers</th>
-                  <th>Coverage</th>
+                  <th>Visits</th>
+                  <th>SLA</th>
+                  <th>Duration</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -205,13 +247,13 @@ const AMCPlansCustomersPage = () => {
                     <td><strong>{p.name}</strong></td>
                     <td><span className="plan-badge">{p.type}</span></td>
                     <td><strong>{p.price}</strong></td>
-                    <td>{p.cycle}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Users size={14} className="text-slate-500" /> {p.customers}
+                        <RefreshCw size={14} className="text-slate-500" /> {p.visits}
                       </div>
                     </td>
-                    <td>{p.coverage}</td>
+                    <td>{p.sla}</td>
+                    <td>{p.duration}</td>
                     <td>
                       <span className={`status-badge status-${p.status.toLowerCase()}`}>
                         {p.status}
@@ -376,7 +418,7 @@ const AMCPlansCustomersPage = () => {
                     </button>
                     {activeMenu.type === 'customer' && activeMenu.id === c.id && (
                       <div className="action-menu">
-                        <button className="menu-item"><Eye size={14} /> View Customer</button>
+                        <button className="menu-item" onClick={() => handleOpenDetail(c)}><Eye size={14} /> View Customer</button>
                         <button className="menu-item" onClick={() => { setEditingItem(c); setShowCustomerModal(true); setActiveMenu({type:null, id:null}); }}><Edit size={14} /> Edit Customer</button>
                         <button className="menu-item" onClick={() => { setShowRenewModal(true); setActiveMenu({type:null, id:null}); }}><RefreshCw size={14} /> Renew Contract</button>
                         <button className="menu-item"><Mail size={14} /> Send Reminder</button>
@@ -405,10 +447,16 @@ const AMCPlansCustomersPage = () => {
       {showCustomerModal && (
         <CustomerModal 
           onClose={() => setShowCustomerModal(false)} 
-          onSubmit={handleAddCustomer}
-          editingItem={editingItem}
-          plans={plans}
+          onSubmit={(data) => { setCustomers([...customers, {...data, id: Date.now()}]); setShowCustomerModal(false); }} 
+          plans={plans} 
           type="AMC"
+        />
+      )}
+
+      {showDetailModal && (
+        <CustomerDetailModal 
+          customer={selectedCustomer} 
+          onClose={() => setShowDetailModal(false)} 
         />
       )}
 
@@ -426,68 +474,116 @@ const AMCPlansCustomersPage = () => {
 
 const PlanModal = ({ onClose, onSubmit, editingItem, type }) => {
   const [formData, setFormData] = useState(editingItem || {
-    name: '', type: '', price: '', cycle: 'Yearly', coverage: ''
+    name: '', 
+    type: '', 
+    price: '', 
+    cycle: 'Yearly', 
+    visits: '', 
+    services: '', 
+    sla: '', 
+    duration: '12 Months',
+    status: 'Active'
   });
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card">
+      <div className="modal-card" style={{ width: '500px' }}>
         <div className="modal-header">
           <h3>{editingItem ? `Edit ${type} Plan` : `Add ${type} Plan`}</h3>
           <button className="icon-button" onClick={onClose} style={{ border: 'none' }}><X size={20} /></button>
         </div>
         <div className="modal-body">
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label>Plan Name</label>
+              <input 
+                className="form-input" 
+                value={formData.name} 
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                placeholder="e.g. Basic AMC"
+              />
+            </div>
+            <div className="form-group">
+              <label>Plan Type</label>
+              <input 
+                className="form-input" 
+                value={formData.type} 
+                onChange={e => setFormData({...formData, type: e.target.value})}
+                placeholder="e.g. Preventive"
+              />
+            </div>
+          </div>
+
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label>Price</label>
+              <input 
+                className="form-input" 
+                value={formData.price} 
+                onChange={e => setFormData({...formData, price: e.target.value})}
+                placeholder="₹"
+              />
+            </div>
+            <div className="form-group">
+              <label>Billing Cycle</label>
+              <select className="form-select" value={formData.cycle} onChange={e => setFormData({...formData, cycle: e.target.value})}>
+                <option>Yearly</option>
+                <option>Monthly</option>
+                <option>Quarterly</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label>Number of Visits</label>
+              <input 
+                className="form-input" 
+                value={formData.visits} 
+                onChange={e => setFormData({...formData, visits: e.target.value})}
+                placeholder="e.g. 2 visits/year"
+              />
+            </div>
+            <div className="form-group">
+              <label>SLA (Response Time)</label>
+              <input 
+                className="form-input" 
+                value={formData.sla} 
+                onChange={e => setFormData({...formData, sla: e.target.value})}
+                placeholder="e.g. 24 Hours"
+              />
+            </div>
+          </div>
+
           <div className="form-group">
-            <label>Plan Name</label>
-            <input 
+            <label>Included Services</label>
+            <textarea 
               className="form-input" 
-              value={formData.name} 
-              onChange={e => setFormData({...formData, name: e.target.value})}
-              placeholder="e.g. Basic AMC"
+              style={{ height: '60px', paddingTop: '10px' }}
+              value={formData.services} 
+              onChange={e => setFormData({...formData, services: e.target.value})}
+              placeholder="e.g. Repair, Cleaning, OS Install"
             />
           </div>
-          <div className="form-group">
-            <label>Plan Type</label>
-            <input 
-              className="form-input" 
-              value={formData.type} 
-              onChange={e => setFormData({...formData, type: e.target.value})}
-              placeholder="e.g. Preventive"
-            />
-          </div>
-          <div className="form-group">
-            <label>Price</label>
-            <input 
-              className="form-input" 
-              value={formData.price} 
-              onChange={e => setFormData({...formData, price: e.target.value})}
-              placeholder="₹"
-            />
-          </div>
-          <div className="form-group">
-            <label>Billing Cycle</label>
-            <select className="form-select" value={formData.cycle} onChange={e => setFormData({...formData, cycle: e.target.value})}>
-              <option>Yearly</option>
-              <option>Monthly</option>
-              <option>Quarterly</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label>Coverage</label>
-            <input 
-              className="form-input" 
-              value={formData.coverage} 
-              onChange={e => setFormData({...formData, coverage: e.target.value})}
-              placeholder="e.g. 2 visits/year"
-            />
-          </div>
-          <div className="form-group">
-            <label>Status</label>
-            <select className="form-select" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-              <option>Active</option>
-              <option>Inactive</option>
-              <option>Draft</option>
-            </select>
+
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label>Duration</label>
+              <input 
+                className="form-input" 
+                value={formData.duration} 
+                onChange={e => setFormData({...formData, duration: e.target.value})}
+                placeholder="e.g. 12 Months"
+              />
+            </div>
+            <div className="form-group">
+              <label>Status</label>
+              <select className="form-select" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                <option>Active</option>
+                <option>Inactive</option>
+                <option>Draft</option>
+              </select>
+            </div>
           </div>
         </div>
         <div className="modal-footer">
@@ -501,39 +597,98 @@ const PlanModal = ({ onClose, onSubmit, editingItem, type }) => {
 
 const CustomerModal = ({ onClose, onSubmit, editingItem, plans, type }) => {
   const [formData, setFormData] = useState(editingItem || {
-    name: '', contractId: '', plan: plans[0]?.name || '', start: '', expiry: '', value: '', status: 'Active'
+    name: '', 
+    contractId: '', 
+    plan: plans[0]?.name || '', 
+    start: '', 
+    expiry: '', 
+    value: '', 
+    authorizedPerson1: '',
+    authorizedPerson2: '',
+    gstin: '',
+    address: '',
+    status: 'Active'
   });
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card">
+      <div className="modal-card" style={{ width: '600px' }}>
         <div className="modal-header">
           <h3>{editingItem ? `Edit ${type} Customer` : `Add ${type} Customer`}</h3>
           <button className="icon-button" onClick={onClose} style={{ border: 'none' }}><X size={20} /></button>
         </div>
         <div className="modal-body">
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label>Customer Name / Company</label>
+              <input 
+                className="form-input" 
+                value={formData.name} 
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                placeholder="e.g. Global Tech Solutions"
+              />
+            </div>
+            <div className="form-group">
+              <label>GSTIN</label>
+              <input 
+                className="form-input" 
+                value={formData.gstin} 
+                onChange={e => setFormData({...formData, gstin: e.target.value})}
+                placeholder="22AAAAA0000A1Z5"
+              />
+            </div>
+          </div>
+
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label>Authorized Person 1</label>
+              <input 
+                className="form-input" 
+                value={formData.authorizedPerson1} 
+                onChange={e => setFormData({...formData, authorizedPerson1: e.target.value})}
+                placeholder="Name and Contact"
+              />
+            </div>
+            <div className="form-group">
+              <label>Authorized Person 2 (Optional)</label>
+              <input 
+                className="form-input" 
+                value={formData.authorizedPerson2} 
+                onChange={e => setFormData({...formData, authorizedPerson2: e.target.value})}
+                placeholder="Name and Contact"
+              />
+            </div>
+          </div>
+
           <div className="form-group">
-            <label>Customer Name</label>
-            <input 
+            <label>Registered Address</label>
+            <textarea 
               className="form-input" 
-              value={formData.name} 
-              onChange={e => setFormData({...formData, name: e.target.value})}
+              style={{ height: '60px', paddingTop: '10px' }}
+              value={formData.address} 
+              onChange={e => setFormData({...formData, address: e.target.value})}
+              placeholder="Full billing address"
             />
           </div>
-          <div className="form-group">
-            <label>Contract ID</label>
-            <input 
-              className="form-input" 
-              value={formData.contractId} 
-              onChange={e => setFormData({...formData, contractId: e.target.value})}
-            />
+
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label>Contract ID</label>
+              <input 
+                className="form-input" 
+                value={formData.contractId} 
+                onChange={e => setFormData({...formData, contractId: e.target.value})}
+                placeholder="e.g. AMC-2026-001"
+              />
+            </div>
+            <div className="form-group">
+              <label>AMC Plan</label>
+              <select className="form-select" value={formData.plan} onChange={e => setFormData({...formData, plan: e.target.value})}>
+                {plans.map(p => <option key={p.id}>{p.name}</option>)}
+              </select>
+            </div>
           </div>
-          <div className="form-group">
-            <label>Plan</label>
-            <select className="form-select" value={formData.plan} onChange={e => setFormData({...formData, plan: e.target.value})}>
-              {plans.map(p => <option key={p.id}>{p.name}</option>)}
-            </select>
-          </div>
+
           <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">
               <label>Start Date</label>
@@ -544,23 +699,26 @@ const CustomerModal = ({ onClose, onSubmit, editingItem, plans, type }) => {
               <input type="date" className="form-input" value={formData.expiry} onChange={e => setFormData({...formData, expiry: e.target.value})} />
             </div>
           </div>
-          <div className="form-group">
-            <label>Contract Value</label>
-            <input 
-              className="form-input" 
-              value={formData.value} 
-              onChange={e => setFormData({...formData, value: e.target.value})}
-              placeholder="₹"
-            />
-          </div>
-          <div className="form-group">
-            <label>Status</label>
-            <select className="form-select" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-              <option>Active</option>
-              <option>Expiring Soon</option>
-              <option>Expired</option>
-              <option>Suspended</option>
-            </select>
+
+          <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label>Contract Value</label>
+              <input 
+                className="form-input" 
+                value={formData.value} 
+                onChange={e => setFormData({...formData, value: e.target.value})}
+                placeholder="₹"
+              />
+            </div>
+            <div className="form-group">
+              <label>Status</label>
+              <select className="form-select" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                <option>Active</option>
+                <option>Expiring Soon</option>
+                <option>Expired</option>
+                <option>Suspended</option>
+              </select>
+            </div>
           </div>
         </div>
         <div className="modal-footer">
@@ -600,5 +758,121 @@ const RenewModal = ({ onClose, onSave }) => (
     </div>
   </div>
 );
+
+const CustomerDetailModal = ({ customer, onClose }) => {
+  if (!customer) return null;
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-card" style={{ width: '800px', maxWidth: '95vw' }}>
+        <div className="modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+             <div className="customer-avatar" style={{ width: '48px', height: '48px', fontSize: '18px' }}>{customer.name[0]}</div>
+             <div>
+               <h3 style={{ margin: 0 }}>{customer.name}</h3>
+               <span className="text-slate-500" style={{ fontSize: '13px' }}>{customer.contractId} | {customer.plan}</span>
+             </div>
+          </div>
+          <button className="icon-button" onClick={onClose} style={{ border: 'none' }}><X size={20} /></button>
+        </div>
+        <div className="modal-body" style={{ padding: '32px' }}>
+          <div className="main-grid" style={{ gridTemplateColumns: '1.2fr 1fr', gap: '32px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Profile Section */}
+              <section>
+                <h4 style={{ marginBottom: '16px', color: 'var(--secondary)', borderBottom: '1px solid var(--slate-100)', paddingBottom: '8px' }}>Customer Profile</h4>
+                <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="agreement-field"><strong>GSTIN</strong>{customer.gstin || 'Not Provided'}</div>
+                  <div className="agreement-field"><strong>Contract Value</strong>{customer.value}</div>
+                  <div className="agreement-field"><strong>Authorized Person 1</strong>{customer.authorizedPerson1 || 'Not Set'}</div>
+                  <div className="agreement-field"><strong>Authorized Person 2</strong>{customer.authorizedPerson2 || 'Not Set'}</div>
+                </div>
+                <div className="agreement-field" style={{ marginTop: '12px' }}><strong>Registered Address</strong>{customer.address || 'Not Set'}</div>
+              </section>
+
+              {/* Locations Section */}
+              <section>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h4 style={{ margin: 0, color: 'var(--secondary)' }}>Service Locations</h4>
+                    <button className="secondary-button" style={{ height: '28px', fontSize: '11px' }}><Plus size={12} /> Add Location</button>
+                 </div>
+                 <div className="table-container" style={{ border: '1px solid var(--slate-100)', borderRadius: '12px' }}>
+                    <table className="data-table" style={{ fontSize: '13px' }}>
+                       <thead style={{ background: 'var(--slate-50)' }}>
+                          <tr>
+                             <th style={{ padding: '10px' }}>Location Name</th>
+                             <th style={{ padding: '10px' }}>Contact Person</th>
+                             <th style={{ padding: '10px' }}>Devices</th>
+                          </tr>
+                       </thead>
+                       <tbody>
+                          <tr>
+                             <td style={{ padding: '10px' }}>Head Office - Floor 4</td>
+                             <td style={{ padding: '10px' }}>Mr. Rajesh</td>
+                             <td style={{ padding: '10px' }}>12 Devices</td>
+                          </tr>
+                          <tr>
+                             <td style={{ padding: '10px' }}>Warehouse - Sector 5</td>
+                             <td style={{ padding: '10px' }}>Ms. Priya</td>
+                             <td style={{ padding: '10px' }}>4 Devices</td>
+                          </tr>
+                       </tbody>
+                    </table>
+                 </div>
+              </section>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Status & Dates */}
+              <section className="plans-card" style={{ padding: '20px', border: '1px solid var(--slate-100)', boxShadow: 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                   <span className="text-slate-500" style={{ fontSize: '13px' }}>Contract Status</span>
+                   <span className={`status-badge status-${customer.status.toLowerCase().replace(' ', '-')}`}>{customer.status}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                      <span className="text-slate-500">Starts</span>
+                      <strong>{customer.start}</strong>
+                   </div>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                      <span className="text-slate-500">Expires</span>
+                      <strong>{customer.expiry}</strong>
+                   </div>
+                </div>
+              </section>
+
+              {/* Devices Section */}
+              <section>
+                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h4 style={{ margin: 0, color: 'var(--secondary)' }}>Asset Registry</h4>
+                    <button className="secondary-button" style={{ height: '28px', fontSize: '11px' }}>View All</button>
+                 </div>
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {[
+                      { type: 'Desktop', brand: 'HP EliteDesk', sn: 'HP-0021' },
+                      { type: 'Printer', brand: 'HP LaserJet', sn: 'PR-8821' },
+                      { type: 'Laptop', brand: 'Dell Latitude', sn: 'DL-9901' },
+                    ].map((d, idx) => (
+                      <div key={idx} style={{ padding: '12px', background: 'var(--slate-50)', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                         <div>
+                            <div style={{ fontWeight: '700', fontSize: '13px' }}>{d.brand}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.type} | SN: {d.sn}</div>
+                         </div>
+                         <button className="icon-button" style={{ width: '28px', height: '28px' }}><Edit size={12} /></button>
+                      </div>
+                    ))}
+                 </div>
+              </section>
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="secondary-button" onClick={onClose}>Close Detail</button>
+          <button className="primary-button"><FileText size={16} /> Download Profile</button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default AMCPlansCustomersPage;
