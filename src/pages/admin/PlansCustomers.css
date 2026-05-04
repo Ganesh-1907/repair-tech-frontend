@@ -157,6 +157,7 @@
   padding: 24px;
   display: flex;
   flex-direction: column;
+  overflow: visible;
 }
 
 .card-header {
@@ -195,6 +196,7 @@
 .table-container {
   width: 100%;
   overflow-x: auto;
+  overflow-y: visible;
 }
 
 .data-table {
@@ -594,17 +596,19 @@
 }
 
 /* Tooltip/Menu */
-.action-menu {
-  position: absolute;
-  right: 44px;
-  bottom: 0;
-  background: var(--white);
-  border: 1px solid var(--slate-200);
-  border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+.actions-menu {
+  position: relative;
+}
+
+.menu-panel {
+  position: fixed;
+  z-index: 9999;
+  min-width: 190px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
   padding: 8px;
-  min-width: 180px;
-  z-index: 50;
   display: flex;
   flex-direction: column;
   gap: 4px;

@@ -55,10 +55,8 @@ import RentalMaintenanceAlertsPage from './pages/admin/RentalMaintenanceAlertsPa
 
 // CMC Module Pages
 import CMCDashboardPage from './pages/admin/CMCDashboardPage';
-import CMCPlansCustomersPage from './pages/admin/CMCPlansCustomersPage';
-import CMCDeviceRegistryPage from './pages/admin/CMCDeviceRegistryPage';
-import CMCScheduledMaintenancePage from './pages/admin/CMCScheduledMaintenancePage';
-import CMCBillingRenewalsPage from './pages/admin/CMCBillingRenewalsPage';
+import CMCPlansPage from './pages/admin/CMCPlansPage';
+import CMCInventoryPage from './pages/admin/CMCInventoryPage';
 import CMCReportsPage from './pages/admin/CMCReportsPage';
 
 import { adminRouteEntries } from './config/adminModules';
@@ -96,10 +94,8 @@ const existingAdminRouteComponents = {
   '/admin/amc/inventory': AMCInventoryPage,
   '/admin/amc/reports': AMCReportsPage,
   '/admin/cmc/dashboard': CMCDashboardPage,
-  '/admin/cmc/plans-customers': CMCPlansCustomersPage,
-  '/admin/cmc/device-registry': CMCDeviceRegistryPage,
-  '/admin/cmc/scheduled-maintenance': CMCScheduledMaintenancePage,
-  '/admin/cmc/billing-renewals': CMCBillingRenewalsPage,
+  '/admin/cmc/plans': CMCPlansPage,
+  '/admin/cmc/inventory': CMCInventoryPage,
   '/admin/cmc/reports': CMCReportsPage,
   '/admin/cmc': CMCDashboardPage,
   '/admin/staff-portal': StaffManagement,
@@ -150,18 +146,9 @@ function App() {
               {/* CMC Module Redirects & Explicit Routes */}
               <Route path="/admin/cmc" element={<Navigate to="/admin/cmc/dashboard" replace />} />
               <Route path="/admin/cmc/dashboard" element={<Layout><CMCDashboardPage /></Layout>} />
-              <Route path="/admin/cmc/plans-customers" element={<Layout><CMCPlansCustomersPage /></Layout>} />
-              <Route path="/admin/cmc/device-registry" element={<Layout><CMCDeviceRegistryPage /></Layout>} />
-              <Route path="/admin/cmc/scheduled-maintenance" element={<Layout><CMCScheduledMaintenancePage /></Layout>} />
-              <Route path="/admin/cmc/billing-renewals" element={<Layout><CMCBillingRenewalsPage /></Layout>} />
+              <Route path="/admin/cmc/plans" element={<Layout><CMCPlansPage /></Layout>} />
+              <Route path="/admin/cmc/inventory" element={<Layout><CMCInventoryPage /></Layout>} />
               <Route path="/admin/cmc/reports" element={<Layout><CMCReportsPage /></Layout>} />
-
-              <Route path="/admin/cmc/contract-creation-plans" element={<Navigate to="/admin/cmc/plans-customers" replace />} />
-              <Route path="/admin/cmc/customer-device-linking" element={<Navigate to="/admin/cmc/device-registry" replace />} />
-              <Route path="/admin/cmc/automated-service-scheduling" element={<Navigate to="/admin/cmc/scheduled-maintenance" replace />} />
-              <Route path="/admin/cmc/inventory-integration" element={<Navigate to="/admin/cmc/billing-renewals" replace />} />
-              <Route path="/admin/cmc/billing-renewal-automation" element={<Navigate to="/admin/cmc/billing-renewals" replace />} />
-              <Route path="/admin/cmc/contract-profit-tracking" element={<Navigate to="/admin/cmc/reports" replace />} />
 
               {/* Explicit Campaign Routes */}
               <Route path="/admin/campaign/dashboard" element={<Layout><CampaignDashboardPage /></Layout>} />

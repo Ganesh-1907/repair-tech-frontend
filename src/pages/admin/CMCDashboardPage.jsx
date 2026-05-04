@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion as Motion } from 'framer-motion';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import {
@@ -37,7 +37,7 @@ import {
   Target
 } from 'lucide-react';
 import { usePrivacy } from '../../context/PrivacyContext';
-import { cmcCustomerService, cmcDashboardService, cmcDeviceRegistryService } from '../../services/cmcServices';
+import { cmcDashboardService } from '../../services/cmcServices';
 import './DashboardPremiumStyles.css';
 
 ChartJS.register(
@@ -55,36 +55,16 @@ ChartJS.register(
 
 const CMCDashboardPage = () => {
   const { formatCurrency } = usePrivacy();
-  const [stats, setStats] = useState({});
-  const [revenueTrend, setRevenueTrend] = useState([]);
-  const [partsTrend, setPartsTrend] = useState([]);
-  const [contracts, setContracts] = useState([]);
-  const [devices, setDevices] = useState([]);
-  const [expiring, setExpiring] = useState([]);
+  const [analytics, setAnalytics] = useState({
+    kpis: {},
+    revenueTrend: [],
+    planDistribution: [],
+    widgets: { expiringSoon: [], upcomingVisits: [], lowProfitAmcs: [] },
+  });
 
   useEffect(() => {
-    Promise.all([
-      cmcDashboardService.getStats(),
-      cmcDashboardService.getRevenueTrend(),
-      cmcDashboardService.getPartsUsageTrend(),
-      cmcDashboardService.getExpiringContracts(),
-      cmcCustomerService.getCustomers(),
-      cmcDeviceRegistryService.getDevices(),
-    ]).then(([nextStats, nextRevenueTrend, nextPartsTrend, nextExpiring, nextContracts, nextDevices]) => {
-      setStats(nextStats);
-      setRevenueTrend(nextRevenueTrend);
-      setPartsTrend(nextPartsTrend);
-      setExpiring(nextExpiring);
-      setContracts(nextContracts);
-      setDevices(nextDevices);
-    });
+    cmcDashboardService.getAnalytics().then(setAnalytics);
   }, []);
-
-  const deviceHealth = useMemo(() => Object.values(devices.reduce((acc, device) => {
-    acc[device.status] = acc[device.status] || { name: device.status, value: 0 };
-    acc[device.status].value += 1;
-    return acc;
-  }, {})), [devices]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -107,7 +87,7 @@ const CMCDashboardPage = () => {
       <header className="dashboard-header">
         <div className="header-left">
           <h1 style={{ fontSize: '26px', fontWeight: 900, margin: 0 }}>CMC Dashboard</h1>
-          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Executive overview of CMC profitability, device health, and service efficiency.</p>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Executive overview of CMC revenue, renewals, and service pipeline.</p>
         </div>
         <div className="header-actions">
           <div className="search-input-wrapper">
@@ -117,7 +97,7 @@ const CMCDashboardPage = () => {
           <button className="btn-premium"><Download size={14} /> Export</button>
           <button className="btn-premium"><LayoutGrid size={14} /> Theme</button>
           <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border border-slate-100 shadow-sm">
-            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs">C</div>
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs">A</div>
             <div className="pr-1">
               <p className="text-[10px] font-black text-slate-900 leading-none">Admin</p>
               <p className="text-[8px] font-bold text-slate-400 uppercase mt-0.5">CMC Lead</p>
@@ -128,13 +108,13 @@ const CMCDashboardPage = () => {
 
       {/* 3. KPI Grid */}
       <div className="ref-kpi-grid">
-         <KPIBox title="CMC Revenue" value={formatCurrency(stats.revenue)} trend="+22.5%" trendUp icon={<IndianRupee />} color="#6366f1" bg="#e0e7ff" />
-         <KPIBox title="Part Cost" value={formatCurrency(stats.partsCost)} trend="+15%" trendUp icon={<Zap />} color="#0ea5e9" bg="#e0f2fe" />
-         <KPIBox title="Active Devices" value={devices.length} trend="+342" trendUp icon={<ShieldCheck />} color="#8b5cf6" bg="#ede9fe" />
-         <KPIBox title="Critical Failure" value={devices.filter((device) => device.status === 'Critical').length} trend="-2" trendUp={false} icon={<AlertTriangle />} color="#ef4444" bg="#fef2f2" />
-         <KPIBox title="Open Visits" value={stats.openTickets || 0} trend="0%" trendUp icon={<Clock />} color="#f59e0b" bg="#fef3c7" />
-         <KPIBox title="Profit Margin" value={`${stats.profitMargin || 0}%`} trend="-0.5h" trendUp={false} icon={<Activity />} color="#10b981" bg="#dcfce7" />
-         <KPIBox title="Net Profit" value={formatCurrency(stats.netProfit)} trend="+12%" trendUp icon={<TrendingUp />} color="#6366f1" bg="#e0e7ff" />
+         <KPIBox title="CMC Revenue" value={formatCurrency(analytics.kpis.totalRevenue)} trend="+18.5%" trendUp icon={<IndianRupee />} color="#6366f1" bg="#e0e7ff" />
+         <KPIBox title="Renewal Rate" value="94%" trend="+3%" trendUp icon={<ShieldCheck />} color="#0ea5e9" bg="#e0f2fe" />
+         <KPIBox title="Active Plans" value={analytics.kpis.activeAmcs || 0} trend="+124" trendUp icon={<Briefcase />} color="#8b5cf6" bg="#ede9fe" />
+         <KPIBox title="Expiring Soon" value={analytics.kpis.expiringSoon || 0} trend="-5" trendUp={false} icon={<Clock />} color="#f59e0b" bg="#fef3c7" />
+         <KPIBox title="Open Visits" value={analytics.kpis.openTickets || 0} trend="-2" trendUp={false} icon={<AlertTriangle />} color="#ef4444" bg="#fef2f2" />
+         <KPIBox title="SLA Adherence" value="98%" trend="+1%" trendUp icon={<Activity />} color="#10b981" bg="#dcfce7" />
+         <KPIBox title="Pipeline" value={formatCurrency((analytics.widgets.expiringSoon || []).reduce((sum, row) => sum + Number(row.revenue || 0), 0))} trend="+22%" trendUp icon={<Target />} color="#6366f1" bg="#e0e7ff" />
       </div>
 
       {/* 4. Main Charts Grid */}
@@ -142,18 +122,18 @@ const CMCDashboardPage = () => {
          <Motion.div className="ref-chart-card" variants={itemVariants}>
             <div className="ref-chart-header">
                <div>
-                  <h3 className="ref-chart-title">Profit vs Inventory</h3>
-                  <p className="ref-chart-subtitle">CMC profitability compared to spare part consumption.</p>
+                  <h3 className="ref-chart-title">Growth vs Target</h3>
+                  <p className="ref-chart-subtitle">Quarterly CMC acquisition compared to growth goals.</p>
                </div>
                <span className="ref-chart-period">Q2 2026</span>
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
                <Bar 
                  data={{
-                   labels: revenueTrend.map((row) => row.month),
+                   labels: analytics.revenueTrend.map((row) => row.month),
                    datasets: [
-                     { label: 'Profit', data: revenueTrend.map((row) => row.profit), backgroundColor: '#6366f1', borderRadius: 12, barThickness: 24 },
-                     { label: 'Parts', data: partsTrend.map((row) => row.cost), backgroundColor: '#e2e8f0', borderRadius: 12, barThickness: 24 }
+                     { label: 'Revenue', data: analytics.revenueTrend.map((row) => row.revenue), backgroundColor: '#6366f1', borderRadius: 8, barThickness: 20 },
+                     { label: 'Cost', data: analytics.revenueTrend.map((row) => row.cost), backgroundColor: '#e2e8f0', borderRadius: 8, barThickness: 20 }
                    ]
                  }}
                  options={commonBarOptions}
@@ -164,17 +144,17 @@ const CMCDashboardPage = () => {
          <Motion.div className="ref-chart-card" variants={itemVariants}>
             <div className="ref-chart-header">
                <div>
-                  <h3 className="ref-chart-title">Device Health</h3>
-                  <p className="ref-chart-subtitle">Status mix of all CMC-covered assets.</p>
+                  <h3 className="ref-chart-title">Plan Distribution</h3>
+                  <p className="ref-chart-subtitle">Customer base split by plan type.</p>
                </div>
             </div>
             <div style={{ height: '140px', marginBottom: '16px' }}>
                <Pie 
                  data={{
-                   labels: deviceHealth.map((row) => row.name),
+                   labels: analytics.planDistribution.map((row) => row.name),
                    datasets: [{
-                     data: deviceHealth.map((row) => row.value),
-                     backgroundColor: ['#6366f1', '#10b981', '#ef4444', '#f59e0b'],
+                     data: analytics.planDistribution.map((row) => row.value),
+                     backgroundColor: analytics.planDistribution.map((row) => row.color),
                      borderWidth: 0
                    }]
                  }}
@@ -182,15 +162,15 @@ const CMCDashboardPage = () => {
                />
             </div>
             <div className="legend-grid">
-               {deviceHealth.map((row, index) => <LegendItem key={row.name} label={row.name} color={['#6366f1', '#10b981', '#ef4444', '#f59e0b'][index % 4]} />)}
+               {analytics.planDistribution.map((row) => <LegendItem key={row.name} label={row.name} color={row.color} />)}
             </div>
          </Motion.div>
 
          <Motion.div className="ref-chart-card" variants={itemVariants}>
             <div className="ref-chart-header">
                <div>
-                  <h3 className="ref-chart-title">Replacement Velocity</h3>
-                  <p className="ref-chart-subtitle">Frequency of major part replacements weekly.</p>
+                  <h3 className="ref-chart-title">Renewal Velocity</h3>
+                  <p className="ref-chart-subtitle">Percentage of renewals completed weekly.</p>
                </div>
             </div>
             <div style={{ flex: 1, minHeight: 0 }}>
@@ -198,7 +178,7 @@ const CMCDashboardPage = () => {
                  data={{
                    labels: ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7'],
                    datasets: [{
-                     data: [12, 18, 15, 22, 19, 25, 20],
+                     data: [88, 92, 90, 95, 94, 98, 96],
                      borderColor: '#6366f1',
                      borderWidth: 2,
                      tension: 0.4,
@@ -219,15 +199,15 @@ const CMCDashboardPage = () => {
                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><CalendarDays size={20} /></div>
                   <div>
-                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Critical Devices</h3>
-                     <p className="text-[9px] text-slate-400 font-medium">Devices requiring immediate visits.</p>
+                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Renewal Alerts</h3>
+                     <p className="text-[9px] text-slate-400 font-medium leading-relaxed">Top customers requiring immediate renewal follow-up.</p>
                   </div>
                </div>
-               <span className="ref-badge ref-badge-pending">5 Devices</span>
+               <span className="ref-badge ref-badge-pending">12 Pending</span>
             </div>
             <div className="space-y-4">
-               {devices.filter((device) => device.status !== 'Healthy').slice(0, 2).map((device) => (
-                 <OpListItem key={device.id} label={device.model} detail={device.customerName} badge={device.status.toUpperCase()} color="indigo" />
+               {(analytics.widgets.expiringSoon || []).slice(0, 2).map((row) => (
+                 <OpListItem key={row.id} label={row.customerName} detail={`${row.planName} plan expiring`} badge={row.expiryDate} color="indigo" />
                ))}
             </div>
          </Motion.div>
@@ -237,27 +217,27 @@ const CMCDashboardPage = () => {
                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><Briefcase size={20} /></div>
                   <div>
-                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Overdue CMC</h3>
-                     <p className="text-[9px] text-slate-400 font-medium">Contracts requiring immediate billing check.</p>
+                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Service Overdue</h3>
+                     <p className="text-[9px] text-slate-400 font-medium leading-relaxed">Planned visits that have missed their schedule.</p>
                   </div>
                </div>
-               <span className="ref-badge ref-badge-critical">3 Critical</span>
+               <span className="ref-badge ref-badge-critical">4 Critical</span>
             </div>
             <div className="space-y-4">
-               {expiring.slice(0, 2).map((row) => (
-                 <OpListItem key={row.id} label={row.customer} detail="Contract renewal due" badge={row.expiry} color="rose" />
+               {(analytics.widgets.upcomingVisits || []).slice(0, 2).map((row) => (
+                 <OpListItem key={row.id} label={row.customer} detail={`${row.status} visit`} badge={row.date} color="rose" />
                ))}
             </div>
          </Motion.div>
 
          <Motion.div className="ref-ops-card" variants={itemVariants}>
             <div className="mb-6">
-               <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Profit Streams</h3>
+               <h3 className="text-xs font-black uppercase tracking-widest text-slate-900">Plan Contribution</h3>
                <p className="text-[9px] text-slate-400 font-medium">Revenue split by CMC category.</p>
             </div>
             <div className="space-y-6">
-               {contracts.slice(0, 3).map((row) => (
-                 <StreamItem key={row.id} name={row.customerName} value={formatCurrency(row.revenue)} percentage={Math.max(5, Math.min(95, Number(row.profit || 0) / (Number(row.revenue || 1)) * 100))} color="indigo" />
+               {(analytics.widgets.lowProfitAmcs || []).slice(0, 3).map((row) => (
+                 <StreamItem key={row.id} name={row.customerName} value={formatCurrency(row.revenue)} percentage={Math.max(10, Math.min(95, ((row.revenue - row.cost) / (row.revenue || 1)) * 100))} color="indigo" />
                ))}
             </div>
          </Motion.div>
@@ -266,25 +246,26 @@ const CMCDashboardPage = () => {
       {/* 6. Bottom Table Section */}
       <Motion.div className="table-card-container" variants={itemVariants}>
          <div className="table-card-header">
-            <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Recent CMC Activations</h3>
+            <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Recent Plan Activations</h3>
             <div className="search-input-wrapper" style={{ width: '280px' }}>
                <Search size={14} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }} />
-               <input type="text" placeholder="Search CMC plans..." style={{ height: '36px', borderRadius: '10px' }} />
+               <input type="text" placeholder="Search contracts..." style={{ height: '36px', borderRadius: '10px' }} />
             </div>
          </div>
          <table className="dash-table">
             <thead>
                <tr>
-                  <th>CMC ID</th>
+                  <th>Plan ID</th>
                   <th>Customer</th>
-                  <th>Device Count</th>
+                  <th>Plan Type</th>
                   <th>Start Date</th>
+                  <th>Renewal</th>
                   <th>Status</th>
                   <th className="text-right">Action</th>
                </tr>
             </thead>
             <tbody>
-               {contracts.map((row) => (
+               {(analytics.widgets.expiringSoon || []).map((row) => (
                   <tr key={row.id} className="group hover:bg-slate-50/50 transition-all">
                      <td><span className="text-xs font-black text-slate-900">#{row.id}</span></td>
                      <td>
@@ -293,8 +274,9 @@ const CMCDashboardPage = () => {
                            <p className="text-[9px] font-bold text-slate-400 uppercase">{row.customerType}</p>
                         </div>
                      </td>
-                     <td><span className="text-xs font-bold text-slate-600">{row.devicesCount} Devices</span></td>
+                     <td><span className="text-[10px] font-black uppercase text-slate-500">{row.planName}</span></td>
                      <td><span className="text-xs font-bold text-slate-600">{row.startDate}</span></td>
+                     <td><span className="text-xs font-black text-slate-900">{row.expiryDate}</span></td>
                      <td><span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[8px] font-black uppercase">{row.status}</span></td>
                      <td className="text-right">
                         <button className="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-indigo-600 shadow-sm transition-all"><ChevronRight size={14} /></button>
@@ -305,6 +287,7 @@ const CMCDashboardPage = () => {
          </table>
       </Motion.div>
     </Motion.div>
+
   );
 };
 
@@ -359,6 +342,8 @@ const StreamItem = ({ name, value, percentage, color: _color }) => (
    </div>
 );
 
+const RefreshCw = ({ size }) => <Activity size={size} />; // Simple placeholder
+
 const commonBarOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -380,3 +365,4 @@ const commonLineOptions = {
 };
 
 export default CMCDashboardPage;
+

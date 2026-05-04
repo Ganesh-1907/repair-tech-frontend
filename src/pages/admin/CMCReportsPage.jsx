@@ -13,7 +13,7 @@ const CMCReportsPage = () => {
   const [dateRange, setDateRange] = useState('Last 30 Days');
   const [reportType, setReportType] = useState('All Reports');
   const [chartType, setChartType] = useState('Bar');
-  const [activeReport, setActiveReport] = useState('CMC Revenue Trend');
+  const [activeReport, setActiveReport] = useState('Revenue Trend');
   const [toasts, setToasts] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -46,27 +46,27 @@ const CMCReportsPage = () => {
       title: 'Financial Performance', 
       icon: IndianRupee, 
       desc: 'Track revenue, costs, and unpaid invoices.',
-      metrics: ['CMC Revenue Trend', 'Invoice Collection', 'Contract Profitability', 'Outstanding Payments'] 
+      metrics: ['Revenue Trend', 'Cost vs Profit', 'Parts Cost Analysis', 'Unpaid Invoices'] 
     },
     { 
       title: 'Operational Health', 
       icon: Activity, 
       desc: 'Monitor SLAs, visits, and efficiency.',
-      metrics: ['Service Completion', 'Technician Utilization', 'Preventive Visits', 'SLA Performance'] 
+      metrics: ['Missed Visits', 'SLA Breach Report', 'Technician Efficiency', 'Visit Volume'] 
     },
     { 
       title: 'Portfolio Insights', 
       icon: PieChart, 
       desc: 'Analyze customers and contract types.',
-      metrics: ['Contract Distribution', 'Renewal Forecast', 'Customer Retention', 'Region-wise Analysis'] 
+      metrics: ['Plan Distribution', 'Renewal Conversion', 'High Cost Customers', 'Location-wise Analysis'] 
     }
   ];
 
   const tableData = [
-    { id: 'RPT-201', customer: 'Global Tech', location: 'Mumbai', revenue: '₹35,000', cost: '₹10,000', profit: '₹25,000', status: 'Healthy' },
-    { id: 'RPT-202', customer: 'Stellar Bank', location: 'Delhi', revenue: '₹62,000', cost: '₹40,000', profit: '₹22,000', status: 'Warning' },
-    { id: 'RPT-203', customer: 'Modern School', location: 'Pune', revenue: '₹12,000', cost: '₹14,000', profit: '-₹2,000', status: 'Risk' },
-    { id: 'RPT-204', customer: 'Apex Retail', location: 'Bangalore', revenue: '₹46,000', cost: '₹15,000', profit: '₹31,000', status: 'Healthy' },
+    { id: 'RPT-101', customer: 'Global Tech', location: 'Mumbai', revenue: '₹45,000', cost: '₹12,000', profit: '₹33,000', status: 'Healthy' },
+    { id: 'RPT-102', customer: 'Stellar Bank', location: 'Delhi', revenue: '₹82,000', cost: '₹50,000', profit: '₹32,000', status: 'Warning' },
+    { id: 'RPT-103', customer: 'Modern School', location: 'Pune', revenue: '₹15,000', cost: '₹18,000', profit: '-₹3,000', status: 'Risk' },
+    { id: 'RPT-104', customer: 'Apex Retail', location: 'Bangalore', revenue: '₹56,000', cost: '₹20,000', profit: '₹36,000', status: 'Healthy' },
   ];
 
   const getStatusClass = (status) => {
@@ -83,7 +83,7 @@ const CMCReportsPage = () => {
       <div className="reports-header">
         <div className="reports-header-left">
           <h1>CMC Reports</h1>
-          <p>Detailed analytics on CMC profitability, renewals, collections, and service performance.</p>
+          <p>Detailed analytics on profitability, conversion, renewals, and service ticket volume.</p>
         </div>
         <div className="reports-header-actions">
           <div className="reports-search">
@@ -150,32 +150,32 @@ const CMCReportsPage = () => {
            <div className="metric-icon-wrapper" style={{ background: '#e0e7ff', color: '#6366f1' }}><IndianRupee size={24} /></div>
            <div className="metric-details">
              <span className="metric-label">Revenue</span>
-             <span className="metric-value">₹9.8L</span>
-             <span className="metric-trend text-green-600">+8% vs last month</span>
+             <span className="metric-value">₹12.5L</span>
+             <span className="metric-trend text-green-600">+12% vs last month</span>
            </div>
         </div>
         <div className="metric-card">
            <div className="metric-icon-wrapper" style={{ background: '#dcfce7', color: '#16a34a' }}><TrendingUp size={24} /></div>
            <div className="metric-details">
-             <span className="metric-label">Contract Conversion</span>
-             <span className="metric-value">76%</span>
-             <span className="metric-trend text-green-600">+3% vs last month</span>
+             <span className="metric-label">Renewal Conversion</span>
+             <span className="metric-value">82%</span>
+             <span className="metric-trend text-green-600">+5% vs last month</span>
            </div>
         </div>
         <div className="metric-card">
            <div className="metric-icon-wrapper" style={{ background: '#fef3c7', color: '#d97706' }}><AlertTriangle size={24} /></div>
            <div className="metric-details">
              <span className="metric-label">Open Tickets</span>
-             <span className="metric-value">18</span>
-             <span className="metric-trend text-green-600">-2 vs last month</span>
+             <span className="metric-value">26</span>
+             <span className="metric-trend text-red-600">+4 vs last month</span>
            </div>
         </div>
         <div className="metric-card">
            <div className="metric-icon-wrapper" style={{ background: '#fee2e2', color: '#dc2626' }}><FileText size={24} /></div>
            <div className="metric-details">
              <span className="metric-label">Unpaid Invoices</span>
-             <span className="metric-value">₹1.7L</span>
-             <span className="metric-trend text-green-600">-₹0.2L vs last month</span>
+             <span className="metric-value">₹2.4L</span>
+             <span className="metric-trend text-green-600">-₹0.5L vs last month</span>
            </div>
         </div>
       </div>
@@ -229,7 +229,7 @@ const CMCReportsPage = () => {
             </div>
           </div>
           <div className="chart-area">
-            {[35, 55, 45, 75, 65, 85, 70, 50, 80, 60, 75, 90].map((h, i) => (
+            {[40, 65, 55, 85, 75, 95, 80, 60, 90, 70, 85, 98].map((h, i) => (
               <div key={i} className="placeholder-bar" style={{ height: `${h}%`, width: chartType === 'Line' ? '2px' : 'auto', background: chartType === 'Line' ? 'transparent' : '#6366f1', borderLeft: chartType === 'Line' ? '2px dashed #6366f1' : 'none' }}></div>
             ))}
             <div className="chart-labels">
@@ -410,3 +410,4 @@ const CMCReportsPage = () => {
 };
 
 export default CMCReportsPage;
+
