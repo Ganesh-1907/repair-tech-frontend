@@ -6,12 +6,21 @@ import { Lock, Mail, ChevronRight } from 'lucide-react';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setError('');
+    setIsSubmitting(true);
     const result = await login(email, password);
+    setIsSubmitting(false);
+    if (!result.success) {
+      setError(result.message);
+      return;
+    }
     navigate(result.user?.role === 'staff' ? '/admin/staff-portal' : '/');
   };
 
@@ -25,6 +34,7 @@ const Login = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
+          {error ? <div className="login-error-alert">{error}</div> : null}
           <div className="form-group">
             <label htmlFor="login-email">Email Address</label>
             <div className="input-with-icon">
@@ -55,8 +65,8 @@ const Login = () => {
             </div>
           </div>
 
-          <button type="submit" className="login-btn">
-            Sign In
+          <button type="submit" className="login-btn" disabled={isSubmitting}>
+            {isSubmitting ? 'Signing In...' : 'Sign In'}
             <ChevronRight size={18} />
           </button>
         </form>

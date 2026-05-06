@@ -1,674 +1,310 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion as Motion } from 'framer-motion';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   BarElement,
-  Title as ChartTitle,
+  Title,
   Tooltip,
   Legend,
   ArcElement,
   PointElement,
   LineElement,
-  Filler
+  Filler,
 } from 'chart.js';
 import {
   Activity,
   AlertTriangle,
-  ArrowUpRight,
   ArrowDownRight,
+  ArrowUpRight,
   CalendarDays,
-  ChevronRight,
   Clock,
   Download,
   IndianRupee,
   LayoutGrid,
   Search,
+  Settings,
   ShieldCheck,
-  TrendingUp,
   Users,
-  Zap,
-  MoreVertical,
-  Plus,
-  Moon,
-  Sun,
-  Truck,
+  Wallet,
   Wrench,
-  CheckCircle2,
-  X
 } from 'lucide-react';
-import './RentalDashboard.css';
+import { usePrivacy } from '../../context/PrivacyContext';
+import { rentalDashboardService } from '../../services/rentalDashboardService';
+import './DashboardPremiumStyles.css';
+import './RentalDashboardOverrides.css';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  ArcElement,
-  ChartTitle,
-  Tooltip,
-  Legend,
-  Filler
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler);
+
+const emptyDashboard = {
+  kpis: {},
+  charts: { monthlyRevenue: [], usageByCustomer: [], assetStatus: [], invoicePaymentStatus: [] },
+  widgets: { recentCustomers: [], recentInstallations: [], recentQuotations: [], upcomingRenewals: [], pendingPayments: [], alerts: [] },
+};
 
 const RentalDashboardPage = () => {
-  // State for Dashboard Data
-  const [installations, setInstallations] = useState([
-    { id: 'AST-1001', customer: 'Alpha Corp', start: '2026-04-01', period: '12 Months', value: 120000, status: 'Active' },
-    { id: 'AST-1002', customer: 'Zeta Logistics', start: '2026-04-04', period: '6 Months', value: 82000, status: 'Pending' },
-    { id: 'AST-1003', customer: 'Tech Park', start: '2026-04-08', period: '18 Months', value: 245000, status: 'Maintenance' },
-    { id: 'AST-1004', customer: 'Global Industries', start: '2026-04-12', period: '24 Months', value: 310000, status: 'Active' },
-    { id: 'AST-1005', customer: 'Riverside Ltd', start: '2026-04-15', period: '12 Months', value: 95000, status: 'Active' },
-  ]);
+  const { formatCurrency } = usePrivacy();
+  const [dashboard, setDashboard] = useState(emptyDashboard);
+  const [search, setSearch] = useState('');
+  const [range, setRange] = useState('30d');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [toast, setToast] = useState('');
+  const [modal, setModal] = useState(null);
 
-  // UI State
-  const [searchTerm, setSearchTerm] = useState('');
-  const [tableSearch, setTableSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [toast, setToast] = useState(null);
-  
-  // Modal State
-  const [activeModal, setActiveModal] = useState(null); // { type: 'KPI' | 'Chart' | 'Renewal' | 'Maintenance' | 'Form', data: any }
-  const [formMode, setFormMode] = useState('Add'); // 'Add' | 'Edit'
-  const [formData, setFormData] = useState({ id: '', customer: '', start: '', period: '', value: '', status: 'Active' });
+  useEffect(() => {
+    rentalDashboardService.getOverview().then(setDashboard);
+  }, []);
 
-  // Filtered Table Data
-  const filteredInstallations = useMemo(() => {
-    return installations.filter(item => {
-      const matchesSearch = item.id.toLowerCase().includes(tableSearch.toLowerCase()) || 
-                            item.customer.toLowerCase().includes(tableSearch.toLowerCase());
-      const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [installations, tableSearch, statusFilter]);
-
-  // Toast Helper
   const showToast = (message) => {
     setToast(message);
-    setTimeout(() => setToast(null), 3000);
+    window.setTimeout(() => setToast(''), 2200);
   };
 
-  // Export Logic
-  const handleExport = () => {
-    const headers = ['Asset ID', 'Customer', 'Lease Start', 'Period', 'Value', 'Status'];
-    const rows = filteredInstallations.map(i => [i.id, i.customer, i.start, i.period, i.value, i.status]);
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
+  const lowUsageAlerts = (dashboard.widgets.alerts || []).filter((row) => String(row.alertType || '').toLowerCase().includes('low'));
+  const highUsageAlerts = (dashboard.widgets.alerts || []).filter((row) => String(row.alertType || '').toLowerCase().includes('high'));
+  const overduePayments = (dashboard.widgets.pendingPayments || []).filter((row) => String(row.paymentStatus || '').toLowerCase().includes('overdue'));
+
+  const exportCsv = () => {
+    const rows = (dashboard.widgets.upcomingRenewals || []).map((row) => ({
+      date: row.endDate,
+      customer: row.customerName,
+      activityType: 'Renewal',
+      deviceOrContract: row.contractType || 'Rental Contract',
+      amount: row.contractValue || 0,
+      status: row.status || 'Pending',
+    }));
+
+    const header = ['Date', 'Customer', 'Activity Type', 'Device / Contract', 'Amount', 'Status'];
+    const lines = rows.map((row) => [row.date, row.customer, row.activityType, row.deviceOrContract, row.amount, row.status]);
+    const csv = [header, ...lines].map((line) => line.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", "rental-dashboard-report.csv");
-    document.body.appendChild(link);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'rental-dashboard-report.csv';
     link.click();
-    document.body.removeChild(link);
-    
-    showToast("Fleet data exported successfully");
+    URL.revokeObjectURL(url);
+    showToast('Rental report exported');
   };
 
-  // CRUD Actions
-  const handleAddClick = () => {
-    setFormMode('Add');
-    setFormData({ id: `AST-${Math.floor(1000 + Math.random() * 9000)}`, customer: '', start: '', period: '12 Months', value: '', status: 'Active' });
-    setActiveModal({ type: 'Form' });
-  };
+  const kpiItems = [
+    { title: 'Rental Revenue', value: formatCurrency(dashboard.kpis.monthlyRentalRevenue || 0), trend: '+12.3%', trendUp: true, icon: <IndianRupee />, color: '#6366f1', bg: '#e0e7ff' },
+    { title: 'Active Customers', value: dashboard.kpis.activeCustomers || 0, trend: '+5', trendUp: true, icon: <Users />, color: '#8b5cf6', bg: '#ede9fe' },
+    { title: 'Active Devices', value: dashboard.kpis.activeAssets || 0, trend: '+10', trendUp: true, icon: <LayoutGrid />, color: '#10b981', bg: '#dcfce7' },
+    { title: 'Fleet Utilization', value: `${Math.round(((dashboard.kpis.installedAssets || 0) / Math.max(dashboard.kpis.activeAssets || 1, 1)) * 100)}%`, trend: '+2%', trendUp: true, icon: <Activity />, color: '#6366f1', bg: '#e0e7ff' },
+    { title: 'Outstanding Amount', value: formatCurrency(dashboard.kpis.outstandingAmount || 0), trend: '-4.5%', trendUp: false, icon: <Wallet />, color: '#f59e0b', bg: '#fffbeb' },
+    { title: 'Maintenance Due', value: dashboard.kpis.maintenancePending || 0, trend: '-1', trendUp: false, icon: <Wrench />, color: '#ef4444', bg: '#fef2f2' },
+    { title: 'Contracts Expiring', value: dashboard.kpis.expiringContracts || 0, trend: '-2', trendUp: false, icon: <Clock />, color: '#f59e0b', bg: '#fef3c7' },
+    { title: 'Overdue Payments', value: overduePayments.length, trend: '-1', trendUp: false, icon: <ShieldCheck />, color: '#0ea5e9', bg: '#e0f2fe' },
+  ];
 
-  const handleEditClick = (item) => {
-    setFormMode('Edit');
-    setFormData(item);
-    setActiveModal({ type: 'Form' });
-  };
+  const filteredActivity = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const rows = (dashboard.widgets.upcomingRenewals || []).map((row) => ({
+      date: row.endDate,
+      customer: row.customerName,
+      activityType: 'Renewal',
+      deviceOrContract: row.contractType || 'Rental Contract',
+      amount: row.contractValue || 0,
+      status: row.status || 'Pending',
+    }));
+    const statusRows = statusFilter === 'all' ? rows : rows.filter((row) => String(row.status || '').toLowerCase() === statusFilter);
+    if (!term) return statusRows;
+    return statusRows.filter((row) => Object.values(row).join(' ').toLowerCase().includes(term));
+  }, [dashboard.widgets.upcomingRenewals, search, statusFilter]);
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    if (formMode === 'Add') {
-      setInstallations([formData, ...installations]);
-      showToast(`Asset ${formData.id} added`);
-    } else {
-      setInstallations(installations.map(i => i.id === formData.id ? formData : i));
-      showToast(`Asset ${formData.id} updated`);
-    }
-    setActiveModal(null);
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this installation?")) {
-      setInstallations(installations.filter(i => i.id !== id));
-      showToast(`Asset ${id} removed`);
-    }
-  };
-
-  const handleStatusChange = (id, newStatus) => {
-    setInstallations(installations.map(i => i.id === id ? { ...i, status: newStatus } : i));
-    showToast(`${id} marked as ${newStatus}`);
-  };
-
-  // Chart Data & Options
-  const commonBarOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: 800, size: 10 } } },
-      y: { grid: { color: '#f8fafc' }, border: { display: false }, ticks: { font: { size: 10 } } }
-    }
-  };
-
-  const commonLineOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: 800, size: 10 } } },
-      y: { grid: { color: '#f8fafc' }, border: { display: false }, ticks: { font: { size: 10 } } }
-    }
-  };
+  const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 } } };
+  const itemVariants = { hidden: { y: 20, opacity: 0 }, visible: { y: 0, opacity: 1 } };
 
   return (
-    <div className={`rental-page ${isDarkMode ? 'dark-mode' : ''}`}>
-      {/* 1. Header */}
-      <header className="rental-header">
-        <div className="rental-header-left">
-          <h1>Rental Management Dashboard</h1>
-          <p>Overall rental health with KPI, renewals, pending payments, and alerts.</p>
+    <Motion.div className="premium-dashboard rental-dashboard-page" initial="hidden" animate="visible" variants={containerVariants}>
+      <header className="dashboard-header">
+        <div className="header-left">
+          <h1 style={{ fontSize: '26px', fontWeight: 900, margin: 0 }}>Rental Dashboard</h1>
+          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Executive overview of revenue, utilization, collections, and contract risk.</p>
         </div>
-        <div className="rental-header-actions">
-          <div className="rental-search-wrapper">
-            <Search className="search-icon" size={18} />
-            <input 
-              type="text" 
-              className="rental-search" 
-              placeholder="Search dashboard..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        <div className="header-actions">
+          <div className="search-input-wrapper" style={{ width: '220px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }} />
+            <input type="text" placeholder="Search insights..." style={{ height: '36px', borderRadius: '10px' }} value={search} onChange={(event) => setSearch(event.target.value)} />
           </div>
-          <button className="icon-button" onClick={() => setIsDarkMode(!isDarkMode)}>
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-          <div className="profile-chip">
-            <div className="profile-avatar">A</div>
-            <div className="profile-info">
-              <p>Admin User</p>
-              <span>Fleet Manager</span>
-            </div>
-          </div>
+          <select className="btn-premium" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="overdue">Overdue</option>
+          </select>
+          <select className="btn-premium" value={range} onChange={(event) => setRange(event.target.value)}>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+          </select>
+          <button className="btn-premium" onClick={exportCsv}><Download size={14} /> Export Report</button>
         </div>
       </header>
 
-      {/* 2. Toolbar */}
-      <div className="flex justify-end">
-        <button className="secondary-button" onClick={handleExport}>
-          <Download size={16} /> Export Fleet Data
-        </button>
+      <div className="ref-kpi-grid">
+        {kpiItems.map((item) => <KPIBox key={item.title} {...item} onClick={() => setModal({ title: item.title, body: `Current value: ${item.value}` })} />)}
       </div>
 
-      {/* 3. KPI Grid */}
-      <div className="kpi-grid">
-        <KPIBox 
-          title="Rental Revenue" value="₹8,42,000" trend="+14.2%" 
-          icon={<IndianRupee />} color="#6366f1" bg="#eef2ff" 
-          onClick={() => setActiveModal({ type: 'KPI', title: 'Rental Revenue', value: '₹8,42,000', detail: 'Total revenue collected from active leases this month.' })}
-        />
-        <KPIBox 
-          title="Fleet Utilization" value="88%" trend="+5%" 
-          icon={<Zap />} color="#0ea5e9" bg="#f0f9ff" 
-          onClick={() => setActiveModal({ type: 'KPI', title: 'Fleet Utilization', value: '88%', detail: 'Percentage of equipment currently on active lease.' })}
-        />
-        <KPIBox 
-          title="Active Contracts" value="452" trend="+32" 
-          icon={<ShieldCheck />} color="#8b5cf6" bg="#f5f3ff" 
-          onClick={() => setActiveModal({ type: 'KPI', title: 'Active Contracts', value: '452', detail: 'Total number of valid rental agreements in force.' })}
-        />
-        <KPIBox 
-          title="Pending Renewals" value="18" trend="-4" trendDown 
-          icon={<Clock />} color="#f59e0b" bg="#fffbeb" 
-          onClick={() => setActiveModal({ type: 'KPI', title: 'Pending Renewals', value: '18', detail: 'Contracts expiring within 30 days awaiting renewal.' })}
-        />
-        <KPIBox 
-          title="Overdue Returns" value="6" trend="-2" trendDown 
-          icon={<Truck />} color="#ef4444" bg="#fef2f2" 
-          onClick={() => setActiveModal({ type: 'KPI', title: 'Overdue Returns', value: '6', detail: 'Assets not returned past their lease end date.' })}
-        />
-        <KPIBox 
-          title="Maintenance Due" value="12" trend="+1" 
-          icon={<Wrench />} color="#10b981" bg="#ecfdf5" 
-          onClick={() => setActiveModal({ type: 'KPI', title: 'Maintenance Due', value: '12', detail: 'Assets scheduled for routine service checks.' })}
-        />
-        <KPIBox 
-          title="New Leads" value="24" trend="+8" 
-          icon={<Users />} color="#6366f1" bg="#eef2ff" 
-          onClick={() => setActiveModal({ type: 'KPI', title: 'New Leads', value: '24', detail: 'Unconverted inquiries for new equipment rentals.' })}
-        />
+      <div className="ref-charts-grid rental-charts-grid">
+        <Motion.div className="ref-chart-card" variants={itemVariants}>
+          <ChartHeader title="Revenue vs Target" subtitle="Monthly rental revenue against billing target." onView={() => setModal({ title: 'Revenue vs Target', body: 'Detailed monthly comparison view opened.' })} />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <Bar data={{ labels: (dashboard.charts.monthlyRevenue || []).map((row) => row.month), datasets: [{ label: 'Revenue', data: (dashboard.charts.monthlyRevenue || []).map((row) => row.value), backgroundColor: '#6366f1', borderRadius: 8, barThickness: 20 }, { label: 'Target', data: (dashboard.charts.monthlyRevenue || []).map((row) => Math.round(Number(row.value || 0) * 0.9)), backgroundColor: '#e2e8f0', borderRadius: 8, barThickness: 20 }] }} options={commonBarOptions} />
+          </div>
+        </Motion.div>
+
+        <Motion.div className="ref-chart-card" variants={itemVariants}>
+          <ChartHeader title="Device Utilization" subtitle="Active, idle, and service fleet ratio." onView={() => setModal({ title: 'Device Utilization', body: 'Utilization details by asset status opened.' })} />
+          <div style={{ height: '140px', marginBottom: '16px' }}>
+            <Pie data={{ labels: (dashboard.charts.assetStatus || []).map((row) => row.name), datasets: [{ data: (dashboard.charts.assetStatus || []).map((row) => row.value), backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#e2e8f0'], borderWidth: 0 }] }} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+          </div>
+          <div className="legend-grid">{(dashboard.charts.assetStatus || []).map((row, idx) => <LegendItem key={row.name} label={row.name} color={['#6366f1', '#10b981', '#f59e0b', '#e2e8f0'][idx % 4]} />)}</div>
+        </Motion.div>
+
+        <Motion.div className="ref-chart-card" variants={itemVariants}>
+          <ChartHeader title="Payment Collection Trend" subtitle="Paid vs pending invoice status mix." onView={() => setModal({ title: 'Payment Collection Trend', body: 'Payment collection details opened.' })} />
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <Line data={{ labels: (dashboard.charts.invoicePaymentStatus || []).map((row) => row.name), datasets: [{ data: (dashboard.charts.invoicePaymentStatus || []).map((row) => row.value), borderColor: '#10b981', borderWidth: 2, tension: 0.35, fill: true, backgroundColor: 'rgba(16, 185, 129, 0.08)' }] }} options={commonLineOptions} />
+          </div>
+        </Motion.div>
       </div>
 
-      {/* 4. Main Charts Grid */}
-      <div className="dashboard-grid">
-        <motion.div className="chart-card large" layout>
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">Revenue vs Maintenance</h3>
-              <p className="card-subtitle">Monthly leasing income compared to upkeep costs.</p>
-            </div>
-            <button className="icon-button" onClick={() => setActiveModal({ type: 'Chart', title: 'Revenue vs Maintenance', detail: 'Historical trend of operational profit margins.' })}>
-              <Activity size={18} />
-            </button>
-          </div>
-          <div className="chart-area">
-            <Bar 
-              data={{
-                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-                datasets: [
-                  { label: 'Revenue', data: [82000, 95000, 88000, 112000, 108000, 125000], backgroundColor: '#6366f1', borderRadius: 8, barThickness: 24 },
-                  { label: 'Upkeep', data: [20000, 15000, 25000, 30000, 22000, 28000], backgroundColor: '#e2e8f0', borderRadius: 8, barThickness: 24 }
-                ]
-              }}
-              options={commonBarOptions}
-            />
-          </div>
-        </motion.div>
-
-        <motion.div className="chart-card" layout>
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">Fleet Distribution</h3>
-              <p className="card-subtitle">Equipment availability status mix.</p>
-            </div>
-          </div>
-          <div className="chart-area flex items-center justify-center">
-            <div style={{ width: '160px', height: '160px' }}>
-              <Pie 
-                data={{
-                  labels: ['Rented', 'Available', 'Repair'],
-                  datasets: [{
-                    data: [65, 25, 10],
-                    backgroundColor: ['#6366f1', '#10b981', '#f59e0b'],
-                    borderWidth: 0
-                  }]
-                }}
-                options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            <LegendItem label="Rented" color="#6366f1" />
-            <LegendItem label="Available" color="#10b981" />
-            <LegendItem label="Repair" color="#f59e0b" />
-          </div>
-        </motion.div>
-
-        <motion.div className="chart-card" layout>
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">Lead Conversion Trend</h3>
-              <p className="card-subtitle">Weekly inquiry conversion rate.</p>
-            </div>
-          </div>
-          <div className="chart-area">
-            <Line 
-              data={{
-                labels: ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7'],
-                datasets: [{
-                  data: [42, 48, 45, 52, 58, 55, 60],
-                  borderColor: '#6366f1',
-                  borderWidth: 3,
-                  tension: 0.4,
-                  fill: true,
-                  backgroundColor: 'rgba(99, 102, 241, 0.05)'
-                }]
-              }}
-              options={commonLineOptions}
-            />
-          </div>
-        </motion.div>
+      <div className="ref-ops-grid rental-risk-grid">
+        <OpsCard title="Contract Expiry Alerts" subtitle="Contracts requiring immediate renewal outreach." badge={`${dashboard.kpis.expiringContracts || 0} Pending`} icon={<CalendarDays size={20} />}>
+          {(dashboard.widgets.upcomingRenewals || []).slice(0, 2).map((row) => <OpListItem key={row.id} label={row.customerName} detail="Contract expiring" badge={row.endDate} />)}
+        </OpsCard>
+        <OpsCard title="Low Usage Devices" subtitle="Devices below expected utilization." badge={`${lowUsageAlerts.length} Devices`} icon={<Activity size={20} />}>
+          {lowUsageAlerts.slice(0, 2).map((row, idx) => <OpListItem key={`low-${idx}`} label={row.customerName || 'Rental Asset'} detail={row.alertType || 'Low usage'} badge={row.createdAt?.slice(0, 10) || '-'} />)}
+        </OpsCard>
+        <OpsCard title="High Usage Devices" subtitle="Devices with above-threshold usage." badge={`${highUsageAlerts.length} Devices`} icon={<AlertTriangle size={20} />}>
+          {highUsageAlerts.slice(0, 2).map((row, idx) => <OpListItem key={`high-${idx}`} label={row.customerName || 'Rental Asset'} detail={row.alertType || 'High usage'} badge={row.createdAt?.slice(0, 10) || '-'} />)}
+        </OpsCard>
+        <OpsCard title="Maintenance Due" subtitle="Assets flagged for maintenance actions." badge={`${dashboard.kpis.maintenancePending || 0} Due`} icon={<Wrench size={20} />}>
+          {(dashboard.widgets.alerts || []).slice(0, 2).map((row, idx) => <OpListItem key={`maint-${idx}`} label={row.customerName || 'Rental Asset'} detail={row.alertType || 'Maintenance alert'} badge={row.createdAt?.slice(0, 10) || '-'} />)}
+        </OpsCard>
       </div>
 
-      {/* 5. Secondary Cards */}
-      <div className="info-grid">
-        <div className="info-card">
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">Renewal Reminders</h3>
-              <p className="card-subtitle">Expiring in next 14 days.</p>
-            </div>
-            <span className="status-badge status-pending">8 Pending</span>
-          </div>
-          <div className="info-list">
-            <InfoRow 
-              label="Alpha Corp" sub="3 Device Lease" value="2 DAYS" color="#6366f1"
-              onClick={() => setActiveModal({ type: 'Renewal', customer: 'Alpha Corp', asset: '3 Device Lease', status: 'Expiring Soon' })}
-            />
-            <InfoRow 
-              label="Zeta Logistics" sub="Forklift Fleet" value="5 DAYS" color="#10b981"
-              onClick={() => setActiveModal({ type: 'Renewal', customer: 'Zeta Logistics', asset: 'Forklift Fleet', status: 'Expiring Soon' })}
-            />
-            <InfoRow 
-              label="Tech Solutions" sub="Server Rack" value="9 DAYS" color="#8b5cf6"
-              onClick={() => setActiveModal({ type: 'Renewal', customer: 'Tech Solutions', asset: 'Server Rack', status: 'Expiring Soon' })}
-            />
-          </div>
-        </div>
-
-        <div className="info-card">
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">Fleet Health</h3>
-              <p className="card-subtitle">Critical maintenance alerts.</p>
-            </div>
-            <span className="status-badge status-critical">4 Critical</span>
-          </div>
-          <div className="info-list">
-            <InfoRow 
-              label="Asset #F-204" sub="Hydraulic Pressure" value="IMMEDIATE" color="#ef4444"
-              onClick={() => setActiveModal({ type: 'Maintenance', asset: '#F-204', issue: 'Hydraulic Pressure Low', priority: 'Critical' })}
-            />
-            <InfoRow 
-              label="Asset #T-102" sub="Engine Service" value="IMMEDIATE" color="#ef4444"
-              onClick={() => setActiveModal({ type: 'Maintenance', asset: '#T-102', issue: 'Engine Service Overdue', priority: 'Critical' })}
-            />
-            <InfoRow 
-              label="Asset #L-501" sub="Battery Check" value="PENDING" color="#f59e0b"
-              onClick={() => setActiveModal({ type: 'Maintenance', asset: '#L-501', issue: 'Battery Efficiency Low', priority: 'Warning' })}
-            />
-          </div>
-        </div>
-
-        <div className="info-card">
-          <div className="card-header">
-            <div>
-              <h3 className="card-title">Rental Performance</h3>
-              <p className="card-subtitle">Top asset categories.</p>
-            </div>
-          </div>
-          <div className="space-y-4">
-            <PerformanceRow name="IT Equipment" value="₹3,45,000" percent={75} color="#6366f1" />
-            <PerformanceRow name="Industrial Tools" value="₹2,12,000" percent={55} color="#10b981" />
-            <PerformanceRow name="Office Furniture" value="₹1,24,000" percent={35} color="#f59e0b" />
-            <PerformanceRow name="Event Gear" value="₹82,000" percent={20} color="#8b5cf6" />
-          </div>
-        </div>
+      <div className="ref-ops-grid rental-ops-grid">
+        <OpsCard title="Recent Installations" subtitle="Latest installed rental assets." badge={`${(dashboard.widgets.recentInstallations || []).length} Recent`} icon={<Settings size={20} />}>
+          {(dashboard.widgets.recentInstallations || []).slice(0, 2).map((row) => <OpListItem key={row.id} label={row.assetName || row.id} detail={row.customerName || 'Customer'} badge={row.updatedAt?.slice(0, 10) || row.createdAt?.slice(0, 10) || '-'} />)}
+        </OpsCard>
+        <OpsCard title="Recent Invoices" subtitle="Latest invoice collection snapshots." badge={`${(dashboard.widgets.pendingPayments || []).length} Open`} icon={<Wallet size={20} />}>
+          {(dashboard.widgets.pendingPayments || []).slice(0, 2).map((row) => <OpListItem key={`inv-${row.id}`} label={row.customerName || row.customerId || 'Customer'} detail={row.paymentStatus || 'Pending'} badge={formatCurrency(row.total || row.outstanding || 0)} />)}
+        </OpsCard>
+        <OpsCard title="Technician Workload" subtitle="Current maintenance load summary." badge={`${dashboard.kpis.maintenancePending || 0} Open`} icon={<ShieldCheck size={20} />}>
+          <OpListItem label="Pending Maintenance" detail="Unresolved service workload" badge={String(dashboard.kpis.maintenancePending || 0)} />
+          <OpListItem label="Usage Alerts" detail="Low/high usage exceptions" badge={String((dashboard.widgets.alerts || []).length)} />
+        </OpsCard>
       </div>
 
-      {/* 6. Bottom Table */}
-      <div className="table-card">
+      <Motion.div className="table-card-container" variants={itemVariants}>
         <div className="table-card-header">
-          <h3 className="card-title">Recent Installations</h3>
-          <div className="table-actions">
-            <input 
-              type="text" 
-              className="table-search-input" 
-              placeholder="Search assets..." 
-              value={tableSearch}
-              onChange={(e) => setTableSearch(e.target.value)}
-            />
-            <select 
-              className="table-filter-select"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="All">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Pending">Pending</option>
-              <option value="Maintenance">Maintenance</option>
-            </select>
-            <button className="primary-button" onClick={handleAddClick}>
-              <Plus size={18} /> Add Installation
-            </button>
+          <h3 className="text-sm font-black uppercase tracking-widest text-slate-900">Recent Rental Activity</h3>
+          <div className="search-input-wrapper" style={{ width: '280px' }}>
+            <Search size={14} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94a3b8' }} />
+            <input type="text" placeholder="Search activity..." style={{ height: '36px', borderRadius: '10px' }} value={search} onChange={(event) => setSearch(event.target.value)} />
           </div>
         </div>
-        <div className="data-table-container">
-          <table className="data-table">
+        <div className="table-scroll">
+          <table className="dash-table">
             <thead>
               <tr>
-                <th>Asset ID</th>
+                <th>Date</th>
                 <th>Customer</th>
-                <th>Lease Start</th>
-                <th>Period</th>
-                <th>Value</th>
+                <th>Activity Type</th>
+                <th>Device / Contract</th>
+                <th>Amount</th>
                 <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Action</th>
               </tr>
             </thead>
             <tbody>
-              <AnimatePresence>
-                {filteredInstallations.map((item) => (
-                  <motion.tr 
-                    key={item.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                  >
-                    <td className="asset-id-cell">{item.id}</td>
-                    <td>{item.customer}</td>
-                    <td>{item.start}</td>
-                    <td>{item.period}</td>
-                    <td>₹{item.value.toLocaleString()}</td>
-                    <td>
-                      <span className={`status-badge status-${item.status.toLowerCase()}`}>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div className="flex justify-end gap-2">
-                        <button className="icon-button" onClick={() => setActiveModal({ type: 'Detail', ...item })} title="View Details">
-                          <Search size={14} />
-                        </button>
-                        <button className="icon-button" onClick={() => handleEditClick(item)} title="Edit">
-                          <Activity size={14} />
-                        </button>
-                        <button className="icon-button" onClick={() => handleStatusChange(item.id, 'Maintenance')} title="Mark Maintenance">
-                          <Wrench size={14} />
-                        </button>
-                        <button className="icon-button" onClick={() => handleDelete(item.id)} title="Delete">
-                          <X size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
-              </AnimatePresence>
+              {filteredActivity.map((row, idx) => (
+                <tr key={`${row.customer}-${idx}`} className="group hover:bg-slate-50/50 transition-all">
+                  <td><span className="text-xs font-bold text-slate-600">{row.date}</span></td>
+                  <td><p className="text-xs font-black text-slate-900">{row.customer}</p></td>
+                  <td><span className="text-[10px] font-black uppercase text-slate-500">{row.activityType}</span></td>
+                  <td><span className="text-xs font-bold text-slate-600">{row.deviceOrContract}</span></td>
+                  <td><span className="text-xs font-black text-slate-900">{formatCurrency(row.amount || 0)}</span></td>
+                  <td><StatusTag status={row.status} /></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </Motion.div>
 
-      {/* Modals */}
-      <AnimatePresence>
-        {activeModal && (
-          <div className="modal-overlay" onClick={() => setActiveModal(null)}>
-            <div className="modal-card" onClick={e => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2>{activeModal.type === 'Form' ? `${formMode} Installation` : activeModal.title || 'Details'}</h2>
-                <button className="icon-button" onClick={() => setActiveModal(null)}><X size={20} /></button>
-              </div>
-              
-              <div className="modal-body">
-                {activeModal.type === 'KPI' && (
-                  <div className="text-center py-6">
-                    <h1 className="text-4xl font-black mb-4">{activeModal.value}</h1>
-                    <p className="text-slate-500">{activeModal.detail}</p>
-                  </div>
-                )}
-
-                {activeModal.type === 'Chart' && (
-                  <div>
-                    <p className="mb-4">{activeModal.detail}</p>
-                    <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 font-bold">
-                      Advanced Chart Drilldown View
-                    </div>
-                  </div>
-                )}
-
-                {activeModal.type === 'Renewal' && (
-                  <div>
-                    <div className="p-4 bg-indigo-50 rounded-xl mb-6">
-                      <p className="text-xs font-bold text-indigo-600 uppercase">Customer</p>
-                      <h3 className="font-bold text-lg">{activeModal.customer}</h3>
-                      <p className="text-slate-600 mt-1">{activeModal.asset}</p>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                      <button className="primary-button w-full justify-center" onClick={() => { showToast("Renewal inquiry sent"); setActiveModal(null); }}>Send Reminder</button>
-                      <button className="secondary-button w-full justify-center" onClick={() => { showToast("Contract renewed"); setActiveModal(null); }}>Renew Contract</button>
-                    </div>
-                  </div>
-                )}
-
-                {activeModal.type === 'Maintenance' && (
-                  <div>
-                    <div className="p-4 bg-rose-50 rounded-xl mb-6">
-                      <p className="text-xs font-bold text-rose-600 uppercase">Asset Alert</p>
-                      <h3 className="font-bold text-lg">{activeModal.asset}</h3>
-                      <p className="text-slate-600 mt-1">{activeModal.issue}</p>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                      <button className="primary-button w-full justify-center" onClick={() => { showToast("Maintenance scheduled"); setActiveModal(null); }}>Schedule Maintenance</button>
-                      <button className="secondary-button w-full justify-center" onClick={() => { showToast("Technician assigned"); setActiveModal(null); }}>Assign Technician</button>
-                    </div>
-                  </div>
-                )}
-
-                {activeModal.type === 'Detail' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Asset ID</label><p className="font-bold">{activeModal.id}</p></div>
-                      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Customer</label><p className="font-bold">{activeModal.customer}</p></div>
-                      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Start Date</label><p className="font-bold">{activeModal.start}</p></div>
-                      <div><label className="text-[10px] font-bold text-slate-400 uppercase">Value</label><p className="font-bold">₹{activeModal.value.toLocaleString()}</p></div>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-xl">
-                      <p className="text-sm font-medium">Lease tracking active. Assets are currently at client location in <strong>Industrial Zone B</strong>.</p>
-                    </div>
-                  </div>
-                )}
-
-                {activeModal.type === 'Form' && (
-                  <form onSubmit={handleSave}>
-                    <div className="form-group">
-                      <label>Asset ID</label>
-                      <input type="text" value={formData.id} readOnly />
-                    </div>
-                    <div className="form-group">
-                      <label>Customer Name</label>
-                      <input 
-                        type="text" required 
-                        value={formData.customer} 
-                        onChange={e => setFormData({...formData, customer: e.target.value})} 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="form-group">
-                        <label>Start Date</label>
-                        <input 
-                          type="date" required 
-                          value={formData.start} 
-                          onChange={e => setFormData({...formData, start: e.target.value})} 
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>Value (₹)</label>
-                        <input 
-                          type="number" required 
-                          value={formData.value} 
-                          onChange={e => setFormData({...formData, value: parseInt(e.target.value)})} 
-                        />
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label>Status</label>
-                      <select 
-                        value={formData.status} 
-                        onChange={e => setFormData({...formData, status: e.target.value})}
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Maintenance">Maintenance</option>
-                      </select>
-                    </div>
-                    <div className="modal-footer px-0 pb-0 bg-transparent">
-                      <button type="button" className="secondary-button" onClick={() => setActiveModal(null)}>Cancel</button>
-                      <button type="submit" className="primary-button">{formMode === 'Add' ? 'Add Asset' : 'Save Changes'}</button>
-                    </div>
-                  </form>
-                )}
-              </div>
+      {modal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.35)', display: 'grid', placeItems: 'center', zIndex: 60 }}>
+          <div className="card-base" style={{ width: 'min(520px, calc(100vw - 32px))' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <h3 className="text-sm font-black uppercase tracking-widest text-slate-900" style={{ margin: 0 }}>{modal.title}</h3>
+              <button className="btn-premium" onClick={() => setModal(null)}>Close</button>
             </div>
+            <p style={{ margin: 0, color: '#475569', fontSize: 13 }}>{modal.body}</p>
           </div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
 
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div 
-            className="toast"
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 50, opacity: 0 }}
-          >
-            <CheckCircle2 size={18} className="text-emerald-500" />
-            <span>{toast}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+      {toast ? <div style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 70 }}><div className="btn-premium" style={{ background: '#0f172a', color: '#ffffff', borderColor: '#0f172a' }}>{toast}</div></div> : null}
+    </Motion.div>
   );
 };
 
-/* Sub-components */
-const KPIBox = ({ title, value, trend, trendDown, icon, color, bg, onClick }) => (
-  <div className="kpi-card" onClick={onClick}>
-    <div className={`kpi-trend ${trendDown ? 'down' : ''}`}>
-      {trendDown ? <ArrowDownRight size={10} /> : <ArrowUpRight size={10} />}
-      {trend}
+const ChartHeader = ({ title, subtitle, onView }) => (
+  <div className="ref-chart-header">
+    <div>
+      <h3 className="ref-chart-title">{title}</h3>
+      <p className="ref-chart-subtitle">{subtitle}</p>
     </div>
-    <div className="kpi-icon" style={{ backgroundColor: bg, color }}>
-      {React.cloneElement(icon, { size: 20 })}
-    </div>
-    <div className="kpi-details">
-      <span className="kpi-label">{title}</span>
-      <h3 className="kpi-value">{value}</h3>
-    </div>
+    <button className="btn-premium" style={{ height: '30px', padding: '0 10px', fontSize: '10px' }} onClick={onView}>View Details</button>
   </div>
 );
 
-const LegendItem = ({ label, color }) => (
-  <div className="flex items-center gap-2">
-    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }}></div>
-    <span className="text-[10px] font-bold text-slate-400 uppercase">{label}</span>
-  </div>
+const KPIBox = ({ title, value, trend, trendUp, icon, color, bg, onClick }) => (
+  <Motion.button type="button" className="ref-kpi-card" whileHover={{ y: -4 }} onClick={onClick} style={{ textAlign: 'left' }}>
+    <div className="ref-kpi-icon-box" style={{ backgroundColor: bg, color }}>{React.cloneElement(icon, { size: 18 })}</div>
+    <div className="ref-kpi-content"><p className="ref-kpi-label">{title}</p><h3 className="ref-kpi-value">{value}</h3></div>
+    <div className={`ref-kpi-trend-pill ${trendUp ? 'ref-kpi-trend-up' : 'ref-kpi-trend-down'}`}>{trendUp ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}{trend}</div>
+    <div className="ref-kpi-circle-bg" style={{ color }}></div>
+  </Motion.button>
 );
 
-const InfoRow = ({ label, sub, value, color, onClick }) => (
-  <div className="info-row" onClick={onClick}>
-    <div className="info-row-left">
-      <div className="info-row-icon" style={{ backgroundColor: `${color}15`, color }}>
-        <CalendarDays size={14} />
-      </div>
-      <div className="info-row-text">
-        <p>{label}</p>
-        <span>{sub}</span>
-      </div>
+const LegendItem = ({ label, color }) => <div className="legend-item"><div className="legend-dot" style={{ backgroundColor: color }}></div><span>{label}</span></div>;
+
+const OpsCard = ({ title, subtitle, badge, icon, children }) => (
+  <Motion.div className="ref-ops-card">
+    <div className="flex justify-between items-center mb-6">
+      <div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">{icon}</div><div><h3 className="text-xs font-black uppercase tracking-widest text-slate-900">{title}</h3><p className="text-[9px] text-slate-400 font-medium leading-relaxed">{subtitle}</p></div></div>
+      <span className="dash-tag dash-tag-warning">{badge}</span>
     </div>
-    <div className="info-row-value" style={{ color }}>{value}</div>
-  </div>
+    <div className="space-y-4">{children}</div>
+  </Motion.div>
 );
 
-const PerformanceRow = ({ name, value, percent, color }) => (
-  <div className="mb-4">
-    <div className="flex justify-between items-end mb-1">
-      <span className="text-xs font-bold text-slate-700">{name}</span>
-      <span className="text-[11px] font-black text-slate-900">{value}</span>
-    </div>
-    <div className="progress-container">
-      <div className="progress-bar-bg">
-        <div className="progress-bar-fill" style={{ width: `${percent}%`, backgroundColor: color }}></div>
-      </div>
-    </div>
-  </div>
-);
+const OpListItem = ({ label, detail, badge }) => <div className="op-list-item"><div className="op-item-left"><div style={{ width: '3px', height: '24px', borderRadius: '4px', background: 'var(--dash-primary)' }}></div><div><p className="text-xs font-black text-slate-900 leading-none">{label}</p><p className="text-[10px] font-bold text-slate-400 mt-1">{detail}</p></div></div><span className="op-item-value text-[10px] font-black text-slate-900">{badge}</span></div>;
+
+const StatusTag = ({ status }) => {
+  const statusText = String(status || '').toLowerCase();
+  const tagClass = statusText.includes('paid') || statusText.includes('active') ? 'dash-tag-success' : statusText.includes('expir') || statusText.includes('pending') ? 'dash-tag-warning' : statusText.includes('overdue') ? 'dash-tag-danger' : 'dash-tag-info';
+  return <span className={`dash-tag ${tagClass}`}>{status}</span>;
+};
+
+const commonBarOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: { x: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: 800, size: 10 } } }, y: { grid: { color: '#f8fafc' }, border: { display: false }, ticks: { font: { size: 10 } } } },
+};
+
+const commonLineOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: { x: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: 800, size: 10 } } }, y: { grid: { color: '#f8fafc' }, border: { display: false }, ticks: { font: { size: 10 } } } },
+};
 
 export default RentalDashboardPage;

@@ -1,0 +1,223 @@
+.invoice-generator-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.invoice-layout-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.invoice-main-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.invoice-card {
+  background: #ffffff;
+  border-radius: 18px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  padding: 20px;
+}
+
+.invoice-step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.invoice-step-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.invoice-summary-card {
+  position: sticky;
+  top: 20px;
+}
+
+.invoice-device-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.invoice-device-table th {
+  background: #f8fafc;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.invoice-device-table th,
+.invoice-device-table td {
+  padding: 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.invoice-device-table input,
+.invoice-device-table select {
+  width: 100%;
+}
+
+.invoice-meter-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.invoice-device-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px;
+  background: #fff;
+}
+
+.invoice-device-card-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.invoice-device-card-head span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.invoice-multi-rate-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.invoice-multi-rate-grid label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  gap: 6px;
+}
+
+.invoice-breakdown-table,
+.invoice-tax-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.invoice-breakdown-table td,
+.invoice-tax-table td {
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.invoice-preview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invoice-status-badge {
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #eef2ff;
+  color: #4338ca;
+}
+
+.invoice-status-badge.status-paid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.invoice-status-badge.status-partially-paid,
+.invoice-status-badge.status-generated {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.invoice-status-badge.status-draft,
+.invoice-status-badge.status-unpaid {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.invoice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.invoice-total-card {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  border-radius: 18px;
+  padding: 24px;
+  margin-top: 14px;
+}
+
+.invoice-total-card p,
+.invoice-total-card h2 {
+  margin: 0;
+}
+
+.invoice-total-card h2 {
+  margin-top: 8px;
+}
+
+.invoice-history-table {
+  margin-top: 8px;
+}
+
+.invoice-skeleton-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.invoice-skeleton-line {
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9);
+}
+
+@media (max-width: 1180px) {
+  .invoice-layout-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-summary-card {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .invoice-device-table,
+  .invoice-breakdown-table,
+  .invoice-tax-table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  .invoice-multi-rate-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    background: #f8fafc;
+    padding: 10px;
+    border-radius: 14px;
+    border: 1px solid #e5e7eb;
+  }
+}

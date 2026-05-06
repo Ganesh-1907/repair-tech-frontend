@@ -1,0 +1,13 @@
+/* Thin rental compatibility layer on top of PlansCustomers.css */
+.rental-customers-page .breadcrumb-card { padding: 18px; }
+.rental-customers-page .breadcrumb { font-size: 12px; color: var(--text-muted); font-weight: 700; }
+.rental-action-cards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.rental-action-card { text-align: left; cursor: pointer; }
+.rental-action-card.active { border-color: var(--secondary); box-shadow: 0 0 0 2px rgba(99,102,241,.08), var(--shadow-premium); }
+.toast-stack { position: fixed; right: 16px; top: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 1200; }
+.toast { background: #0f172a; color: #fff; padding: 10px 14px; border-radius: 10px; }
+.action-menu { position: absolute; right: 0; top: 44px; z-index: 9999; min-width: 220px; background: #fff; border: 1px solid var(--slate-200); border-radius: 12px; box-shadow: 0 18px 40px rgba(15,23,42,0.16); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.rental-customers-page .table-card { overflow: visible; }
+.rental-customers-page .table-container { overflow-x: auto; overflow-y: visible; }
+@media (max-width: 1024px){ .rental-action-cards { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 640px){ .rental-action-cards { grid-template-columns: 1fr; } }

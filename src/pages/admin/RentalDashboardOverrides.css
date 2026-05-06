@@ -1,0 +1,119 @@
+/* Rental dashboard visual alignment using AMC dashboard pattern */
+
+.rental-dashboard-page {
+  background: #f5f7fb;
+  padding: 24px;
+  gap: 24px;
+}
+
+.rental-dashboard-page .ref-kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.rental-dashboard-page .ref-kpi-card {
+  min-height: 112px;
+  height: auto;
+  gap: 14px;
+}
+
+.rental-dashboard-page .rental-charts-grid {
+  grid-template-columns: 1.6fr 1fr 1fr;
+  gap: 20px;
+}
+
+.rental-dashboard-page .rental-charts-grid > .ref-chart-card {
+  min-height: 320px;
+  height: 320px;
+}
+
+.rental-dashboard-page .rental-charts-grid > .ref-chart-card:nth-child(4) {
+  grid-column: 1 / span 1;
+}
+
+.rental-dashboard-page .rental-ops-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.rental-dashboard-page .rental-risk-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.rental-dashboard-page .table-card-container {
+  overflow: visible;
+}
+
+.rental-dashboard-page .table-scroll {
+  overflow-x: auto;
+}
+
+.rental-dashboard-page .dash-table th {
+  background: #f8fafc;
+  font-size: 12px;
+}
+
+.rental-dashboard-page .dash-table td {
+  height: 72px;
+  padding: 14px 16px;
+}
+
+.rental-dashboard-page .dash-table tbody tr:hover td {
+  background: #f9fafb;
+}
+
+.rental-dashboard-page .btn-premium {
+  height: 42px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.rental-dashboard-page .search-input-wrapper input {
+  height: 42px;
+  border-radius: 12px;
+}
+
+@media (max-width: 1200px) {
+  .rental-dashboard-page .rental-charts-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .rental-dashboard-page .rental-charts-grid > .ref-chart-card:first-child {
+    grid-column: span 2;
+  }
+
+  .rental-dashboard-page .rental-charts-grid > .ref-chart-card:nth-child(4) {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .rental-dashboard-page .ref-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rental-dashboard-page .rental-charts-grid,
+  .rental-dashboard-page .rental-risk-grid,
+  .rental-dashboard-page .rental-ops-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rental-dashboard-page .rental-charts-grid > .ref-chart-card:first-child {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .rental-dashboard-page {
+    padding: 16px;
+  }
+
+  .rental-dashboard-page .ref-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rental-dashboard-page .dash-table {
+    min-width: 900px;
+  }
+}

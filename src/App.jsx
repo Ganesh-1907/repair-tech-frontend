@@ -44,14 +44,10 @@ import RentalQuotationPage from './pages/admin/RentalQuotationPage';
 import RentalCorporateAgreementPage from './pages/admin/RentalCorporateAgreementPage';
 import RentalIndividualAgreementPage from './pages/admin/RentalIndividualAgreementPage';
 import RentalDashboardPage from './pages/admin/RentalDashboardPage';
-import RentalCustomersPage from './pages/admin/RentalCustomersPage';
 import RentalCustomerDetailPage from './pages/admin/RentalCustomerDetailPage';
-import RentalAgreementsPage from './pages/admin/RentalAgreementsPage';
-import RentalAssetsInstallationsPage from './pages/admin/RentalAssetsInstallationsPage';
 import RentalAssetDetailPage from './pages/admin/RentalAssetDetailPage';
-import RentalBillingInvoicesPage from './pages/admin/RentalBillingInvoicesPage';
 import RentalBillingGeneratePage from './pages/admin/RentalBillingGeneratePage';
-import RentalMaintenanceAlertsPage from './pages/admin/RentalMaintenanceAlertsPage';
+import RentalOperationsBillingPage from './pages/admin/RentalOperationsBillingPage';
 
 // CMC Module Pages
 import CMCDashboardPage from './pages/admin/CMCDashboardPage';
@@ -83,10 +79,7 @@ const existingAdminRouteComponents = {
   '/admin/campaign/reports': CampaignReportsPage,
   '/admin/rental': RentalDashboardPage,
   '/admin/rental/dashboard': RentalDashboardPage,
-  '/admin/rental/customers': RentalCustomersPage,
-  '/admin/rental/assets': RentalAssetsInstallationsPage,
-  '/admin/rental/billing': RentalBillingInvoicesPage,
-  '/admin/rental/maintenance-alerts': RentalMaintenanceAlertsPage,
+  '/admin/rental/customers': RentalOperationsBillingPage,
   '/admin/amc/dashboard': AMCDashboardPage,
   '/admin/amc/plans': AMCPlansPage,
   '/admin/amc/quotations': AMCQuotationPage,
@@ -129,13 +122,15 @@ function App() {
 
               {/* Explicit Rental Routes */}
               <Route path="/admin/rental/dashboard" element={<Layout><RentalDashboardPage /></Layout>} />
-              <Route path="/admin/rental/customers" element={<Layout><RentalCustomersPage /></Layout>} />
+              <Route path="/admin/rental/customers" element={<Layout><RentalOperationsBillingPage /></Layout>} />
               <Route path="/admin/rental/customers/:customerId" element={<Layout><RentalCustomerDetailPage /></Layout>} />
-              <Route path="/admin/rental/assets" element={<Layout><RentalAssetsInstallationsPage /></Layout>} />
               <Route path="/admin/rental/assets/:assetId" element={<Layout><RentalAssetDetailPage /></Layout>} />
-              <Route path="/admin/rental/billing" element={<Layout><RentalBillingInvoicesPage /></Layout>} />
               <Route path="/admin/rental/billing/generate" element={<Layout><RentalBillingGeneratePage /></Layout>} />
-              <Route path="/admin/rental/maintenance-alerts" element={<Layout><RentalMaintenanceAlertsPage /></Layout>} />
+              <Route path="/admin/rental/documents-contracts" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/operations-billing" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/assets" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/billing" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/maintenance-alerts" element={<Navigate to="/admin/rental/customers" replace />} />
 
               {/* Explicit AMC Routes */}
               <Route path="/admin/amc/dashboard" element={<Layout><AMCDashboardPage /></Layout>} />
