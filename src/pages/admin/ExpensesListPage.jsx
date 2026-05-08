@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { usePrivacy } from '../../context/PrivacyContext';
 import { expenseManagementService } from '../../services/expenseManagementService';
+import { api } from '../../services/apiClient';
 
 const formatDateLabel = (value) => {
   if (!value) return '-';
@@ -30,9 +31,11 @@ const ExpensesListPage = () => {
   const { formatCurrency } = usePrivacy();
   const [searchParams, setSearchParams] = useSearchParams();
   const [expenses, setExpenses] = useState([]);
+  const [staffList, setStaffList] = useState([]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [flowFilter, setFlowFilter] = useState('All');
+  const [sourceFilter, setSourceFilter] = useState('all'); // 'all' | 'admin' | staffId
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [activeDropdownId, setActiveDropdownId] = useState(null);
@@ -42,10 +45,14 @@ const ExpensesListPage = () => {
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
-  const loadExpenses = async () => setExpenses(await expenseManagementService.getExpenses());
+  const loadExpenses = async () => {
+    const rows = await expenseManagementService.getAllExpenses();
+    setExpenses(rows);
+  };
 
   useEffect(() => {
     loadExpenses();
+    api.list('staff').then((rows) => setStaffList(Array.isArray(rows) ? rows : []));
   }, []);
 
   useEffect(() => {
@@ -72,14 +79,16 @@ const ExpensesListPage = () => {
   }, [searchParams]);
 
   const filtered = useMemo(() => expenses.filter((row) => {
-    const blob = `${row.id} ${row.description} ${row.vendorPayee} ${row.category} ${row.personName || ''} ${row.flowType || ''}`.toLowerCase();
+    const blob = `${row.id} ${row.description} ${row.vendorPayee} ${row.category} ${row.personName || ''} ${row.flowType || ''} ${row.staffName || ''}`.toLowerCase();
     if (search.trim() && !blob.includes(search.toLowerCase())) return false;
     if (categoryFilter !== 'All' && row.category !== categoryFilter) return false;
     if (flowFilter !== 'All' && row.flowType !== flowFilter) return false;
+    if (sourceFilter === 'admin' && row.source !== 'admin') return false;
+    if (sourceFilter !== 'all' && sourceFilter !== 'admin' && row.staffId !== sourceFilter) return false;
     if (fromDate && row.expenseDate < fromDate) return false;
     if (toDate && row.expenseDate > toDate) return false;
     return true;
-  }), [expenses, search, categoryFilter, flowFilter, fromDate, toDate]);
+  }), [expenses, search, categoryFilter, flowFilter, sourceFilter, fromDate, toDate]);
 
   const flowSummary = useMemo(() => {
     const income = filtered.filter((row) => row.flowType === 'Income').reduce((sum, row) => sum + Number(row.amount || 0), 0);
@@ -150,6 +159,11 @@ const ExpensesListPage = () => {
   };
 
   const openEdit = (expense) => {
+    // Staff expenses cannot be edited from admin (they belong to the staff portal)
+    if (expense.source === 'staff') {
+      setNotice('Staff-added expenses can only be edited by the staff member from their portal.');
+      return;
+    }
     setSelectedExpense(expense);
     setForm({
       flowType: expense.flowType || 'Outgoing',
@@ -207,6 +221,20 @@ const ExpensesListPage = () => {
     closeModal();
   };
 
+  // Build staff dropdown options from expenses that have staffId (in case staff list is empty)
+  const staffOptions = useMemo(() => {
+    const fromList = staffList.map((s) => ({ id: s.id, name: s.name }));
+    if (fromList.length > 0) return fromList;
+    // fallback: derive from staffExpenses in loaded data
+    const seen = new Map();
+    expenses.forEach((row) => {
+      if (row.source === 'staff' && row.staffId && !seen.has(row.staffId)) {
+        seen.set(row.staffId, row.staffName || row.staffId);
+      }
+    });
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name }));
+  }, [staffList, expenses]);
+
   return (
     <div className="admin-module-page expenses-list-page">
       {notice && (
@@ -218,7 +246,7 @@ const ExpensesListPage = () => {
 
       <AdminPageHeader
         title="Expenses"
-        description="Manage all expenses with popup-based add, view, and edit flows."
+        description="View all admin and staff expenses. Add, edit, or filter by source and category."
         breadcrumbs={['Admin', 'Expense Management', 'Expenses Listing']}
         actions={[{ label: 'Add Expense', icon: Plus, onClick: openAddModal }]}
       />
@@ -227,6 +255,15 @@ const ExpensesListPage = () => {
         <label className="search-box expenses-list-search">
           <Search size={16} className="search-icon" />
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by id, description, vendor, category..." />
+        </label>
+        <label className="expenses-control-select">
+          <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
+            <option value="all">All Sources</option>
+            <option value="admin">Admin</option>
+            {staffOptions.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
         </label>
         <label className="expenses-control-select">
           <select value={flowFilter} onChange={(event) => setFlowFilter(event.target.value)}>
@@ -266,14 +303,14 @@ const ExpensesListPage = () => {
             <tr>
               <th>Expense ID</th>
               <th>Date</th>
+              <th>Source</th>
               <th>Flow</th>
               <th>Person</th>
               <th>Category</th>
               <th>Description</th>
               <th>Amount</th>
               <th>Payment Mode</th>
-              <th>Vendor and Payee</th>
-              <th>Created By</th>
+              <th>Vendor / Payee</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -282,6 +319,19 @@ const ExpensesListPage = () => {
               <tr key={row.id}>
                 <td>{row.id}</td>
                 <td>{formatDateLabel(row.expenseDate)}</td>
+                <td>
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    background: row.source === 'admin' ? '#e0e7ff' : '#dcfce7',
+                    color: row.source === 'admin' ? '#3730a3' : '#15803d',
+                  }}>
+                    {row.source === 'admin' ? 'Admin' : row.staffName || 'Staff'}
+                  </span>
+                </td>
                 <td>{row.flowType || 'Outgoing'}</td>
                 <td>{row.personName || '-'}</td>
                 <td>{row.category}</td>
@@ -289,7 +339,6 @@ const ExpensesListPage = () => {
                 <td>{formatCurrency(row.amount)}</td>
                 <td>{row.paymentMode}</td>
                 <td>{row.vendorPayee || '-'}</td>
-                <td>{row.createdBy || '-'}</td>
                 <td>
                   <div style={{ position: 'relative' }}>
                     <button
@@ -305,9 +354,11 @@ const ExpensesListPage = () => {
                         <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openView(row); }}>
                           <Eye size={14} className="icon-muted" /> View
                         </button>
-                        <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openEdit(row); }}>
-                          <Edit size={14} className="icon-muted" /> Edit
-                        </button>
+                        {row.source === 'admin' && (
+                          <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openEdit(row); }}>
+                            <Edit size={14} className="icon-muted" /> Edit
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -327,7 +378,7 @@ const ExpensesListPage = () => {
             <div className="modal-header">
               <div>
                 <h2>{modalMode === 'edit' ? 'Edit Expense' : 'Add Expense'}</h2>
-                <p>{modalMode === 'edit' ? 'Update expense details' : 'Create a new expense entry'}</p>
+                <p>{modalMode === 'edit' ? 'Update expense details' : 'Create a new admin expense entry'}</p>
               </div>
               <button className="icon-btn" onClick={closeModal} aria-label="Close expense form"><X size={16} /></button>
             </div>
@@ -417,6 +468,7 @@ const ExpensesListPage = () => {
             <div className="modal-form">
               <div className="detail-list">
                 <div><span>Expense ID</span><strong>{selectedExpense.id}</strong></div>
+                <div><span>Source</span><strong>{selectedExpense.source === 'admin' ? 'Admin' : `Staff — ${selectedExpense.staffName || ''}`}</strong></div>
                 <div><span>Flow Type</span><strong>{selectedExpense.flowType || 'Outgoing'}</strong></div>
                 <div><span>Respective Person</span><strong>{selectedExpense.personName || '-'}</strong></div>
                 <div><span>Category</span><strong>{selectedExpense.category}</strong></div>
@@ -424,15 +476,23 @@ const ExpensesListPage = () => {
                 <div><span>Description</span><strong>{selectedExpense.description}</strong></div>
                 <div><span>Amount</span><strong>{formatCurrency(selectedExpense.amount)}</strong></div>
                 <div><span>Payment Mode</span><strong>{selectedExpense.paymentMode}</strong></div>
-                <div><span>Vendor</span><strong>{selectedExpense.vendorPayee || '-'}</strong></div>
+                <div><span>Vendor / Payee</span><strong>{selectedExpense.vendorPayee || '-'}</strong></div>
+                {selectedExpense.source === 'staff' && (
+                  <>
+                    <div><span>Task</span><strong>{selectedExpense.taskTitle || '-'}</strong></div>
+                    <div><span>Customer</span><strong>{selectedExpense.customerName || '-'}</strong></div>
+                  </>
+                )}
                 <div><span>Reference Number</span><strong>{selectedExpense.referenceNumber || '-'}</strong></div>
                 <div><span>Notes</span><strong>{selectedExpense.notes || '-'}</strong></div>
-                <div><span>Created By</span><strong>{selectedExpense.createdBy || '-'}</strong></div>
-                <div><span>Created Date</span><strong>{formatDateLabel(selectedExpense.createdDate)}</strong></div>
+                <div><span>Added By</span><strong>{selectedExpense.createdBy || selectedExpense.staffName || '-'}</strong></div>
+                <div><span>Created Date</span><strong>{formatDateLabel(selectedExpense.createdDate || selectedExpense.spentOn)}</strong></div>
               </div>
               <div className="modal-actions">
                 <button className="btn btn-secondary" type="button" onClick={closeModal}>Close</button>
-                <button className="btn btn-primary" type="button" onClick={() => openEdit(selectedExpense)}>Edit Expense</button>
+                {selectedExpense.source === 'admin' && (
+                  <button className="btn btn-primary" type="button" onClick={() => openEdit(selectedExpense)}>Edit Expense</button>
+                )}
               </div>
             </div>
           </div>

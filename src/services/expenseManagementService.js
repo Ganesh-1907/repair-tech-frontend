@@ -44,6 +44,27 @@ const trendSeries = (rows) => {
   return Object.keys(grouped).sort().map((month) => ({ month, amount: grouped[month] }));
 };
 
+// Normalize a staff expense record to the shared shape
+const normalizeStaffExpense = (row) => ({
+  ...row,
+  source: 'staff',
+  sourceLabel: row.staffName || 'Staff',
+  expenseDate: row.spentOn ? String(row.spentOn).slice(0, 10) : String(row.createdAt || '').slice(0, 10),
+  description: row.notes || row.taskTitle || '',
+  paymentMode: row.mode || 'Cash',
+  vendorPayee: row.customerName || '',
+  personName: row.staffName || '',
+  createdBy: row.staffName || 'Staff',
+  flowType: 'Outgoing',
+});
+
+// Normalize an admin expense record to the shared shape
+const normalizeAdminExpense = (row) => ({
+  ...row,
+  source: 'admin',
+  sourceLabel: 'Admin',
+});
+
 export const expenseManagementService = {
   categories,
   paymentModes,
@@ -56,7 +77,7 @@ export const expenseManagementService = {
   },
 
   async getDashboardStats() {
-    const rows = await this.getExpenses();
+    const rows = await this.getAllExpenses();
     return {
       totalExpenses: rows.filter((row) => row.flowType !== 'Income').reduce((sum, row) => sum + Number(row.amount || 0), 0),
       monthlyExpenses: monthlyTotal(rows),
@@ -66,9 +87,31 @@ export const expenseManagementService = {
     };
   },
 
+  // Fetch only admin-added expenses
   async getExpenses() {
     const rows = await api.list('expenses');
-    return rows.sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate));
+    return rows.map(normalizeAdminExpense).sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate));
+  },
+
+  // Fetch only staff-added expenses
+  async getStaffExpenses() {
+    const rows = await api.list('staffExpenses');
+    return rows.map(normalizeStaffExpense).sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate));
+  },
+
+  // Fetch and merge both sources
+  async getAllExpenses() {
+    const [adminResult, staffResult] = await Promise.allSettled([
+      api.list('expenses'),
+      api.list('staffExpenses'),
+    ]);
+    const adminRows = adminResult.status === 'fulfilled' ? adminResult.value : [];
+    const staffRows = staffResult.status === 'fulfilled' ? staffResult.value : [];
+    const merged = [
+      ...adminRows.map(normalizeAdminExpense),
+      ...staffRows.map(normalizeStaffExpense),
+    ];
+    return merged.sort((a, b) => new Date(b.expenseDate) - new Date(a.expenseDate));
   },
 
   getExpenseById: (expenseId) => api.get('expenses', expenseId),
@@ -77,6 +120,7 @@ export const expenseManagementService = {
     return api.create('expenses', {
       createdDate: new Date().toISOString().slice(0, 10),
       createdBy: payload.createdBy || 'Admin User',
+      source: 'admin',
       ...payload,
     });
   },

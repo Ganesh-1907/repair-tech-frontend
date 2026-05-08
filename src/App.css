@@ -3695,7 +3695,7 @@ a:focus-visible,
 
 .expenses-list-filters-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 1.35fr) repeat(2, minmax(150px, 1fr)) repeat(2, minmax(170px, 1fr));
+  grid-template-columns: minmax(220px, 1.35fr) repeat(3, minmax(130px, 1fr)) repeat(2, minmax(150px, 1fr));
   align-items: center;
   gap: 10px;
 }

@@ -67,34 +67,33 @@ const StaffListingPage = () => {
   const [notice, setNotice] = useState('');
 
   const loadData = async () => {
-    try {
-      const [staffRows, jobs, regularizations] = await Promise.all([
-        staffManagementService.getStaffList(),
-        staffManagementService.getPendingJobs(),
-        staffManagementService.getAttendanceRegularizations(),
-      ]);
-      setStaff(Array.isArray(staffRows) ? staffRows : (staffRows?.data || []));
-      setPendingJobs(Array.isArray(jobs) ? jobs : (jobs?.data || []));
-      setRegularizationRequests(Array.isArray(regularizations) ? regularizations : []);
-    } catch (error) {
-      console.error('Reload error:', error);
-    }
+    const [staffResult, jobsResult, regResult] = await Promise.allSettled([
+      staffManagementService.getStaffList(),
+      staffManagementService.getPendingJobs(),
+      staffManagementService.getAttendanceRegularizations(),
+    ]);
+    const staffRows = staffResult.status === 'fulfilled' ? staffResult.value : [];
+    const jobs = jobsResult.status === 'fulfilled' ? jobsResult.value : [];
+    const regularizations = regResult.status === 'fulfilled' ? regResult.value : [];
+    setStaff(Array.isArray(staffRows) ? staffRows : (staffRows?.data || []));
+    setPendingJobs(Array.isArray(jobs) ? jobs : (jobs?.data || []));
+    setRegularizationRequests(Array.isArray(regularizations) ? regularizations : []);
   };
 
   useEffect(() => {
     let mounted = true;
-    Promise.all([
+    Promise.allSettled([
       staffManagementService.getStaffList(),
       staffManagementService.getPendingJobs(),
       staffManagementService.getAttendanceRegularizations(),
-    ]).then(([staffRows, jobs, regularizations]) => {
+    ]).then(([staffResult, jobsResult, regResult]) => {
       if (!mounted) return;
+      const staffRows = staffResult.status === 'fulfilled' ? staffResult.value : [];
+      const jobs = jobsResult.status === 'fulfilled' ? jobsResult.value : [];
+      const regularizations = regResult.status === 'fulfilled' ? regResult.value : [];
       setStaff(Array.isArray(staffRows) ? staffRows : (staffRows?.data || []));
       setPendingJobs(Array.isArray(jobs) ? jobs : (jobs?.data || []));
       setRegularizationRequests(Array.isArray(regularizations) ? regularizations : []);
-    }).catch((error) => {
-      console.error('Staff loading error:', error);
-      if (mounted) setNotice(error.response?.data?.message || error.message || 'Staff data failed to load.');
     });
     return () => {
       mounted = false;
