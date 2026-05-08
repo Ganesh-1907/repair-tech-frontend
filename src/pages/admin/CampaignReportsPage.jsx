@@ -1,182 +1,211 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion as Motion } from 'framer-motion';
-import { 
-  BarChart3, 
-  Boxes, 
-  CheckCircle2, 
-  IndianRupee, 
-  MonitorSmartphone, 
-  Truck, 
-  UserCog, 
-  Users,
-  Search,
-  Filter,
-  Download,
-  Calendar,
-  ArrowRight,
-  TrendingUp,
-  Activity,
-  Zap,
-  Target
+import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import {
+  Boxes, CheckCircle2, IndianRupee, MonitorSmartphone, Truck, UserCog, Users,
+  Download, ChevronRight, ArrowRight, Loader2, Target, X,
 } from 'lucide-react';
 import { billingService, campaignService, jobService } from '../../services/campaignServices';
-import './DashboardPremiumStyles.css';
+import './CampaignModule.css';
 
 const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
 
 const CampaignReportsPage = () => {
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    campaignService.listCampaigns().then(setCampaigns);
-    jobService.listJobs().then(setJobs);
-    billingService.listInvoices().then(setInvoices);
+    setLoading(true);
+    Promise.all([
+      campaignService.listCampaigns(),
+      jobService.listJobs(),
+      billingService.listInvoices(),
+    ]).then(([c, j, i]) => { setCampaigns(c); setJobs(j); setInvoices(i); })
+      .catch(() => setToast({ msg: 'Failed to load reports.', type: 'error' }))
+      .finally(() => setLoading(false));
   }, []);
 
   const reports = useMemo(() => {
-    const revenue = campaigns.reduce((sum, campaign) => sum + campaign.revenue, 0);
-    const leads = campaigns.reduce((sum, campaign) => sum + campaign.leads, 0);
-    const conversions = campaigns.reduce((sum, campaign) => sum + campaign.conversions, 0);
-    const devices = campaigns.reduce((sum, campaign) => sum + campaign.devicesCollected, 0);
-    const pendingPayments = invoices.filter((invoice) => invoice.paymentStatus !== 'Paid').length;
-    const pendingDeliveries = jobs.filter((job) => job.deliveryStatus !== 'Delivered').length;
-    return { revenue, leads, conversions, devices, pendingPayments, pendingDeliveries };
+    const revenue = campaigns.reduce((s, c) => s + c.revenue, 0);
+    const leads = campaigns.reduce((s, c) => s + c.leads, 0);
+    const conversions = campaigns.reduce((s, c) => s + c.conversions, 0);
+    const devices = campaigns.reduce((s, c) => s + c.devicesCollected, 0);
+    const pendingPayments = invoices.filter((i) => i.paymentStatus !== 'Paid').length;
+    const pendingDeliveries = jobs.filter((j) => j.deliveryStatus !== 'Delivered').length;
+    const technicians = new Set(jobs.map((j) => j.technician)).size;
+    const partsUsed = jobs.reduce((s, j) => s + (j.partsUsed || []).length, 0);
+    return { revenue, leads, conversions, devices, pendingPayments, pendingDeliveries, technicians, partsUsed };
   }, [campaigns, invoices, jobs]);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+  const handleExport = () => {
+    const rows = campaigns.map((c) => [c.name, c.college || c.collegeName, c.leads, c.conversions, c.revenue, c.devicesCollected, c.status]);
+    const csv = [['Campaign', 'College', 'Leads', 'Conversions', 'Revenue', 'Devices', 'Status'], ...rows].map((r) => r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'campaign_reports.csv'; a.click();
   };
 
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
+  const CAMPAIGN_STATUS_STYLE = {
+    Active:    'bg-emerald-50 text-emerald-700',
+    Planned:   'bg-blue-50 text-blue-700',
+    Completed: 'bg-slate-100 text-slate-500',
+    Paused:    'bg-amber-50 text-amber-700',
   };
-
-  const tiles = [
-    { label: 'Campaigns', value: campaigns.length, icon: <Target />, color: '#6366f1', bg: '#e0e7ff', trend: 'Active' },
-    { label: 'Conversions', value: `${reports.conversions}/${reports.leads}`, icon: <Users />, color: '#10b981', bg: '#dcfce7', trend: 'High' },
-    { label: 'Total Revenue', value: formatCurrency(reports.revenue), icon: <IndianRupee />, color: '#06b6d4', bg: '#cffafe', trend: '+12%' },
-    { label: 'Devices', value: reports.devices, icon: <MonitorSmartphone />, color: '#f59e0b', bg: '#fef3c7', trend: 'Synced' },
-    { label: 'Technicians', value: new Set(jobs.map((job) => job.technician)).size, icon: <UserCog />, color: '#8b5cf6', bg: '#ede9fe', trend: 'Optimal' },
-    { label: 'Inventory', value: `${jobs.reduce((sum, job) => sum + job.partsUsed.length, 0)} Pcs`, icon: <Boxes />, color: '#3b82f6', bg: '#dbeafe', trend: 'Stable' },
-    { label: 'Pending Pay', value: reports.pendingPayments, icon: <CheckCircle2 />, color: '#ef4444', bg: '#fef2f2', trend: 'Attention', negative: reports.pendingPayments > 0 },
-    { label: 'Deliveries', value: reports.pendingDeliveries, icon: <Truck />, color: '#ec4899', bg: '#fdf2f8', trend: 'In Progress' },
-  ];
 
   return (
-    <Motion.div 
-      className="premium-dashboard"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
-      {/* Reports Header */}
-      <div className="flex justify-between items-center mb-10">
-        
-        <div className="flex gap-4">
-           <div className="h-12 px-6 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 shadow-sm">
-              <Calendar size={16} className="text-indigo-600" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Apr 2026</span>
-           </div>
-          <button className="h-12 px-8 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20">
-             <Download size={18} strokeWidth={3} /> Export Executive Summary
-          </button>
+    <div className="campaign-page">
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <Motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className={`fixed top-4 right-4 z-[9999] px-5 py-3 rounded-xl shadow-xl text-sm font-semibold flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+            {toast.type === 'error' ? <X size={16}/> : <CheckCircle2 size={16}/>} {toast.msg}
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <section className="breadcrumb-card">
+        <div className="breadcrumb">
+          <span>Admin</span><ChevronRight size={14}/><span>Campaign</span><ChevronRight size={14}/><strong>Reports</strong>
         </div>
-      </div>
+        <div className="flex justify-between items-end flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 m-0">Campaign Reports</h1>
+            <p className="text-slate-500 text-sm m-0 mt-1">Performance analytics across all campaigns.</p>
+          </div>
+          <div className="flex gap-3 items-center">
+            {loading && <span className="flex items-center gap-2 text-xs text-slate-400 font-semibold"><Loader2 size={14} className="animate-spin"/> Loading...</span>}
+            <button className="primary-button !h-10 !px-4 text-xs" onClick={handleExport}>
+              <Download size={16}/> Export CSV
+            </button>
+          </div>
+        </div>
+      </section>
 
-      {/* Campaign KPI Grid (8-Columns for this specific page) */}
-      <div className="grid grid-cols-8 gap-4 mb-10">
-        {tiles.map((tile, idx) => (
-          <KPIItem key={idx} {...tile} />
+      {/* Stats — 4 top KPIs */}
+      <section className="stats-grid">
+        {[
+          { label: 'Total Revenue',      value: loading ? '—' : formatCurrency(reports.revenue),             color: '#4f46e5', icon: <IndianRupee size={16}/> },
+          { label: 'Leads / Converted',  value: loading ? '—' : `${reports.conversions} / ${reports.leads}`, color: '#10b981', icon: <Users size={16}/> },
+          { label: 'Devices Collected',  value: loading ? '—' : reports.devices,                             color: '#06b6d4', icon: <MonitorSmartphone size={16}/> },
+          { label: 'Pending Payments',   value: loading ? '—' : reports.pendingPayments,                     color: '#ef4444', icon: <CheckCircle2 size={16}/> },
+        ].map((s) => (
+          <div key={s.label} className="stat-card">
+            <div className="flex items-center justify-between mb-2">
+              <span className="stat-label">{s.label}</span>
+              <span style={{ color: s.color }}>{s.icon}</span>
+            </div>
+            <span className="stat-value" style={{ color: s.color }}>{s.value}</span>
+          </div>
         ))}
-      </div>
+      </section>
 
-      <div className="dash-ops-grid">
-        <Motion.div className="dash-card col-span-3" variants={itemVariants}>
-          <div className="dash-card-header">
-             <div className="flex justify-between items-center w-full">
-                <div className="flex items-center gap-4">
-                   <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-                      <Target size={20} />
-                   </div>
-                   <div>
-                      <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Campaign Performance Table</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Real-time KPI tracking per college campaign</p>
-                   </div>
-                </div>
-                <div className="flex gap-3">
-                   <button className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 hover:border-indigo-200 transition-all">Filter By Status</button>
-                   <button className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/10">Full Report</button>
-                </div>
-             </div>
+      {/* Secondary stats row */}
+      <section className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        {[
+          { label: 'Total Campaigns',    value: loading ? '—' : campaigns.length,       color: '#8b5cf6', icon: <Target size={16}/> },
+          { label: 'Technicians',        value: loading ? '—' : reports.technicians,     color: '#f59e0b', icon: <UserCog size={16}/> },
+          { label: 'Parts Used',         value: loading ? '—' : `${reports.partsUsed} pcs`, color: '#3b82f6', icon: <Boxes size={16}/> },
+          { label: 'Pending Deliveries', value: loading ? '—' : reports.pendingDeliveries, color: '#ec4899', icon: <Truck size={16}/> },
+        ].map((s) => (
+          <div key={s.label} className="stat-card">
+            <div className="flex items-center justify-between mb-2">
+              <span className="stat-label">{s.label}</span>
+              <span style={{ color: s.color }}>{s.icon}</span>
+            </div>
+            <span className="stat-value" style={{ color: s.color }}>{s.value}</span>
           </div>
-          
-          <div className="overflow-x-auto">
-             <table className="cmc-table">
-                <thead>
-                   <tr>
-                      <th className="pl-8">Campaign & College</th>
-                      <th>Leads</th>
-                      <th>Conversions</th>
-                      <th>Revenue</th>
-                      <th>Devices</th>
-                      <th>Status</th>
-                      <th className="pr-8 text-right">Actions</th>
-                   </tr>
-                </thead>
-                <tbody>
-                   {campaigns.map((campaign) => (
-                      <tr key={campaign.id}>
-                         <td className="pl-8">
-                            <div>
-                               <p className="text-xs font-black uppercase tracking-tight">{campaign.name}</p>
-                               <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{campaign.collegeName}</p>
-                            </div>
-                         </td>
-                         <td><span className="text-xs font-black">{campaign.leads}</span></td>
-                         <td>
-                            <div className="flex items-center gap-2">
-                               <span className="text-xs font-black text-indigo-600">{campaign.conversions}</span>
-                               <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                  <div className="h-full bg-indigo-500" style={{ width: `${(campaign.conversions / campaign.leads) * 100}%` }}></div>
-                               </div>
-                            </div>
-                         </td>
-                         <td><span className="text-xs font-black">{formatCurrency(campaign.revenue)}</span></td>
-                         <td><span className="text-xs font-black">{campaign.devicesCollected}</span></td>
-                         <td><span className={`dash-tag dash-tag-primary`}>{campaign.status}</span></td>
-                         <td className="pr-8 text-right">
-                            <button className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-indigo-600 transition-all"><ArrowRight size={14} /></button>
-                         </td>
-                      </tr>
-                   ))}
-                </tbody>
-             </table>
+        ))}
+      </section>
+
+      {/* Campaign Performance Table */}
+      <section className="table-card">
+        <div className="table-toolbar">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+              <Target size={18}/>
+            </div>
+            <div>
+              <p className="text-sm font-black text-slate-900 m-0">Campaign Performance</p>
+              <p className="text-[10px] text-slate-400 font-semibold m-0">Per-campaign KPI breakdown</p>
+            </div>
           </div>
-        </Motion.div>
-      </div>
-    </Motion.div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
+            <Loader2 size={20} className="animate-spin"/> Loading campaigns...
+          </div>
+        ) : campaigns.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+            <Target size={36} className="mb-2 opacity-30"/>
+            <p className="text-sm font-semibold">No campaigns found.</p>
+          </div>
+        ) : (
+          <div className="campaign-table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Campaign</th>
+                  <th>College</th>
+                  <th>Leads</th>
+                  <th>Conversions</th>
+                  <th>Conv. Rate</th>
+                  <th>Revenue</th>
+                  <th>Devices</th>
+                  <th>Status</th>
+                  <th className="text-right">View</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaigns.map((campaign) => {
+                  const convRate = Number(campaign.leads) > 0
+                    ? Math.round((Number(campaign.conversions || 0) / Number(campaign.leads)) * 100)
+                    : 0;
+                  return (
+                    <tr key={campaign.id} className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => navigate(`/admin/campaign/jobs?campaign=${campaign.id}`)}>
+                      <td className="font-bold text-slate-800">{campaign.name}</td>
+                      <td className="text-xs text-slate-500">{campaign.college || campaign.collegeName || '—'}</td>
+                      <td className="font-semibold text-slate-700">{campaign.leads || 0}</td>
+                      <td className="font-black text-indigo-600">{campaign.conversions || 0}</td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-600">{convRate}%</span>
+                          <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${convRate}%` }}/>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="font-black text-slate-900">{formatCurrency(campaign.revenue)}</td>
+                      <td className="font-semibold text-slate-700">{campaign.devicesCollected || 0}</td>
+                      <td>
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${CAMPAIGN_STATUS_STYLE[campaign.status] || 'bg-slate-50 text-slate-500'}`}>
+                          {campaign.status || 'Planned'}
+                        </span>
+                      </td>
+                      <td className="text-right">
+                        <button className="w-8 h-8 inline-flex items-center justify-center bg-slate-50 rounded-lg hover:text-indigo-600 transition-all"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/admin/campaign/jobs?campaign=${campaign.id}`); }}>
+                          <ArrowRight size={14}/>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
   );
 };
-
-const KPIItem = ({ label, value, icon, color, bg, trend, negative }) => (
-  <div className="dash-kpi-card group hover:border-indigo-200 transition-all p-5">
-    <div className="dash-kpi-header mb-4">
-      <div className="dash-kpi-icon w-10 h-10" style={{ backgroundColor: bg, color: color }}>
-        {React.cloneElement(icon, { size: 18 })}
-      </div>
-    </div>
-    <div>
-      <p className="dash-kpi-label text-[9px] mb-0.5">{label}</p>
-      <h3 className="dash-kpi-value text-lg mb-2">{value}</h3>
-      <div className={`dash-kpi-trend ${negative ? 'negative' : ''} text-[8px] py-0.5`}>
-        {trend}
-      </div>
-    </div>
-  </div>
-);
 
 export default CampaignReportsPage;

@@ -6,15 +6,32 @@ import { staffManagementService } from '../../services/staffManagementService';
 
 const emptyForm = {
   name: '',
+  age: '',
   phone: '',
   email: '',
   role: 'Staff',
-  departmentSkill: '',
+  department: '',
+  designation: '',
+  salary: '',
+  joiningDate: '',
   address: '',
+  aadhaarAddress: '',
   status: 'Active',
   attendanceStatus: 'Present',
+  jobType: 'Full time',
   notes: '',
+  attachedDocuments: [],
 };
+
+const accountStatusOptions = ['Active', 'Passive', 'Resign', 'Abscond', 'Terminate'];
+const jobTypeOptions = ['Full time', 'Part time'];
+
+const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve({ name: file.name, type: file.type, dataUrl: reader.result });
+  reader.onerror = reject;
+  reader.readAsDataURL(file);
+});
 
 const isAssignableJob = (job) => {
   const status = String(job.status || job.jobStatus || '').toLowerCase();
@@ -26,11 +43,18 @@ const getPendingJobLabel = (job) => {
   return title || job.id;
 };
 
+const formatAdminTime = (value) => {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+};
+
 const StaffListingPage = () => {
   const location = useLocation();
   const initialMode = new URLSearchParams(location.search).get('mode') === 'add' || new URLSearchParams(location.search).get('add') === '1' ? 'add' : '';
   const [staff, setStaff] = useState([]);
   const [pendingJobs, setPendingJobs] = useState([]);
+  const [regularizationRequests, setRegularizationRequests] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [departmentFilter, setDepartmentFilter] = useState('All');
@@ -44,12 +68,14 @@ const StaffListingPage = () => {
 
   const loadData = async () => {
     try {
-      const [staffRows, jobs] = await Promise.all([
+      const [staffRows, jobs, regularizations] = await Promise.all([
         staffManagementService.getStaffList(),
         staffManagementService.getPendingJobs(),
+        staffManagementService.getAttendanceRegularizations(),
       ]);
       setStaff(Array.isArray(staffRows) ? staffRows : (staffRows?.data || []));
       setPendingJobs(Array.isArray(jobs) ? jobs : (jobs?.data || []));
+      setRegularizationRequests(Array.isArray(regularizations) ? regularizations : []);
     } catch (error) {
       console.error('Reload error:', error);
     }
@@ -60,10 +86,12 @@ const StaffListingPage = () => {
     Promise.all([
       staffManagementService.getStaffList(),
       staffManagementService.getPendingJobs(),
-    ]).then(([staffRows, jobs]) => {
+      staffManagementService.getAttendanceRegularizations(),
+    ]).then(([staffRows, jobs, regularizations]) => {
       if (!mounted) return;
       setStaff(Array.isArray(staffRows) ? staffRows : (staffRows?.data || []));
       setPendingJobs(Array.isArray(jobs) ? jobs : (jobs?.data || []));
+      setRegularizationRequests(Array.isArray(regularizations) ? regularizations : []);
     }).catch((error) => {
       console.error('Staff loading error:', error);
       if (mounted) setNotice(error.response?.data?.message || error.message || 'Staff data failed to load.');
@@ -92,6 +120,7 @@ const StaffListingPage = () => {
   }), [staff, search, statusFilter, departmentFilter]);
 
   const assignableJobs = useMemo(() => pendingJobs.filter(isAssignableJob), [pendingJobs]);
+  const pendingRegularizations = useMemo(() => regularizationRequests.filter((row) => row.status === 'Pending'), [regularizationRequests]);
 
   const closeModal = () => {
     setModalMode('');
@@ -116,14 +145,21 @@ const StaffListingPage = () => {
     setSelectedStaff(row);
     setForm({
       name: row.name || '',
+      age: row.age || '',
       phone: row.phone || '',
       email: row.email || '',
       role: 'Staff',
-      departmentSkill: row.departmentSkill || '',
+      department: row.department || row.departmentSkill || '',
+      designation: row.designation || '',
+      salary: row.salary || '',
+      joiningDate: row.joiningDate || '',
       address: row.address || '',
+      aadhaarAddress: row.aadhaarAddress || '',
       status: row.status || 'Active',
       attendanceStatus: row.attendanceStatus || 'Present',
+      jobType: row.jobType || 'Full time',
       notes: row.notes || '',
+      attachedDocuments: Array.isArray(row.attachedDocuments) ? row.attachedDocuments : [],
     });
     setModalMode('edit');
     setErrors({});
@@ -139,11 +175,29 @@ const StaffListingPage = () => {
   const validateStaff = () => {
     const next = {};
     if (!form.name.trim()) next.name = 'Name is required.';
+    if (!String(form.age).trim()) next.age = 'Age is required.';
     if (!form.phone.trim()) next.phone = 'Phone is required.';
     if (!form.email.trim()) next.email = 'Email is required for staff login.';
     if (form.email.trim() && !/^\S+@\S+\.\S+$/.test(form.email.trim())) next.email = 'Invalid email format.';
+    if (!form.department.trim()) next.department = 'Department is required.';
+    if (!form.designation.trim()) next.designation = 'Designation is required.';
+    if (!String(form.salary).trim()) next.salary = 'Salary is required.';
+    if (!form.joiningDate) next.joiningDate = 'Joining date is required.';
+    if (!form.address.trim()) next.address = 'Residence address is required.';
+    if (!form.aadhaarAddress.trim()) next.aadhaarAddress = 'Aadhaar address is required.';
     setErrors(next);
     return Object.keys(next).length === 0;
+  };
+
+  const updateStaffForm = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: '' }));
+  };
+
+  const handleDocumentsChange = async (event) => {
+    const files = Array.from(event.target.files || []).slice(0, 3);
+    const docs = await Promise.all(files.map(fileToDataUrl));
+    updateStaffForm('attachedDocuments', docs);
   };
 
   const saveStaff = async () => {
@@ -172,6 +226,13 @@ const StaffListingPage = () => {
     setNotice('Job assigned successfully.');
     await loadData();
     closeModal();
+  };
+
+  const processRegularization = async (request, status) => {
+    await staffManagementService.updateAttendanceRegularization(request.id, { status });
+    setNotice(`Regularization ${status.toLowerCase()} for ${request.staffName}.`);
+    const rows = await staffManagementService.getAttendanceRegularizations();
+    setRegularizationRequests(Array.isArray(rows) ? rows : []);
   };
 
   return (
@@ -208,6 +269,32 @@ const StaffListingPage = () => {
           </select>
         </div>
       </div>
+
+      {pendingRegularizations.length > 0 && (
+        <div className="card staff-regularization-admin-card">
+          <div className="staff-card-header staff-card-header-static">
+            <div>
+              <h3>Attendance Regularization Requests</h3>
+              <p>Approve missed clock-out requests from staff.</p>
+            </div>
+          </div>
+          <div className="staff-regularization-admin-list">
+            {pendingRegularizations.map((request) => (
+              <div key={request.id} className="staff-regularization-admin-row">
+                <div>
+                  <strong>{request.staffName}</strong>
+                  <span>{request.attendanceDate} · In {formatAdminTime(request.clockInAt)} · Requested out {formatAdminTime(request.requestedClockOutAt)}</span>
+                  <small>{request.reason}</small>
+                </div>
+                <div>
+                  <button type="button" className="btn btn-secondary" onClick={() => processRegularization(request, 'Rejected')}>Reject</button>
+                  <button type="button" className="btn btn-primary" onClick={() => processRegularization(request, 'Approved')}>Approve</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card overflow-hidden">
         <table className="leads-table">
@@ -289,7 +376,6 @@ const StaffListingPage = () => {
             <div className="modal-header">
               <div>
                 <h2 className="text-2xl font-black text-slate-800">{modalMode === 'edit' ? 'Edit Staff Member' : 'Add New Staff'}</h2>
-                <p className="text-sm text-slate-500">{modalMode === 'edit' ? 'Update staff profile and login email.' : 'Create a staff record. Login password will be staff@123.'}</p>
               </div>
               <button className="icon-btn" onClick={closeModal} aria-label="Close staff form"><X size={20} /></button>
             </div>
@@ -299,15 +385,25 @@ const StaffListingPage = () => {
                   <span>Staff ID:</span> <strong>{selectedStaff.id}</strong>
                 </div>
               )}
-              <div className="form-grid-premium">
-                <div className="form-group"><label>Full Name</label><input placeholder="e.g. John Doe" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />{errors.name && <span className="form-error">{errors.name}</span>}</div>
-                <div className="form-group"><label>Phone Number</label><input placeholder="e.g. 9876543210" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} />{errors.phone && <span className="form-error">{errors.phone}</span>}</div>
-                <div className="form-group"><label>Email Address</label><input placeholder="e.g. john@example.com" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />{errors.email && <span className="form-error">{errors.email}</span>}</div>
-                <div className="form-group"><label>Department / Primary Skill</label><input placeholder="e.g. Hardware Repair" value={form.departmentSkill} onChange={(event) => setForm((current) => ({ ...current, departmentSkill: event.target.value }))} /></div>
-                <div className="form-group"><label>Account Status</label><select value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}><option>Active</option><option>Inactive</option></select></div>
-                <div className="form-group"><label>Attendance Status</label><select value={form.attendanceStatus} onChange={(event) => setForm((current) => ({ ...current, attendanceStatus: event.target.value }))}>{staffManagementService.attendanceOptions.map((status) => <option key={status}>{status}</option>)}</select></div>
-                <div className="form-group"><label>Office / Residential Address</label><input placeholder="City, Area" value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} /></div>
-                <div className="form-group span-3"><label>Internal Notes (Optional)</label><textarea rows={3} placeholder="Add any specific details about the staff member..." value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} /></div>
+              <div className="form-grid-premium staff-form-grid">
+                <div className="form-group"><label>Full Name</label><input placeholder="Enter full name" value={form.name} onChange={(event) => updateStaffForm('name', event.target.value)} />{errors.name && <span className="form-error">{errors.name}</span>}</div>
+                <div className="form-group"><label>Age</label><input type="number" min="18" placeholder="Enter age" value={form.age} onChange={(event) => updateStaffForm('age', event.target.value)} />{errors.age && <span className="form-error">{errors.age}</span>}</div>
+                <div className="form-group"><label>Mobile</label><input placeholder="Enter mobile number" value={form.phone} onChange={(event) => updateStaffForm('phone', event.target.value.replace(/\D/g, '').slice(0, 10))} />{errors.phone && <span className="form-error">{errors.phone}</span>}</div>
+                <div className="form-group"><label>Email</label><input type="email" placeholder="Enter email address" value={form.email} onChange={(event) => updateStaffForm('email', event.target.value)} />{errors.email && <span className="form-error">{errors.email}</span>}</div>
+                <div className="form-group"><label>Department</label><input placeholder="Enter department" value={form.department} onChange={(event) => updateStaffForm('department', event.target.value)} />{errors.department && <span className="form-error">{errors.department}</span>}</div>
+                <div className="form-group"><label>Designation</label><input placeholder="Enter designation" value={form.designation} onChange={(event) => updateStaffForm('designation', event.target.value)} />{errors.designation && <span className="form-error">{errors.designation}</span>}</div>
+                <div className="form-group"><label>Salary</label><input type="number" min="0" placeholder="Enter salary" value={form.salary} onChange={(event) => updateStaffForm('salary', event.target.value)} />{errors.salary && <span className="form-error">{errors.salary}</span>}</div>
+                <div className="form-group"><label>Joining Date</label><input type="date" value={form.joiningDate} onChange={(event) => updateStaffForm('joiningDate', event.target.value)} />{errors.joiningDate && <span className="form-error">{errors.joiningDate}</span>}</div>
+                <div className="form-group"><label>Job Type</label><select value={form.jobType} onChange={(event) => updateStaffForm('jobType', event.target.value)}>{jobTypeOptions.map((type) => <option key={type}>{type}</option>)}</select></div>
+                <div className="form-group"><label>Account Status</label><select value={form.status} onChange={(event) => updateStaffForm('status', event.target.value)}>{accountStatusOptions.map((status) => <option key={status}>{status}</option>)}</select></div>
+                <div className="form-group"><label>Residence Address</label><textarea rows={2} placeholder="Enter residence address" value={form.address} onChange={(event) => updateStaffForm('address', event.target.value)} />{errors.address && <span className="form-error">{errors.address}</span>}</div>
+                <div className="form-group"><label>As per Aadhaar Card Address</label><textarea rows={2} placeholder="Enter Aadhaar address" value={form.aadhaarAddress} onChange={(event) => updateStaffForm('aadhaarAddress', event.target.value)} />{errors.aadhaarAddress && <span className="form-error">{errors.aadhaarAddress}</span>}</div>
+                <div className="form-group staff-form-half"><label>Internal Notes</label><textarea rows={2} placeholder="Enter internal notes" value={form.notes} onChange={(event) => updateStaffForm('notes', event.target.value)} /></div>
+                <div className="form-group staff-form-half">
+                  <label>Attached Documents 3 No</label>
+                  <input type="file" multiple onChange={handleDocumentsChange} />
+                  <span className="field-hint">{form.attachedDocuments.length} / 3 document(s) attached</span>
+                </div>
               </div>
               <div className="modal-actions pt-6 border-t border-slate-100 mt-6">
                 <button className="btn btn-secondary" type="button" onClick={closeModal}>Cancel</button>
@@ -329,14 +425,22 @@ const StaffListingPage = () => {
               <div className="detail-list">
                 <div><span>Staff ID</span><strong>{selectedStaff.id}</strong></div>
                 <div><span>Name</span><strong>{selectedStaff.name}</strong></div>
+                <div><span>Age</span><strong>{selectedStaff.age || '-'}</strong></div>
                 <div><span>Phone</span><strong>{selectedStaff.phone}</strong></div>
                 <div><span>Email</span><strong>{selectedStaff.email || '-'}</strong></div>
+                <div><span>Department</span><strong>{selectedStaff.department || '-'}</strong></div>
                 <div><span>Department / Skill</span><strong>{selectedStaff.departmentSkill || '-'}</strong></div>
+                <div><span>Designation</span><strong>{selectedStaff.designation || '-'}</strong></div>
+                <div><span>Salary</span><strong>{selectedStaff.salary || '-'}</strong></div>
+                <div><span>Joining Date</span><strong>{selectedStaff.joiningDate || '-'}</strong></div>
+                <div><span>Job Type</span><strong>{selectedStaff.jobType || '-'}</strong></div>
                 <div><span>Status</span><strong>{selectedStaff.status}</strong></div>
                 <div><span>Attendance Status</span><strong>{selectedStaff.attendanceStatus || '-'}</strong></div>
                 <div><span>Assigned Jobs</span><strong>{selectedStaff.assignedJobs}</strong></div>
                 <div><span>Last Seen</span><strong>{selectedStaff.lastSeen || '-'}</strong></div>
-                <div><span>Address</span><strong>{selectedStaff.address || '-'}</strong></div>
+                <div><span>Residence Address</span><strong>{selectedStaff.address || '-'}</strong></div>
+                <div><span>Aadhaar Address</span><strong>{selectedStaff.aadhaarAddress || '-'}</strong></div>
+                <div><span>Attached Documents</span><strong>{selectedStaff.attachedDocuments?.length || 0}</strong></div>
                 <div><span>Notes</span><strong>{selectedStaff.notes || '-'}</strong></div>
               </div>
               <div className="modal-actions">

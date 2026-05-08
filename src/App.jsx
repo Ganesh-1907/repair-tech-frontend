@@ -31,13 +31,12 @@ import StaffTechnicianManagementPage from './pages/admin/StaffTechnicianManageme
 import StaffListingPage from './pages/admin/StaffListingPage';
 import StaffPortalTasksPage from './pages/admin/StaffPortalTasksPage';
 import StaffProfilePage from './pages/admin/StaffProfilePage';
-import InstantMessagePage from './pages/admin/InstantMessagePage';
+import InventoryDashboardPage from './pages/admin/InventoryDashboardPage';
 import AssetManagementPage from './pages/admin/AssetManagementPage';
 import AssetDetailPage from './pages/admin/AssetDetailPage';
 import QuoteApprovalPlaceholderPage from './pages/admin/QuoteApprovalPlaceholderPage';
 import CampaignDashboardPage from './pages/admin/CampaignDashboardPage';
 import CampaignJobsPage from './pages/admin/CampaignJobsPage';
-import CampaignReportsPage from './pages/admin/CampaignReportsPage';
 
 // Rental Module Pages
 import RentalQuotationPage from './pages/admin/RentalQuotationPage';
@@ -71,12 +70,12 @@ const existingAdminRouteComponents = {
   '/admin/staff/dashboard': StaffTechnicianManagementPage,
   '/admin/staff/list': StaffListingPage,
   '/admin/staff-management': StaffTechnicianManagementPage,
-  '/admin/instant-massage-option': InstantMessagePage,
+  '/admin/inventory/dashboard': InventoryDashboardPage,
   '/admin/inventory': Inventory,
+  '/inventory': Inventory,
   '/admin/inventory/asset-management': AssetManagementPage,
   '/admin/campaign/dashboard': CampaignDashboardPage,
   '/admin/campaign/jobs': CampaignJobsPage,
-  '/admin/campaign/reports': CampaignReportsPage,
   '/admin/rental': RentalDashboardPage,
   '/admin/rental/dashboard': RentalDashboardPage,
   '/admin/rental/customers': RentalOperationsBillingPage,
@@ -114,7 +113,6 @@ function App() {
               
               {/* Admin Redirects */}
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="/admin/instant-message-option" element={<Navigate to="/admin/instant-massage-option" replace />} />
               <Route path="/admin/expenses" element={<Navigate to="/admin/expenses/dashboard" replace />} />
               <Route path="/admin/expenses-management" element={<Navigate to="/admin/expenses/dashboard" replace />} />
               <Route path="/admin/expenses/add" element={<Navigate to="/admin/expenses/list?mode=add" replace />} />

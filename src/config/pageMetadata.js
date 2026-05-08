@@ -101,10 +101,10 @@ const basePageMetadata = [
     searchPlaceholder: 'Search staff by id, name, role, skill...',
   },
   {
-    path: '/admin/instant-massage-option',
-    title: 'Instant Message option',
-    subtitle: 'Bookings, message templates, and communication history.',
-    searchPlaceholder: 'Search bookings, messages, customers...',
+    path: '/admin/inventory/dashboard',
+    title: 'Inventory Dashboard',
+    subtitle: 'Stock, device assets, and repair status overview.',
+    searchPlaceholder: 'Search inventory dashboard...',
   },
   {
     path: '/admin/inventory/asset-management',
@@ -117,12 +117,6 @@ const basePageMetadata = [
     title: 'Campaign Job Workflow',
     subtitle: 'One-screen campaign workflow from quick entry to close job.',
     searchPlaceholder: 'Search job id, customer, status...',
-  },
-  {
-    path: '/admin/campaign/reports',
-    title: 'Campaign Reports',
-    subtitle: 'Campaign performance, lead conversion, and inventory reports.',
-    searchPlaceholder: 'Search reports...',
   },
   {
     pathPrefix: '/admin/inventory/asset-management/',

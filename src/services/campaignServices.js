@@ -85,7 +85,7 @@ export const leadService = {
       campaignSource,
       campaignId: campaign?.id || '',
       deviceType: payload.deviceType,
-      deviceModel: `${payload.deviceType} model pending`,
+      deviceModel: '',
       serialNumber: '',
       problem: payload.problem,
       problemNotes: payload.problemNotes || '',
@@ -169,11 +169,11 @@ export const jobService = {
 };
 
 export const quoteService = {
-  async sendQuote(jobId, { issue, estimate, status = 'Sent', channel = 'WhatsApp' }) {
+  async sendQuote(jobId, { issue, estimate, status = 'Sent', channel = 'WhatsApp', notes = '' }) {
     const job = await jobService.getJob(jobId);
     const version = (job.quoteHistory?.length || 0) + 1;
-    const quote = { issue, estimate: money(estimate), status, version };
-    const quoteHistory = [{ version, issue, estimate: money(estimate), status, sentAt: nowIso(), channel }, ...(job.quoteHistory || [])];
+    const quote = { issue, estimate: money(estimate), status, version, notes };
+    const quoteHistory = [{ version, issue, estimate: money(estimate), status, notes, sentAt: nowIso(), channel }, ...(job.quoteHistory || [])];
     await jobService.updateJob(jobId, { quoteStatus: status, quote, quoteHistory });
     await addActivity(jobId, status === 'Updated' ? 'Updated quote sent' : 'Quote sent', channel, 'Sent');
     return jobService.getJob(jobId);

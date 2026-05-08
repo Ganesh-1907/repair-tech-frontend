@@ -1,3 +1,4 @@
+import { api } from './apiClient';
 import {
   billingService,
   deliveryService,
@@ -21,7 +22,6 @@ const issueTemplates = [
   { issue: 'Software Issue', min: 500, max: 2000, defaultEstimate: 1200 },
   { issue: 'Other', min: 0, max: 0, defaultEstimate: 0 },
 ];
-const enforceOtpVerification = false;
 
 const workflowStateByJob = new Map();
 
@@ -30,7 +30,6 @@ const makeId = (prefix) => `${prefix}-${Date.now().toString().slice(-6)}`;
 const ensureWorkflowState = (jobId) => {
   if (!workflowStateByJob.has(jobId)) {
     workflowStateByJob.set(jobId, {
-      otp: { sent: false, verified: false },
       quoteDraft: null,
       receipt: null,
       repairChecklist: {
@@ -89,7 +88,8 @@ const normalizeJobRecord = (job) => {
   if (!job) return null;
   const state = ensureWorkflowState(job.id);
   const totals = jobService.totalsForJob(job);
-  const latestQuote = (job.quoteHistory || [])[0] || job.quote || {};
+  const savedQuote = (job.quoteHistory || [])[0] || job.quote || {};
+  const latestQuote = state.quoteDraft || savedQuote || {};
   const receipt = state.receipt || null;
   const qrState = state.qr || { generated: false, qrToken: '', barcode: '' };
   const intakeDevices = Array.isArray(receipt?.devices) && receipt.devices.length
@@ -117,6 +117,7 @@ const normalizeJobRecord = (job) => {
         issue: latestQuote.issue || '',
         estimate: Number(latestQuote.estimate || 0),
         status: latestQuote.status || job.quoteStatus || 'Draft',
+        notes: latestQuote.notes || '',
       },
       intake: {
         condition: receipt?.condition || job.condition || [],
@@ -174,6 +175,8 @@ export const campaignJobWorkflowService = {
       customerName: String(payload?.name || payload?.customerName || '').trim(),
       phoneNumber: String(payload?.phoneNumber || payload?.phone || '').trim(),
       deviceType: String(payload?.deviceType || payload?.device || '').trim(),
+      deviceModel: String(payload?.deviceModel || payload?.brand || '').trim(),
+      serialNumber: String(payload?.serialNumber || payload?.serial || '').trim(),
       problem: String(payload?.problem || '').trim(),
       problemNotes: String(payload?.problemNotes || payload?.notes || '').trim(),
     };
@@ -246,21 +249,6 @@ export const campaignJobWorkflowService = {
     return inventoryUsageService.addUsage(jobId, partId, quantity);
   },
 
-  async sendOtp(phoneNumber) {
-    if (!phonePattern.test(String(phoneNumber || '').trim())) {
-      throw new Error('Enter a valid 10 digit Indian mobile number.');
-    }
-    return { otpId: makeId('OTP'), status: 'Sent' };
-  },
-
-  async verifyOtp(otpValue) {
-    const otp = String(otpValue || '').trim();
-    if (!/^\d{6}$/.test(otp)) {
-      throw new Error('OTP must be 6 digits.');
-    }
-    return { verified: true };
-  },
-
   async createQuickEntry(payload) {
     const name = String(payload?.name || '').trim();
     const phoneNumber = String(payload?.phoneNumber || '').trim();
@@ -270,9 +258,6 @@ export const campaignJobWorkflowService = {
     if (!phonePattern.test(phoneNumber)) throw new Error('Valid phone number is required.');
     if (!deviceType) throw new Error('Device type is required.');
     if (!problem) throw new Error('Problem is required.');
-    if (enforceOtpVerification && !payload?.otpVerified) {
-      throw new Error('OTP verification is required.');
-    }
 
     const created = await leadService.createWalkIn({
       name,
@@ -283,15 +268,6 @@ export const campaignJobWorkflowService = {
       campaignSource: payload.campaignSource || '',
     });
     ensureWorkflowState(created.jobCardId);
-    if (!payload?.otpVerified) {
-      appendInternalActivity(created.jobCardId, {
-        action: 'OTP verification skipped (mock mode)',
-        user: 'Reception',
-        channel: 'System',
-        status: 'Delivered',
-        notes: 'Job created without strict OTP verification.',
-      });
-    }
     appendInternalActivity(created.jobCardId, {
       action: 'Ticket created',
       user: 'Reception',
@@ -389,23 +365,38 @@ export const campaignJobWorkflowService = {
     const finalAmount = Math.max(estimate - discount, 0);
     const status = payload?.status || 'Draft';
     const channel = payload?.channel || 'WhatsApp';
+    const notes = String(payload?.notes || '').trim();
 
-    if (status === 'Draft') {
+    if (['Draft', 'Approved', 'Rejected'].includes(status)) {
       const state = ensureWorkflowState(jobId);
-      state.quoteDraft = { issue, estimate, discount, finalAmount, channel, status };
+      state.quoteDraft = { issue, estimate, discount, finalAmount, channel, status, notes };
+      const job = await jobService.getJob(jobId);
+      await jobService.updateJob(jobId, {
+        quoteStatus: status,
+        quote: {
+          ...(job.quote || {}),
+          issue,
+          estimate: finalAmount,
+          status,
+          notes,
+          version: job.quote?.version || 0,
+        },
+      });
       appendInternalActivity(jobId, {
-        action: 'Quote saved as draft',
+        action: status === 'Draft' ? 'Quote saved as draft' : `Quote marked ${status}`,
         user: 'Staff',
         channel: 'System',
-        status: 'Pending',
+        status: status === 'Draft' ? 'Pending' : status,
         notes: `${issue} - INR ${finalAmount}`,
       });
       return state.quoteDraft;
     }
 
     const quoteStatus = status === 'Updated' ? 'Updated' : 'Sent';
-    await quoteService.sendQuote(jobId, { issue, estimate: finalAmount, status: quoteStatus, channel });
-    return { issue, estimate, discount, finalAmount, channel, status: quoteStatus };
+    const state = ensureWorkflowState(jobId);
+    state.quoteDraft = null;
+    await quoteService.sendQuote(jobId, { issue, estimate: finalAmount, status: quoteStatus, channel, notes });
+    return { issue, estimate, discount, finalAmount, channel, notes, status: quoteStatus };
   },
 
   async sendQuoteMessage(jobId, payload) {
@@ -527,7 +518,8 @@ export const campaignJobWorkflowService = {
     const nextStatus = String(payload?.status || '').trim();
     if (!nextStatus) throw new Error('Status is required.');
     const job = await jobService.getJob(jobId);
-    if (job.jobStatus === nextStatus && !payload?.allowDuplicate) {
+    const nextQuoteStatus = payload?.quoteStatus ? String(payload.quoteStatus).trim() : '';
+    if (job.jobStatus === nextStatus && (!nextQuoteStatus || job.quoteStatus === nextQuoteStatus) && !payload?.allowDuplicate) {
       return { duplicate: true, job };
     }
 
@@ -535,6 +527,22 @@ export const campaignJobWorkflowService = {
       jobStatus: nextStatus,
       technician: payload?.technician || job.technician,
     };
+    if (nextQuoteStatus) {
+      patch.quoteStatus = nextQuoteStatus;
+      if (job.quote) {
+        patch.quote = { ...job.quote, status: nextQuoteStatus };
+      }
+      if (Array.isArray(job.quoteHistory) && job.quoteHistory.length > 0) {
+        patch.quoteHistory = [
+          { ...job.quoteHistory[0], status: nextQuoteStatus },
+          ...job.quoteHistory.slice(1),
+        ];
+      }
+      const state = ensureWorkflowState(jobId);
+      if (state.quoteDraft) {
+        state.quoteDraft = { ...state.quoteDraft, status: nextQuoteStatus };
+      }
+    }
     const updated = await jobService.updateJob(jobId, patch, `Status changed to ${nextStatus}`);
     const state = ensureWorkflowState(jobId);
     state.statusTimeline.unshift({
@@ -564,13 +572,55 @@ export const campaignJobWorkflowService = {
     return { sent: true };
   },
 
+  async addPartToJob(jobId, { partId, name, quantity, unitPrice }) {
+    const qty = Number(quantity || 0);
+    if (qty <= 0) throw new Error('Quantity must be greater than zero.');
+    if (!name) throw new Error('Part name is required.');
+    if (partId) {
+      // inventory-tracked part — deduct stock
+      return inventoryUsageService.addUsage(jobId, partId, qty);
+    }
+    // manual entry — no inventory to deduct, just append to partsUsed
+    const job = await jobService.getJob(jobId);
+    const existing = (job.partsUsed || []).find((p) => p.name === name && !p.id);
+    const partsUsed = existing
+      ? job.partsUsed.map((p) => p.name === name && !p.id ? { ...p, quantity: Number(p.quantity) + qty } : p)
+      : [...(job.partsUsed || []), { id: '', name, quantity: qty, unitPrice: Number(unitPrice || 0) }];
+    await jobService.updateJob(jobId, { partsUsed }, `${name} added to job`);
+    return jobService.getJob(jobId);
+  },
+
+  async removePartFromJob(jobId, partIdentifier) {
+    const job = await jobService.getJob(jobId);
+    const part = (job.partsUsed || []).find((p) => p.id === partIdentifier || p.name === partIdentifier);
+    if (!part) return jobService.getJob(jobId);
+    // restore stock if this was an inventory-tracked part
+    if (part.id) {
+      const inv = await api.get('campaignInventoryParts', part.id).catch(() => null);
+      if (inv) {
+        await api.patch('campaignInventoryParts', part.id, { availableStock: Number(inv.availableStock || 0) + Number(part.quantity || 0) });
+      }
+    }
+    const partsUsed = (job.partsUsed || []).filter((p) => p !== part);
+    await jobService.updateJob(jobId, { partsUsed }, `${part.name} removed from job`);
+    return jobService.getJob(jobId);
+  },
+
+  async updateLabourCharge(jobId, amount) {
+    const labour = Number(amount || 0);
+    if (labour < 0) throw new Error('Labour charge cannot be negative.');
+    await jobService.updateJob(jobId, { labourCharge: labour }, `Labour charge set to ₹${labour}`);
+    return jobService.getJob(jobId);
+  },
+
   async saveDeliveryPlan(jobId, payload) {
-    if (!payload?.deliveryType) throw new Error('Delivery type is required.');
+    const deliveryType = payload?.type || payload?.deliveryType || '';
+    if (!deliveryType) throw new Error('Delivery type is required.');
     const updated = await deliveryService.updateDelivery(jobId, {
-      type: payload.deliveryType,
-      person: payload.deliveryPerson || '',
+      type: deliveryType,
+      person: payload.deliveryPerson || payload.assignedTo || '',
       route: payload.route || '',
-      dateTime: payload.deliveryDateTime || '',
+      dateTime: payload.scheduledAt || payload.deliveryDateTime || '',
       notes: payload.notes || '',
       status: payload.status || 'Planned',
     });
@@ -612,30 +662,18 @@ export const campaignJobWorkflowService = {
 
   async closeJob(jobId, payload) {
     const allowPending = Boolean(payload?.allowPending);
-    const deliveryConfirmed = Boolean(payload?.deliveryConfirmed);
-    const signatureCaptured = Boolean(payload?.signatureCaptured);
-    const handoverChecklist = payload?.handoverChecklist || {};
-    const handoverComplete = Object.values(handoverChecklist).every(Boolean);
-
-    if (!deliveryConfirmed) throw new Error('Delivery must be confirmed before closing the job.');
-    if (!signatureCaptured) throw new Error('Customer signature is required before closing the job.');
-    if (!handoverComplete) throw new Error('Complete the handover checklist before closing the job.');
-
     const job = await jobService.getJob(jobId);
-    if (job.paymentStatus !== 'Paid' && !allowPending) {
-      throw new Error('Payment must be marked paid or admin must allow pending.');
+    const totals = jobService.totalsForJob(job);
+    if (totals.balance > 0 && !allowPending) {
+      throw new Error(`Payment pending: ₹${totals.balance}. Collect full payment before closing.`);
     }
-
     const updated = await deliveryService.closeJob(jobId);
-    const state = ensureWorkflowState(jobId);
-    state.signatureCaptured = true;
-    state.handoverChecklist = { ...handoverChecklist };
     appendInternalActivity(jobId, {
       action: 'Job closed',
       user: 'Staff',
       channel: 'System',
       status: 'Delivered',
-      notes: allowPending ? 'Closed with pending payment approval.' : 'Closed after full handover.',
+      notes: allowPending ? 'Closed with pending payment.' : 'Closed after full payment and handover.',
     });
     return normalizeJobRecord(updated);
   },

@@ -1,225 +1,289 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { motion as Motion } from 'framer-motion';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { 
-  AlertCircle, 
-  CheckCircle, 
-  CreditCard, 
-  IndianRupee, 
-  MessageSquare, 
-  Printer, 
-  Search, 
-  Wallet, 
-  X,
-  TrendingUp,
-  ArrowUpRight,
-  Filter,
-  Download,
-  Zap,
-  Target,
-  Globe,
-  Database,
-  CheckCircle2,
-  Activity,
-  ArrowRight
+import {
+  AlertCircle, CheckCircle2, CreditCard, IndianRupee, MessageSquare,
+  Search, Wallet, X, Download, ArrowRight, RefreshCcw, Loader2,
+  ChevronRight,
 } from 'lucide-react';
 import { billingService } from '../../services/campaignServices';
-import './DashboardPremiumStyles.css';
+import './CampaignModule.css';
 
 const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
 
-const CampaignBillingPage = () => {
-  const [invoices, setInvoices] = useState([]);
-  const [search, setSearch] = useState('');
-  const [notice, setNotice] = useState('');
-
-  useEffect(() => {
-    billingService.listInvoices().then(setInvoices);
-  }, []);
-
-  const filteredInvoices = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return invoices;
-    return invoices.filter((invoice) => [
-      invoice.invoiceNo,
-      invoice.jobCardId,
-      invoice.customer,
-      invoice.campaign,
-      invoice.paymentStatus,
-      invoice.paymentMode,
-    ].some((value) => String(value || '').toLowerCase().includes(query)));
-  }, [invoices, search]);
-
-  const summary = useMemo(() => {
-    const paidAmount = invoices.reduce((sum, invoice) => sum + invoice.paidAmount, 0);
-    const pendingAmount = invoices.reduce((sum, invoice) => sum + invoice.balance, 0);
-    const overdueAmount = invoices
-      .filter((invoice) => invoice.paymentStatus !== 'Paid')
-      .reduce((sum, invoice) => sum + invoice.balance, 0);
-    const upiAmount = invoices.filter((invoice) => invoice.paymentMode === 'UPI').reduce((sum, invoice) => sum + invoice.paidAmount, 0);
-    return { totalInvoices: invoices.length, paidAmount, pendingAmount, overdueAmount, upiAmount };
-  }, [invoices]);
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
-  };
-
-  return (
-    <Motion.div 
-      className="premium-dashboard"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
-      {/* Header Section */}
-      <div className="flex justify-between items-center mb-10">
-        
-        <div className="flex gap-4">
-          <button className="h-12 px-6 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-slate-50 transition-all shadow-sm">
-             <MessageSquare size={18} className="text-indigo-600" /> Bulk Reminders
-          </button>
-          <button className="h-12 px-8 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20">
-             <Download size={18} strokeWidth={3} /> Revenue Export
-          </button>
-        </div>
-      </div>
-
-      {/* Financial KPI Grid (8-Columns) */}
-      <div className="dash-kpi-grid grid-cols-8">
-        <KPIItem title="Net Invoices" value={summary.totalInvoices} icon={<CreditCard />} color="#6366f1" bg="#e0e7ff" trend="Total" />
-        <KPIItem title="Paid Position" value={formatCurrency(summary.paidAmount)} icon={<Wallet />} color="#10b981" bg="#dcfce7" trend="Collected" />
-        <KPIItem title="Net Receivables" value={formatCurrency(summary.pendingAmount)} icon={<IndianRupee />} color="#f59e0b" bg="#fef3c7" trend="Pending" />
-        <KPIItem title="Overdue Debt" value={formatCurrency(summary.overdueAmount)} icon={<AlertCircle />} color="#ef4444" bg="#fef2f2" trend="Action" negative={true} />
-        <KPIItem title="UPI Velocity" value={formatCurrency(summary.upiAmount)} icon={<Zap />} color="#06b6d4" bg="#cffafe" trend="Digital" />
-        <KPIItem title="Cash Intake" value={formatCurrency(0)} icon={<Database />} color="#8b5cf6" bg="#ede9fe" trend="Physical" />
-        <KPIItem title="Growth" value="+18%" icon={<TrendingUp />} color="#ec4899" bg="#fdf2f8" trend="YoY" />
-        <KPIItem title="Health" value="96%" icon={<Activity />} color="#6366f1" bg="#e0e7ff" trend="Synced" />
-      </div>
-
-      <div className="dash-ops-grid">
-        <Motion.div className="dash-card col-span-3" variants={itemVariants}>
-          <div className="dash-card-header">
-             <div className="flex gap-4 items-center flex-1">
-                <div className="relative w-96">
-                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                   <input 
-                      type="text" 
-                      placeholder="Search Invoices, Job IDs, Clients..." 
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="h-12 w-full pl-12 pr-6 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium focus:ring-4 focus:ring-indigo-600/10 transition-all"
-                   />
-                </div>
-                <button className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-indigo-600 transition-all">
-                   <Filter size={18} />
-                </button>
-             </div>
-          </div>
-          
-          <div className="p-2">
-            <div className="overflow-x-auto cmc-custom-scroll">
-              <table className="cmc-table">
-                <thead>
-                  <tr>
-                    <th className="pl-8">Invoice ID</th>
-                    <th>Job Card</th>
-                    <th>Customer & Campaign</th>
-                    <th>Total Value</th>
-                    <th>Balance</th>
-                    <th>Status</th>
-                    <th>Settlement</th>
-                    <th className="pr-8 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoices.map((invoice) => (
-                    <tr key={invoice.invoiceNo}>
-                      <td className="pl-8">
-                        <span className="text-xs font-black uppercase tracking-tight text-indigo-600">{invoice.invoiceNo}</span>
-                      </td>
-                      <td>
-                        <span className="text-xs font-bold text-slate-500">{invoice.jobCardId}</span>
-                      </td>
-                      <td>
-                         <div className="flex flex-col">
-                            <span className="text-xs font-black uppercase tracking-tight text-slate-900">{invoice.customer}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{invoice.campaign}</span>
-                         </div>
-                      </td>
-                      <td><span className="text-sm font-black text-slate-900">{formatCurrency(invoice.totalAmount)}</span></td>
-                      <td>
-                         <div className="flex flex-col">
-                            <span className={`text-xs font-black ${invoice.balance > 0 ? 'text-rose-600' : 'text-slate-400'}`}>{formatCurrency(invoice.balance)}</span>
-                            <span className="text-[9px] text-slate-400 font-bold uppercase">Pending</span>
-                         </div>
-                      </td>
-                      <td>
-                         <span className={`dash-tag dash-tag-${invoice.paymentStatus === 'Paid' ? 'success' : invoice.paymentStatus === 'Partially Paid' ? 'warning' : 'danger'}`}>
-                            {invoice.paymentStatus}
-                         </span>
-                      </td>
-                      <td>
-                         <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-indigo-400"></div>
-                            <span className="text-[10px] font-black uppercase text-slate-500">{invoice.paymentMode}</span>
-                         </div>
-                      </td>
-                      <td className="pr-8 text-right">
-                         <div className="flex justify-end gap-2">
-                            <Link className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-indigo-600 transition-all" to={`/admin/campaign/jobs/${invoice.jobCardId}`} title="Open Job"><ArrowRight size={14} /></Link>
-                            <button className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-emerald-600 transition-all" onClick={() => setNotice(`${invoice.invoiceNo} marked for collection.`)} title="Collect"><CheckCircle2 size={14} /></button>
-                            <button className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-indigo-600 transition-all" onClick={() => window.print()} title="Print"><Printer size={14} /></button>
-                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </Motion.div>
-      </div>
-
-      {notice && (
-        <Motion.div 
-           className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 z-[200]"
-           initial={{ y: 100 }}
-           animate={{ y: 0 }}
-        >
-           <span className="text-xs font-black uppercase tracking-widest">{notice}</span>
-           <button onClick={() => setNotice('')}><X size={16} /></button>
-        </Motion.div>
-      )}
-    </Motion.div>
-  );
+const downloadInvoicePdf = async (invoice) => {
+  const el = document.getElementById(`inv-row-${invoice.invoiceNo}`);
+  if (!el) return;
+  const html2pdf = (await import('html2pdf.js')).default;
+  html2pdf().set({ margin: 8, filename: `${invoice.invoiceNo}.pdf`, html2canvas: { scale: 2 }, jsPDF: { format: 'a5' } }).from(el).save();
 };
 
-const KPIItem = ({ title, value, icon, color, bg, trend, negative }) => (
-  <div className="dash-kpi-card group hover:border-indigo-200 transition-all">
-    <div className="dash-kpi-header">
-      <div className="dash-kpi-icon" style={{ backgroundColor: bg, color: color }}>
-        {React.cloneElement(icon, { size: 18 })}
-      </div>
-      <div className={`dash-kpi-trend ${negative ? 'negative' : ''}`}>
-        {trend}
-      </div>
+const STATUS_STYLE = {
+  'Paid':           'bg-emerald-50 text-emerald-700',
+  'Partially Paid': 'bg-amber-50 text-amber-700',
+  'Unpaid':         'bg-red-50 text-red-700',
+};
+
+const CampaignBillingPage = () => {
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [toast, setToast] = useState(null);
+
+  const [payModal, setPayModal] = useState(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMode, setPayMode] = useState('UPI');
+  const [payLoading, setPayLoading] = useState(false);
+
+  const showToast = useCallback((msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await billingService.listInvoices();
+      setInvoices(list);
+    } catch {
+      showToast('Failed to load invoices.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCollectPayment = async () => {
+    if (!payAmount || Number(payAmount) <= 0) return showToast('Enter a valid amount.', 'error');
+    setPayLoading(true);
+    try {
+      await billingService.collectPayment(payModal.jobCardId, Number(payAmount), payMode);
+      setPayModal(null);
+      setPayAmount('');
+      showToast(`Payment of ${formatCurrency(payAmount)} recorded.`);
+      await load();
+    } catch (e) {
+      showToast(e.message || 'Payment failed.', 'error');
+    } finally {
+      setPayLoading(false);
+    }
+  };
+
+  const handleExport = () => {
+    const rows = filteredInvoices.map((inv) => [inv.invoiceNo, inv.jobCardId, inv.customer, inv.campaign, inv.totalAmount, inv.paidAmount, inv.balance, inv.paymentStatus, inv.paymentMode]);
+    const csv = [['Invoice', 'Job Card', 'Customer', 'Campaign', 'Total', 'Paid', 'Balance', 'Status', 'Mode'], ...rows].map((r) => r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'campaign_billing.csv'; a.click();
+  };
+
+  const filteredInvoices = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return invoices;
+    return invoices.filter((inv) =>
+      [inv.invoiceNo, inv.jobCardId, inv.customer, inv.campaign, inv.paymentStatus, inv.paymentMode]
+        .some((v) => String(v || '').toLowerCase().includes(q))
+    );
+  }, [invoices, search]);
+
+  const summary = useMemo(() => ({
+    total: invoices.length,
+    collected: invoices.reduce((s, i) => s + i.paidAmount, 0),
+    pending: invoices.reduce((s, i) => s + i.balance, 0),
+    unpaid: invoices.filter((i) => i.paymentStatus === 'Unpaid').length,
+  }), [invoices]);
+
+  return (
+    <div className="campaign-page">
+
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <Motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className={`fixed top-4 right-4 z-[9999] px-5 py-3 rounded-xl shadow-xl text-sm font-semibold flex items-center gap-2 ${toast.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+            {toast.type === 'error' ? <X size={16}/> : <CheckCircle2 size={16}/>} {toast.msg}
+          </Motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Header */}
+      <section className="breadcrumb-card">
+        <div className="breadcrumb">
+          <span>Admin</span><ChevronRight size={14}/><span>Campaign</span><ChevronRight size={14}/><strong>Billing & Payments</strong>
+        </div>
+        <div className="flex justify-between items-end flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 m-0">Billing & Payments</h1>
+            <p className="text-slate-500 text-sm m-0 mt-1">Campaign invoices, payment collection, UPI/Cash/Online tracking.</p>
+          </div>
+          <div className="flex gap-3">
+            <button className="icon-button" onClick={load}><RefreshCcw size={18} className={loading ? 'animate-spin' : ''}/></button>
+            <button className="secondary-button !h-10 !px-4 text-xs" onClick={() => showToast('Bulk reminder sent (placeholder).')}>
+              <MessageSquare size={16}/> Bulk Reminders
+            </button>
+            <button className="primary-button !h-10 !px-4 text-xs" onClick={handleExport}>
+              <Download size={16}/> Export CSV
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats */}
+      <section className="stats-grid">
+        {[
+          { label: 'Total Invoices',  value: loading ? '—' : summary.total,                    color: '#4f46e5', icon: <CreditCard size={16}/> },
+          { label: 'Collected',       value: loading ? '—' : formatCurrency(summary.collected), color: '#10b981', icon: <Wallet size={16}/> },
+          { label: 'Pending Balance', value: loading ? '—' : formatCurrency(summary.pending),   color: '#f59e0b', icon: <IndianRupee size={16}/> },
+          { label: 'Unpaid Jobs',     value: loading ? '—' : summary.unpaid,                   color: '#ef4444', icon: <AlertCircle size={16}/> },
+        ].map((s) => (
+          <div key={s.label} className="stat-card">
+            <div className="flex items-center justify-between mb-2">
+              <span className="stat-label">{s.label}</span>
+              <span style={{ color: s.color }}>{s.icon}</span>
+            </div>
+            <span className="stat-value" style={{ color: s.color }}>{s.value}</span>
+          </div>
+        ))}
+      </section>
+
+      {/* Table */}
+      <section className="table-card">
+        <div className="table-toolbar">
+          <div className="relative">
+            <input type="text" placeholder="Search invoice, job, customer..."
+              className="h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm w-72"
+              value={search} onChange={(e) => setSearch(e.target.value)}/>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-slate-400 gap-2">
+            <Loader2 size={20} className="animate-spin"/> Loading invoices...
+          </div>
+        ) : filteredInvoices.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+            <CreditCard size={36} className="mb-2 opacity-30"/>
+            <p className="text-sm font-semibold">No invoices found.</p>
+          </div>
+        ) : (
+          <div className="campaign-table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice ID</th>
+                  <th>Job Card</th>
+                  <th>Customer</th>
+                  <th>Campaign</th>
+                  <th>Total</th>
+                  <th>Paid</th>
+                  <th>Balance</th>
+                  <th>Status</th>
+                  <th>Mode</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInvoices.map((invoice) => (
+                  <tr key={invoice.invoiceNo} id={`inv-row-${invoice.invoiceNo}`}>
+                    <td className="font-mono text-xs font-black text-indigo-600">{invoice.invoiceNo}</td>
+                    <td>
+                      <Link className="text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors"
+                        to={`/admin/campaign/jobs?ticketId=${invoice.jobCardId}`}>
+                        {invoice.jobCardId}
+                      </Link>
+                    </td>
+                    <td className="font-semibold text-slate-800 text-sm">{invoice.customer}</td>
+                    <td className="text-xs text-slate-500 max-w-[120px] truncate">{invoice.campaign || '—'}</td>
+                    <td className="font-black text-slate-900">{formatCurrency(invoice.totalAmount)}</td>
+                    <td className="font-semibold text-emerald-700">{formatCurrency(invoice.paidAmount)}</td>
+                    <td>
+                      <span className={`font-black text-sm ${invoice.balance > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                        {formatCurrency(invoice.balance)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${STATUS_STYLE[invoice.paymentStatus] || 'bg-slate-50 text-slate-500'}`}>
+                        {invoice.paymentStatus}
+                      </span>
+                    </td>
+                    <td className="text-xs font-semibold text-slate-500">{invoice.paymentMode || '—'}</td>
+                    <td className="text-right">
+                      <div className="flex justify-end gap-1.5">
+                        <Link className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-indigo-600 transition-all"
+                          to={`/admin/campaign/jobs?ticketId=${invoice.jobCardId}`} title="Open Job">
+                          <ArrowRight size={14}/>
+                        </Link>
+                        {invoice.balance > 0 && (
+                          <button className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-emerald-600 transition-all"
+                            onClick={() => { setPayModal(invoice); setPayAmount(String(invoice.balance)); setPayMode('UPI'); }}
+                            title="Collect Payment">
+                            <CheckCircle2 size={14}/>
+                          </button>
+                        )}
+                        <button className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-indigo-600 transition-all"
+                          onClick={() => downloadInvoicePdf(invoice)} title="Download PDF">
+                          <Download size={14}/>
+                        </button>
+                        <button className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-slate-700 transition-all"
+                          onClick={() => showToast(`Reminder sent to ${invoice.customer}.`)} title="Send Reminder">
+                          <MessageSquare size={14}/>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Collect Payment Modal */}
+      <AnimatePresence>
+        {payModal && (
+          <div className="modal-overlay" onClick={() => setPayModal(null)}>
+            <Motion.div className="modal-card !max-w-sm"
+              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}>
+              <div className="modal-header">
+                <h3 className="text-lg font-black text-slate-900">Collect Payment</h3>
+                <button className="icon-button !border-none" onClick={() => setPayModal(null)}><X size={18}/></button>
+              </div>
+              <div className="modal-body space-y-4">
+                <div className="p-4 bg-slate-50 rounded-xl text-sm space-y-2">
+                  <div className="flex justify-between"><span className="text-slate-500 font-semibold">Customer</span><span className="font-black text-slate-900">{payModal.customer}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500 font-semibold">Invoice</span><span className="font-mono text-indigo-600 font-bold">{payModal.invoiceNo}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500 font-semibold">Balance</span><span className="font-black text-rose-600">{formatCurrency(payModal.balance)}</span></div>
+                </div>
+                <div className="flex gap-2">
+                  {['UPI', 'Cash', 'Online Link'].map((m) => (
+                    <button key={m} onClick={() => setPayMode(m)}
+                      className={`flex-1 h-10 rounded-xl border text-xs font-bold transition-colors ${payMode === m ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Amount (₹)</label>
+                  <input type="number" className="px-4 h-11 text-sm font-bold w-full"
+                    value={payAmount} onChange={(e) => setPayAmount(e.target.value)}/>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="primary-button w-full !h-11" onClick={handleCollectPayment} disabled={payLoading}>
+                  {payLoading ? <Loader2 size={16} className="animate-spin"/> : <CheckCircle2 size={16}/>} Record Payment
+                </button>
+              </div>
+            </Motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
-    <div>
-      <p className="dash-kpi-label">{title}</p>
-      <h3 className="dash-kpi-value text-xl">{value}</h3>
-    </div>
-    <div className="dash-kpi-sparkline h-6">
-       <svg viewBox="0 0 100 40" className="w-full h-full">
-          <path d="M0,35 Q15,10 30,25 T60,15 T100,5" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" opacity="0.3" />
-       </svg>
-    </div>
-  </div>
-);
+  );
+};
 
 export default CampaignBillingPage;

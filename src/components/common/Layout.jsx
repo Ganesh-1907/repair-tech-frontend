@@ -3,7 +3,7 @@ import Sidebar from './Sidebar';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ChevronDown, FileText, LogOut, Moon, Plus, Search, Sun, Menu } from 'lucide-react';
+import { ChevronDown, FileText, LogOut, Moon, Plus, Sun, Menu } from 'lucide-react';
 import { getPageMetadata } from '../../config/pageMetadata';
 
 const actionIcons = {
@@ -18,15 +18,10 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const [localSearchByPath, setLocalSearchByPath] = useState({});
   const accountMenuRef = useRef(null);
   const pageMeta = useMemo(() => getPageMetadata(location.pathname), [location.pathname]);
   const primaryAction = pageMeta.primaryAction;
   const PrimaryActionIcon = actionIcons[primaryAction?.icon] || Plus;
-  const currentSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
-  const quickSearch = pageMeta.searchParam
-    ? currentSearchParams.get(pageMeta.searchParam) || ''
-    : localSearchByPath[location.pathname] || '';
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -59,35 +54,6 @@ const Layout = ({ children }) => {
     setIsMobileNavOpen(false);
   };
 
-  const handleQuickSearchSubmit = (event) => {
-    event.preventDefault();
-    if (!pageMeta.searchParam) return;
-    const params = new URLSearchParams(currentSearchParams);
-    const query = quickSearch.trim();
-    if (query) {
-      params.set(pageMeta.searchParam, query);
-    } else {
-      params.delete(pageMeta.searchParam);
-    }
-    navigate(`${location.pathname}${params.toString() ? `?${params.toString()}` : ''}`);
-  };
-
-  const handleQuickSearchChange = (event) => {
-    const nextValue = event.target.value;
-    if (!pageMeta.searchParam) {
-      setLocalSearchByPath((current) => ({ ...current, [location.pathname]: nextValue }));
-      return;
-    }
-
-    const params = new URLSearchParams(currentSearchParams);
-    if (nextValue.trim()) {
-      params.set(pageMeta.searchParam, nextValue);
-    } else {
-      params.delete(pageMeta.searchParam);
-    }
-    navigate(`${location.pathname}${params.toString() ? `?${params.toString()}` : ''}`, { replace: true });
-  };
-
   const handleLogout = () => {
     setIsAccountMenuOpen(false);
     logout();
@@ -110,20 +76,6 @@ const Layout = ({ children }) => {
               <h1>{pageMeta.title}</h1>
               {pageMeta.subtitle && <p>{pageMeta.subtitle}</p>}
             </div>
-          </div>
-
-          <div className="header-center">
-            <form className="search-container" role="search" onSubmit={handleQuickSearchSubmit}>
-              <Search size={18} className="search-icon" />
-              <input
-                type="text"
-                placeholder={pageMeta.searchPlaceholder}
-                aria-label={pageMeta.searchPlaceholder}
-                className="search-input"
-                value={quickSearch}
-                onChange={handleQuickSearchChange}
-              />
-            </form>
           </div>
 
           <div className="header-right">

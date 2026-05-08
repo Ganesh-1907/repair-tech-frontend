@@ -7,20 +7,13 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
-  FileText,
-  Mail,
-  MapPin,
+  LogIn,
+  LogOut,
   PenLine,
-  Phone,
-  PlayCircle,
   ReceiptText,
   Search,
-  TrendingUp,
-  Upload,
-  User,
   UserCheck,
   Wallet,
-  Wrench,
   X,
 } from 'lucide-react';
 import { staffManagementService } from '../services/staffManagementService';
@@ -58,10 +51,22 @@ const emptySummary = {
   expenses: [],
   attendanceLogs: [],
   todayAttendance: [],
+  attendance: {
+    scheduledStart: '',
+    scheduledEnd: '',
+    dayCutoff: '',
+    clockIn: null,
+    clockOut: null,
+    isClockedIn: false,
+    canClockIn: true,
+    canClockOut: false,
+    lateMinutes: 0,
+    monthlyLateCount: 0,
+    overtimeMinutes: 0,
+    missedClockOut: null,
+    status: 'Not clocked in',
+  },
 };
-
-const paymentModes = ['Cash', 'UPI', 'Card', 'Online', 'Bank Transfer', 'Cheque'];
-const expenseCategories = ['Fuel', 'TA/DA', 'Tools', 'Parking', 'Meals', 'Spare Purchase', 'Other'];
 
 const currencyFormatter = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -77,15 +82,10 @@ const formatDate = (value, options = {}) => {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', ...options });
 };
 
-const formatDateTime = (value) => {
+const formatTime = (value) => {
   const date = value ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-};
-
-const getInitials = (name = '') => {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return parts.length ? parts.slice(0, 2).map((part) => part[0]).join('').toUpperCase() : 'S';
+  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 };
 
 const getStatusTone = (status = '') => {
@@ -95,13 +95,6 @@ const getStatusTone = (status = '') => {
   if (value.includes('pending') || value.includes('quotation') || value.includes('assigned')) return 'warning';
   if (value.includes('cancel') || value.includes('missed')) return 'danger';
   return 'neutral';
-};
-
-const isClosedStatus = (status = '') => ['closed', 'delivered', 'complete', 'paid'].some((item) => String(status).toLowerCase().includes(item));
-
-const getTaskAmount = (task = {}) => {
-  const partsTotal = (task.partsUsed || []).reduce((total, part) => total + Number(part.quantity || 0) * Number(part.unitPrice || 0), 0);
-  return Number(task.quote?.estimate || task.quote?.amount || task.amount || partsTotal + Number(task.labourCharge || 0) + Number(task.tax || 0) - Number(task.discount || 0) || 0);
 };
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
@@ -158,19 +151,54 @@ const StaffPortalDashboard = () => {
   const stats = summary.stats || emptySummary.stats;
   const totalCollection = stats.totalPayments || 0;
   const totalExpenses = stats.totalExpenses || 0;
+  const attendance = summary.attendance || emptySummary.attendance;
+  const clockInTime = attendance.clockIn?.loggedAt;
+  const clockOutTime = attendance.clockOut?.loggedAt;
+  const isOvertimeNow = attendance.scheduledEnd && new Date() > new Date(attendance.scheduledEnd);
+  const attendanceAlert = attendance.missedClockOut
+    ? `Previous day is not clocked out. Contact admin to regularize ${formatDate(attendance.missedClockOut.loggedAt)} attendance.`
+    : attendance.clockIn && attendance.lateMinutes > 0
+      ? `You logged in ${attendance.lateMinutes} min late. This month it is your ${attendance.monthlyLateCount}${getOrdinalSuffix(attendance.monthlyLateCount)} late login.`
+      : '';
 
-  const handleStatusUpdate = async (task, status) => {
-    if (!task || isClosedStatus(task.status)) return;
+  const handleClockIn = async () => {
     setSubmitting(true);
     try {
-      await staffManagementService.updateTaskStatus(task.id, status);
-      setNotice(`Task moved to ${status}.`);
-      await loadSummary(task.id);
+      const result = await staffManagementService.clockIn();
+      const lateMinutes = Number(result.lateMinutes || 0);
+      const lateCount = Number(result.monthlyLateCount || 0);
+      setNotice(lateMinutes > 0
+        ? `You logged in ${lateMinutes} min late. This month it is your ${lateCount}${getOrdinalSuffix(lateCount)} late login.`
+        : 'Clock-in saved.');
+      await loadSummary();
     } catch (error) {
-      setNotice(error.response?.data?.message || error.message || 'Status update failed.');
+      setNotice(error.response?.data?.message || error.message || 'Clock-in failed.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const submitClockOut = async (reason = '') => {
+    setSubmitting(true);
+    try {
+      const result = await staffManagementService.clockOut({ reason });
+      const overtimeMinutes = Number(result.overtimeMinutes || 0);
+      setNotice(overtimeMinutes > 0 ? `Clock-out saved with ${overtimeMinutes} min extra work.` : 'Clock-out saved.');
+      setModal(null);
+      await loadSummary();
+    } catch (error) {
+      setNotice(error.response?.data?.message || error.message || 'Clock-out failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleClockOut = () => {
+    if (isOvertimeNow) {
+      setModal({ type: 'clockout-reason' });
+      return;
+    }
+    submitClockOut();
   };
 
   const handleCloseJob = async (payload) => {
@@ -206,17 +234,33 @@ const StaffPortalDashboard = () => {
         </div>
       )}
 
+      {!notice && attendanceAlert && (
+        <div className="staff-attendance-alert" role="status">
+          <AlertCircle size={17} />
+          <span>{attendanceAlert}</span>
+        </div>
+      )}
+
       <section className="staff-hero-band">
         <div className="staff-hero-copy">
           <span className="staff-eyebrow">Staff Dashboard</span>
           <h1>Good Morning, {profile.name || 'Staff'}</h1>
           <div className="staff-hero-meta">
             <span><Calendar size={15} /> {formatDate(summary.today, { weekday: 'short' })}</span>
-            <span><UserCheck size={15} /> {profile.attendanceStatus || 'Present'}</span>
+            <span><UserCheck size={15} /> {attendance.status || profile.attendanceStatus || 'Not clocked in'}</span>
             <span><Briefcase size={15} /> {stats.assignedTasks || 0} assigned</span>
           </div>
         </div>
       </section>
+
+      <AttendancePanel
+        attendance={attendance}
+        submitting={submitting}
+        clockInTime={clockInTime}
+        clockOutTime={clockOutTime}
+        onClockIn={handleClockIn}
+        onClockOut={handleClockOut}
+      />
 
       <section className="staff-stat-grid">
         <StatCard icon={Briefcase} label="Assigned" value={stats.assignedTasks} meta={`${stats.todayAssigned || 0} today`} tone="blue" />
@@ -224,7 +268,6 @@ const StaffPortalDashboard = () => {
         <StatCard icon={AlertCircle} label="Pending" value={stats.pendingTasks} meta={`${stats.inProgressTasks || 0} in progress`} tone="amber" />
         <StatCard icon={Wallet} label="Today Payments" value={formatCurrency(stats.todayPayments)} meta={`${formatCurrency(totalCollection)} total`} tone="teal" />
         <StatCard icon={ReceiptText} label="Daily Expenses" value={formatCurrency(stats.todayExpenses)} meta={`${formatCurrency(totalExpenses)} total`} tone="rose" />
-        <StatCard icon={TrendingUp} label="Net Revenue" value={formatCurrency(stats.netRevenue)} meta="Collection minus expense" tone="violet" />
       </section>
 
       <div className="card" style={{ padding: '24px' }}>
@@ -249,9 +292,65 @@ const StaffPortalDashboard = () => {
           onSubmit={handleCloseJob}
         />
       )}
+
+      {modal?.type === 'clockout-reason' && (
+        <ClockOutReasonModal
+          submitting={submitting}
+          scheduledEnd={attendance.scheduledEnd}
+          onClose={() => setModal(null)}
+          onSubmit={submitClockOut}
+        />
+      )}
     </div>
   );
 };
+
+const getOrdinalSuffix = (value) => {
+  const number = Number(value || 0);
+  const mod10 = number % 10;
+  const mod100 = number % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'st';
+  if (mod10 === 2 && mod100 !== 12) return 'nd';
+  if (mod10 === 3 && mod100 !== 13) return 'rd';
+  return 'th';
+};
+
+const AttendancePanel = ({ attendance, submitting, clockInTime, clockOutTime, onClockIn, onClockOut }) => (
+  <section className="staff-attendance-card">
+    <div className="staff-attendance-main">
+      <div className="staff-attendance-icon"><Clock size={22} /></div>
+      <div>
+        <span className="staff-eyebrow">Attendance</span>
+        <h2>{attendance.status || 'Not clocked in'}</h2>
+      </div>
+    </div>
+    <div className="staff-attendance-times">
+      <div>
+        <small>Clock in</small>
+        <strong>{formatTime(clockInTime)}</strong>
+        {attendance.lateMinutes > 0 && <span>{attendance.lateMinutes} min late</span>}
+      </div>
+      <div>
+        <small>Clock out</small>
+        <strong>{formatTime(clockOutTime)}</strong>
+        {!clockOutTime && clockInTime && <span>Not clocked out</span>}
+      </div>
+      <div>
+        <small>Late this month</small>
+        <strong>{attendance.monthlyLateCount || 0}</strong>
+        <span>times</span>
+      </div>
+    </div>
+    <div className="staff-attendance-buttons">
+      <button type="button" onClick={onClockIn} disabled={submitting || !attendance.canClockIn}>
+        <LogIn size={16} /> Clock In
+      </button>
+      <button type="button" onClick={onClockOut} disabled={submitting || !attendance.canClockOut}>
+        <LogOut size={16} /> Clock Out
+      </button>
+    </div>
+  </section>
+);
 
 const StatCard = ({ icon, label, value, meta, tone }) => (
   <div className={`staff-stat-card tone-${tone}`}>
@@ -377,6 +476,40 @@ const CloseJobModal = ({ task, submitting, onClose, onSubmit }) => {
         <div className="staff-form-actions">
           <button type="button" onClick={onClose}>Cancel</button>
           <button type="submit" disabled={submitting}>{submitting ? 'Closing...' : 'Close Job'}</button>
+        </div>
+      </form>
+    </ModalShell>
+  );
+};
+
+const ClockOutReasonModal = ({ submitting, scheduledEnd, onClose, onSubmit }) => {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!reason.trim()) {
+      setError('Reason is mandatory for extra work.');
+      return;
+    }
+    onSubmit(reason.trim());
+  };
+
+  return (
+    <ModalShell title="Extra Work Reason" onClose={onClose}>
+      <form className="staff-form" onSubmit={handleSubmit}>
+        <div className="staff-form-wide staff-overtime-note">
+          <Clock size={18} />
+          <span>Scheduled logout was {formatTime(scheduledEnd)}. Add the reason before clock-out.</span>
+        </div>
+        <label className="staff-form-wide">
+          <span>Reason</span>
+          <textarea rows="4" value={reason} onChange={(event) => { setReason(event.target.value); setError(''); }} placeholder="Example: customer site work extended, emergency repair, pending delivery..." />
+          {error && <small className="staff-form-error">{error}</small>}
+        </label>
+        <div className="staff-form-actions">
+          <button type="button" onClick={onClose}>Cancel</button>
+          <button type="submit" disabled={submitting}>{submitting ? 'Saving...' : 'Clock Out'}</button>
         </div>
       </form>
     </ModalShell>

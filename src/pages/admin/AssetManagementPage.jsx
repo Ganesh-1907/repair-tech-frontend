@@ -1,241 +1,211 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { motion as Motion } from 'framer-motion';
-import { 
-  Search, 
-  Monitor, 
-  Smartphone, 
-  Printer, 
-  Server, 
-  Cpu, 
-  Plus, 
-  Filter, 
-  MoreVertical, 
-  ArrowRight, 
-  ShieldCheck, 
-  Activity, 
-  History, 
-  Settings2, 
-  X, 
-  QrCode, 
-  UserPlus, 
-  CheckCircle2, 
-  AlertCircle, 
-  Clock, 
-  IndianRupee,
-  MapPin,
-  Tag,
-  Link as LinkIcon,
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  CheckCircle2,
+  Clock,
   HardDrive,
-  Settings,
-  TrendingUp,
-  Box
+  Monitor,
+  Plus,
+  Printer,
+  QrCode,
+  Search,
+  Settings2,
+  Wrench,
+  X,
 } from 'lucide-react';
 import { assetManagementService } from '../../services/assetManagementService';
-import './DashboardPremiumStyles.css';
+import '../InventoryPremiumStyles.css';
+
+const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle'];
+
+const normalizeAssetStatus = (status) => {
+  if (status === 'Available' || status === 'Rented' || status === 'Sold') return 'Active';
+  if (status === 'Under Repair') return 'In repair';
+  return status || 'Idle';
+};
+
+const statusTone = (status) => {
+  switch (normalizeAssetStatus(status)) {
+    case 'Active': return 'green';
+    case 'In repair': return 'amber';
+    case 'Replaced': return 'red';
+    case 'Idle': return 'slate';
+    default: return 'blue';
+  }
+};
 
 const AssetManagementPage = () => {
   const [assets, setAssets] = useState([]);
-  const [stats, setStats] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     loadData();
   }, []);
 
   async function loadData() {
-    const [nextAssets, nextStats] = await Promise.all([
-      assetManagementService.getAssets(),
-      assetManagementService.getStats(),
-    ]);
-    setAssets(nextAssets);
-    setStats(nextStats);
+    try {
+      const nextAssets = await assetManagementService.getAssets();
+      setAssets(nextAssets);
+    } catch (error) {
+      setNotice(error.response?.data?.message || error.message || 'Asset records failed to load.');
+    }
   }
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
-  };
+  const counts = useMemo(() => {
+    const next = { Active: 0, 'In repair': 0, Replaced: 0, Idle: 0, Printer: 0, Laptop: 0 };
+    assets.forEach((asset) => {
+      const status = normalizeAssetStatus(asset.status);
+      if (next[status] !== undefined) next[status] += 1;
+      if (String(asset.type).toLowerCase() === 'printer') next.Printer += 1;
+      if (String(asset.type).toLowerCase() === 'laptop') next.Laptop += 1;
+    });
+    return next;
+  }, [assets]);
 
   const filteredAssets = useMemo(() => {
-    return assets.filter(asset => {
-      const matchesSearch = asset.assetTag.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          asset.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          asset.model.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = filterStatus === 'All' || asset.status === filterStatus;
+    const query = searchTerm.trim().toLowerCase();
+    return assets.filter((asset) => {
+      const haystack = [
+        asset.assetTag,
+        asset.id,
+        asset.serialNumber,
+        asset.type,
+        asset.model,
+        asset.configuration,
+        asset.configurations,
+        asset.addOnParts,
+      ].join(' ').toLowerCase();
+      const matchesSearch = !query || haystack.includes(query);
+      const matchesStatus = filterStatus === 'All' || normalizeAssetStatus(asset.status) === filterStatus;
       return matchesSearch && matchesStatus;
     });
   }, [assets, searchTerm, filterStatus]);
 
-  const getAssetIcon = (type) => {
-    const size = 20;
-    switch (type.toLowerCase()) {
-      case 'laptop': return <Monitor size={size} />;
-      case 'desktop': return <Cpu size={size} />;
-      case 'printer': return <Printer size={size} />;
-      case 'server': return <Server size={size} />;
-      case 'mobile': return <Smartphone size={size} />;
-      default: return <HardDrive size={size} />;
-    }
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Available': return 'success';
-      case 'Rented': return 'primary';
-      case 'Sold': return 'info';
-      case 'Under Repair': return 'warning';
-      case 'Idle': return 'muted';
-      case 'Replaced': return 'danger';
-      case 'Scrapped': return 'danger';
-      default: return 'primary';
-    }
-  };
-
-  if (!stats.totalAssets) return null;
-
   return (
-    <Motion.div 
-      className="premium-dashboard"
-      initial="hidden"
-      animate="visible"
-      variants={containerVariants}
-    >
-      {/* Asset Header */}
-      <div className="flex justify-between items-center mb-10">
-        
-        <div className="flex gap-4">
-          <button className="h-12 px-6 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
-             <QrCode size={14} className="text-indigo-600" /> Bulk QR Print
+    <div className="inventory-page">
+      {notice && <div className="inventory-notice">{notice}</div>}
+
+      <section className="inventory-hero">
+        <div>
+          <span className="inventory-eyebrow">Asset Management</span>
+          <h1>Printer and laptop lifecycle</h1>
+          <p>Each device is tracked individually with Device ID, serial number, model, configurations, add-on parts, and lifecycle status.</p>
+        </div>
+        <div className="inventory-hero-actions">
+          <button className="inventory-secondary-button" type="button">
+            <QrCode size={17} /> Bulk QR Print
           </button>
-          <button className="h-12 px-8 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-3 hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20" onClick={() => setShowAddModal(true)}>
-             <Plus size={18} strokeWidth={3} /> Onboard Physical Asset
+          <button className="inventory-primary-button" type="button" onClick={() => setShowAddModal(true)}>
+            <Plus size={17} /> Add Asset
           </button>
         </div>
-      </div>
+      </section>
 
-      {/* Asset KPI Grid (7-Columns) */}
-      <div className="dash-kpi-grid">
-        <KPIItem title="Total Fleet" value={stats.totalAssets} icon={<Monitor />} color="#6366f1" bg="#e0e7ff" trend="+5 New" />
-        <KPIItem title="Portfolio Value" value={`₹${(stats.totalValue / 100000).toFixed(1)}L`} icon={<IndianRupee />} color="#06b6d4" bg="#cffafe" trend="+12%" />
-        <KPIItem title="Active Rentals" value={stats.rented} icon={<UserPlus />} color="#10b981" bg="#dcfce7" trend="Synced" />
-        <KPIItem title="Maintenance" value={stats.underRepair} icon={<Settings2 />} color="#ef4444" bg="#fef2f2" trend="Review" negative={true} />
-        <KPIItem title="Ready Assets" value={stats.available} icon={<CheckCircle2 />} color="#f59e0b" bg="#fef3c7" trend="Optimal" />
-        <KPIItem title="Idle Pool" value={stats.idle} icon={<Clock />} color="#8b5cf6" bg="#ede9fe" trend="Low Usage" negative={true} />
-        <KPIItem title="Asset Pulse" value="Stable" icon={<Activity />} color="#3b82f6" bg="#dbeafe" trend="Healthy" />
-      </div>
+      <section className="inventory-kpis">
+        <MetricCard icon={<HardDrive />} label="Total Devices" value={assets.length} tone="indigo" />
+        <MetricCard icon={<CheckCircle2 />} label="Active" value={counts.Active} tone="green" />
+        <MetricCard icon={<Wrench />} label="In Repair" value={counts['In repair']} tone="amber" />
+        <MetricCard icon={<Settings2 />} label="Replaced" value={counts.Replaced} tone="red" />
+        <MetricCard icon={<Clock />} label="Idle" value={counts.Idle} tone="slate" />
+        <MetricCard icon={<Printer />} label="Printers" value={counts.Printer} tone="blue" />
+        <MetricCard icon={<Monitor />} label="Laptops" value={counts.Laptop} tone="indigo" />
+      </section>
 
-      <div className="dash-ops-grid">
-        <Motion.div className="dash-card col-span-3" variants={itemVariants}>
-          <div className="dash-card-header">
-             <div className="flex gap-4 items-center flex-1">
-                <div className="relative w-96">
-                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                   <input 
-                      type="text" 
-                      placeholder="Search Tag, Serial or Model..." 
-                      className="h-12 w-full pl-12 pr-6 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-medium focus:ring-4 focus:ring-indigo-600/10 transition-all"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                   />
-                </div>
-                <div className="flex gap-2">
-                   {['All', 'Available', 'Rented', 'Sold', 'Under Repair'].map(status => (
-                      <button 
-                         key={status}
-                         onClick={() => setFilterStatus(status)}
-                         className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${filterStatus === status ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-500 hover:border-indigo-200'}`}
-                      >
-                         {status}
-                      </button>
-                   ))}
-                </div>
-             </div>
+      <section className="inventory-panel">
+        <div className="inventory-toolbar">
+          <div className="inventory-tabs">
+            <button className="active" type="button"><HardDrive size={16} /> Asset Listing</button>
           </div>
-          
-          <div className="overflow-x-auto">
-             <table className="cmc-table">
-                <thead>
-                   <tr>
-                      <th className="pl-8">Asset Tag / Serial</th>
-                      <th>Specifications</th>
-                      <th>Status</th>
-                      <th>Assignment</th>
-                      <th>Value</th>
-                      <th className="pr-8 text-right">Actions</th>
-                   </tr>
-                </thead>
-                <tbody>
-                   {filteredAssets.map(asset => (
-                      <tr key={asset.id}>
-                         <td className="pl-8">
-                            <div className="flex items-center gap-3">
-                               <div className="w-10 h-10 bg-slate-100 text-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
-                                  {getAssetIcon(asset.type)}
-                               </div>
-                               <div>
-                                  <p className="text-xs font-black uppercase tracking-tight">{asset.assetTag}</p>
-                                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">S/N: {asset.serialNumber}</p>
-                               </div>
-                            </div>
-                         </td>
-                         <td>
-                            <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest">{asset.brand} {asset.model}</p>
-                            <p className="text-[9px] text-slate-400 font-medium truncate max-w-[150px]">{asset.configuration}</p>
-                         </td>
-                         <td><span className={`dash-tag dash-tag-${getStatusColor(asset.status)}`}>{asset.status}</span></td>
-                         <td>
-                            {asset.assignedCustomer ? (
-                               <div className="flex items-center gap-2">
-                                  <LinkIcon size={12} className="text-indigo-600" />
-                                  <span className="text-[10px] font-black uppercase">{asset.assignedCustomer}</span>
-                               </div>
-                            ) : (
-                               <span className="text-[9px] font-bold text-slate-400 uppercase">{asset.location}</span>
-                            )}
-                         </td>
-                         <td><span className="text-xs font-black">₹{asset.currentValue?.toLocaleString()}</span></td>
-                         <td className="pr-8 text-right">
-                            <button className="w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg hover:text-indigo-600 transition-all"><ArrowRight size={14} /></button>
-                         </td>
-                      </tr>
-                   ))}
-                </tbody>
-             </table>
+          <div className="inventory-search">
+            <Search size={17} />
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search device ID, serial number, model, configuration..."
+            />
           </div>
-        </Motion.div>
-      </div>
+        </div>
 
-      {showAddModal && <AddAssetModal onClose={() => setShowAddModal(false)} onSave={async () => { await loadData(); setShowAddModal(false); }} />}
-    </Motion.div>
+        <div className="inventory-filter-row">
+          {['All', ...ASSET_STATUSES].map((status) => (
+            <button key={status} className={filterStatus === status ? 'active' : ''} onClick={() => setFilterStatus(status)}>
+              {status}
+            </button>
+          ))}
+        </div>
+
+        <AssetTable assets={filteredAssets} />
+      </section>
+
+      {showAddModal && (
+        <AddAssetModal
+          onClose={() => setShowAddModal(false)}
+          onSave={async () => {
+            await loadData();
+            setShowAddModal(false);
+          }}
+        />
+      )}
+    </div>
   );
 };
 
-const KPIItem = ({ title, value, icon, color, bg, trend, negative }) => (
-  <div className="dash-kpi-card group hover:border-indigo-200 transition-all">
-    <div className="dash-kpi-header">
-      <div className="dash-kpi-icon" style={{ backgroundColor: bg, color: color }}>
-        {React.cloneElement(icon, { size: 20 })}
-      </div>
-      <div className={`dash-kpi-trend ${negative ? 'negative' : ''}`}>
-        {trend}
-      </div>
-    </div>
+const MetricCard = ({ icon, label, value, tone }) => (
+  <div className={`inventory-metric metric-${tone}`}>
+    <div className="inventory-metric-icon">{React.cloneElement(icon, { size: 21 })}</div>
     <div>
-      <p className="dash-kpi-label">{title}</p>
-      <h3 className="dash-kpi-value">{value}</h3>
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
-    <div className="dash-kpi-sparkline">
-       <svg viewBox="0 0 100 40" className="w-full h-full">
-          <path d="M0,35 Q15,10 30,25 T60,15 T100,5" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" opacity="0.3" />
-       </svg>
-    </div>
+  </div>
+);
+
+const DeviceIcon = ({ type }) => {
+  const normalized = String(type || '').toLowerCase();
+  if (normalized === 'printer') return <Printer size={20} />;
+  if (normalized === 'laptop') return <Monitor size={20} />;
+  return <HardDrive size={20} />;
+};
+
+const AssetTable = ({ assets }) => (
+  <div className="inventory-table-wrap">
+    <table className="inventory-table asset-table">
+      <thead>
+        <tr>
+          <th>Device ID / Serial Number</th>
+          <th>Type</th>
+          <th>Model</th>
+          <th>Configurations</th>
+          <th>Add-on Parts</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {assets.map((asset) => (
+          <tr key={asset.id}>
+            <td>
+              <div className="inventory-device-cell">
+                <div className="inventory-device-icon"><DeviceIcon type={asset.type} /></div>
+                <div>
+                  <strong>{asset.assetTag || asset.id}</strong>
+                  <span>S/N: {asset.serialNumber || '-'}</span>
+                </div>
+              </div>
+            </td>
+            <td>{asset.type || '-'}</td>
+            <td>{asset.model || '-'}</td>
+            <td className="inventory-muted-cell">{asset.configuration || asset.configurations || '-'}</td>
+            <td className="inventory-muted-cell">{asset.addOnParts || '-'}</td>
+            <td><span className={`inventory-status ${statusTone(asset.status)}`}>{normalizeAssetStatus(asset.status)}</span></td>
+          </tr>
+        ))}
+        {assets.length === 0 && (
+          <tr><td colSpan="6" className="inventory-empty">No assets match this view.</td></tr>
+        )}
+      </tbody>
+    </table>
   </div>
 );
 
@@ -243,95 +213,90 @@ const AddAssetModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
     assetTag: '',
     serialNumber: '',
-    type: 'Laptop',
-    brand: '',
+    type: 'Printer',
     model: '',
     configuration: '',
-    purchaseDate: '',
-    purchasePrice: '',
-    currentValue: '',
-    location: 'Main Warehouse',
-    notes: ''
+    addOnParts: '',
+    status: 'Active',
   });
+  const [errors, setErrors] = useState({});
 
-  const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const update = (field, value) => setFormData((current) => ({ ...current, [field]: value }));
 
   const handleSave = async () => {
+    const nextErrors = {};
+    if (!formData.assetTag.trim()) nextErrors.assetTag = 'Device ID is required';
+    if (!formData.serialNumber.trim()) nextErrors.serialNumber = 'Serial number is required';
+    if (!formData.model.trim()) nextErrors.model = 'Model is required';
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length) return;
+
     await assetManagementService.addAsset({
       ...formData,
-      purchasePrice: Number(formData.purchasePrice),
-      currentValue: Number(formData.currentValue) || Number(formData.purchasePrice)
+      configurations: formData.configuration,
+      purchasePrice: 0,
+      currentValue: 0,
     });
     await onSave();
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-8">
-      <div className="bg-white rounded-[56px] w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
-         <div className="p-10 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-            <div className="flex items-center gap-6">
-               <div className="w-16 h-16 bg-indigo-600 text-white rounded-[24px] flex items-center justify-center shadow-xl">
-                  <Monitor size={32} />
-               </div>
-               <div>
-                  <h3 className="text-2xl font-black text-slate-900">Onboard Asset</h3>
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-widest mt-1">Enroll company-owned physical hardware</p>
-               </div>
-            </div>
-            <button onClick={onClose} className="w-12 h-12 flex items-center justify-center bg-white rounded-full shadow-lg text-slate-400 hover:text-slate-900 transition-all"><X size={24} /></button>
-         </div>
-
-         <div className="flex-1 overflow-y-auto p-10 space-y-8">
-            <div className="grid grid-cols-2 gap-6">
-               <FormGroup label="Asset Tag" placeholder="RT-LAP-101" value={formData.assetTag} onChange={e => handleChange('assetTag', e.target.value)} />
-               <FormGroup label="Serial Number" placeholder="S/N: XXX-XXX" value={formData.serialNumber} onChange={e => handleChange('serialNumber', e.target.value)} />
-            </div>
-            <div className="grid grid-cols-3 gap-6">
-               <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Category</label>
-                  <select className="h-12 w-full px-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black" value={formData.type} onChange={e => handleChange('type', e.target.value)}>
-                     <option>Laptop</option>
-                     <option>Desktop</option>
-                     <option>Printer</option>
-                     <option>Server</option>
-                  </select>
-               </div>
-               <FormGroup label="Brand" placeholder="Dell" value={formData.brand} onChange={e => handleChange('brand', e.target.value)} />
-               <FormGroup label="Model" placeholder="Latitude" value={formData.model} onChange={e => handleChange('model', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-               <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Configuration</label>
-               <textarea className="w-full p-4 bg-slate-50 border border-slate-100 rounded-3xl text-xs font-medium min-h-[100px]" placeholder="i7, 16GB, 512GB..." value={formData.configuration} onChange={e => handleChange('configuration', e.target.value)} />
-            </div>
-            <div className="grid grid-cols-3 gap-6">
-               <FormGroup label="Purchase Date" type="date" value={formData.purchaseDate} onChange={e => handleChange('purchaseDate', e.target.value)} />
-               <FormGroup label="Price (₹)" type="number" value={formData.purchasePrice} onChange={e => handleChange('purchasePrice', e.target.value)} />
-               <FormGroup label="Location" value={formData.location} onChange={e => handleChange('location', e.target.value)} />
-            </div>
-         </div>
-
-         <div className="p-10 bg-slate-50 border-t border-slate-100 flex justify-end gap-4">
-            <button className="h-14 px-8 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400" onClick={onClose}>Cancel</button>
-            <button className="h-14 px-12 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl" onClick={handleSave}>Enroll Asset</button>
-         </div>
+    <div className="inventory-modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="inventory-modal" role="dialog" aria-modal="true" aria-labelledby="asset-modal-title">
+        <header>
+          <div>
+            <h2 id="asset-modal-title">Add Asset</h2>
+            <p>Track each printer or laptop individually.</p>
+          </div>
+          <button onClick={onClose} title="Close"><X size={20} /></button>
+        </header>
+        <div className="inventory-modal-body">
+          <div className="inventory-form-grid two">
+            <Field label="Device ID" error={errors.assetTag}>
+              <input value={formData.assetTag} onChange={(event) => update('assetTag', event.target.value)} placeholder="RT-PRN-001" />
+            </Field>
+            <Field label="Serial Number" error={errors.serialNumber}>
+              <input value={formData.serialNumber} onChange={(event) => update('serialNumber', event.target.value)} placeholder="SN-4582-XL" />
+            </Field>
+          </div>
+          <div className="inventory-form-grid three">
+            <Field label="Type">
+              <select value={formData.type} onChange={(event) => update('type', event.target.value)}>
+                <option>Printer</option>
+                <option>Laptop</option>
+              </select>
+            </Field>
+            <Field label="Model" error={errors.model}>
+              <input value={formData.model} onChange={(event) => update('model', event.target.value)} placeholder="HP LaserJet / Dell Latitude" />
+            </Field>
+            <Field label="Status">
+              <select value={formData.status} onChange={(event) => update('status', event.target.value)}>
+                {ASSET_STATUSES.map((status) => <option key={status}>{status}</option>)}
+              </select>
+            </Field>
+          </div>
+          <Field label="Configurations">
+            <textarea value={formData.configuration} onChange={(event) => update('configuration', event.target.value)} placeholder="Processor, RAM, storage, printer speed, tray capacity..." />
+          </Field>
+          <Field label="Add-on Parts">
+            <textarea value={formData.addOnParts} onChange={(event) => update('addOnParts', event.target.value)} placeholder="Extra tray, duplex unit, RAM upgrade, docking station..." />
+          </Field>
+        </div>
+        <footer>
+          <button className="inventory-secondary-button" onClick={onClose}>Cancel</button>
+          <button className="inventory-primary-button" onClick={handleSave}>Save Asset</button>
+        </footer>
       </div>
     </div>
   );
 };
 
-const FormGroup = ({ label, type = 'text', placeholder, value, onChange }) => (
-  <div className="space-y-2">
-    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{label}</label>
-    <input 
-      type={type} 
-      className="h-12 w-full px-4 bg-slate-50 border border-slate-100 rounded-2xl text-xs font-black focus:ring-4 focus:ring-indigo-600/10 focus:bg-white transition-all" 
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-    />
-  </div>
+const Field = ({ label, error, children }) => (
+  <label className="inventory-field">
+    <span>{label}</span>
+    {children}
+    {error && <small>{error}</small>}
+  </label>
 );
 
 export default AssetManagementPage;

@@ -1,0 +1,456 @@
+.repair-pricing-modal {
+  width: min(960px, 94vw);
+  max-width: 94vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.28);
+}
+
+.repair-pricing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.repair-pricing-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.repair-pricing-ticket {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #4f46e5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.repair-pricing-label,
+.repair-pricing-input-labels span,
+.repair-pricing-labour-input > span,
+.repair-pricing-table-head span,
+.repair-pricing-total-row span:nth-child(2) {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.repair-pricing-header h2 {
+  margin: 4px 0 0;
+  color: #0f172a;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.repair-pricing-close {
+  flex: 0 0 auto;
+  border: 1px solid #e2e8f0;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.repair-pricing-close:hover {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+.repair-pricing-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.repair-pricing-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 64px;
+  color: #6366f1;
+}
+
+.repair-pricing-loading svg,
+.repair-pricing-spin {
+  animation: repair-pricing-spin 1s linear infinite;
+}
+
+.repair-pricing-add-section,
+.repair-pricing-labour-section {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 20px 24px;
+}
+
+.repair-pricing-add-section {
+  padding-top: 24px;
+  padding-bottom: 24px;
+}
+
+.repair-pricing-input-labels,
+.repair-pricing-input-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.repair-pricing-input-labels {
+  margin-bottom: 8px;
+}
+
+.repair-pricing-input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.repair-pricing-input-grid {
+  flex: 1;
+}
+
+.repair-pricing-input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid #dbe4f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0f172a;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  outline: none;
+  padding: 0 16px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.repair-pricing-input::placeholder {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.repair-pricing-input:focus {
+  background: #ffffff;
+  border-color: #a5b4fc;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+}
+
+.repair-pricing-input-center {
+  text-align: center;
+}
+
+.repair-pricing-money-field {
+  position: relative;
+}
+
+.repair-pricing-money-field svg {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  z-index: 1;
+  color: #94a3b8;
+  transform: translateY(-50%);
+}
+
+.repair-pricing-money-field .repair-pricing-input {
+  padding-left: 32px;
+}
+
+.repair-pricing-add-button {
+  height: 44px;
+  flex: 0 0 auto;
+  padding: 0 20px;
+  border-radius: 10px;
+}
+
+.repair-pricing-add-button span,
+.repair-pricing-save span {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.repair-pricing-add-button:disabled,
+.repair-pricing-save:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.repair-pricing-check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.repair-pricing-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: #4f46e5;
+  cursor: pointer;
+}
+
+.repair-pricing-check span {
+  color: #334155;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.repair-pricing-labour-collapse {
+  overflow: hidden;
+}
+
+.repair-pricing-labour-input {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 14px;
+  padding-left: 28px;
+}
+
+.repair-pricing-labour-input .repair-pricing-money-field {
+  width: 176px;
+}
+
+.repair-pricing-labour-input .repair-pricing-input {
+  height: 40px;
+}
+
+.repair-pricing-table-wrap {
+  padding: 20px 24px 10px;
+}
+
+.repair-pricing-grid {
+  display: grid;
+  grid-template-columns: 24px minmax(160px, 1fr) 64px 96px 96px 28px;
+  gap: 8px;
+  align-items: center;
+}
+
+.repair-pricing-table-head {
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.repair-pricing-table-head span:first-child {
+  color: #cbd5e1;
+}
+
+.repair-pricing-table-head span:nth-child(3) {
+  text-align: center;
+}
+
+.repair-pricing-table-head span:nth-child(4),
+.repair-pricing-table-head span:nth-child(5) {
+  text-align: right;
+}
+
+.repair-pricing-row {
+  margin-inline: -4px;
+  padding: 12px 4px;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.repair-pricing-row:hover {
+  background: rgba(248, 250, 252, 0.82);
+}
+
+.repair-pricing-serial {
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.repair-pricing-name {
+  min-width: 0;
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.repair-pricing-qty {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.repair-pricing-money {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.repair-pricing-subtotal {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.repair-pricing-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.repair-pricing-delete {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.repair-pricing-delete:hover {
+  background: #fef2f2;
+  color: #f87171;
+}
+
+.repair-pricing-new-item {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.repair-pricing-new-item > span:last-child {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #d1fae5;
+  color: #059669;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.repair-pricing-labour-row {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.repair-pricing-labour-total {
+  color: #475569;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.repair-pricing-total-row {
+  margin-top: 4px;
+  padding: 12px 0 0;
+  border-top: 1px solid #f1f5f9;
+}
+
+.repair-pricing-total-row span:nth-child(5) {
+  color: #4f46e5;
+  font-size: 16px;
+  font-weight: 900;
+  text-align: right;
+}
+
+.repair-pricing-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.repair-pricing-cancel {
+  min-width: 90px;
+  height: 44px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.repair-pricing-save {
+  height: 44px;
+  flex: 1;
+  justify-content: center;
+  border-radius: 10px;
+  background: #1e293b;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.16);
+  text-transform: uppercase;
+}
+
+@keyframes repair-pricing-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .repair-pricing-modal {
+    width: min(100%, 96vw);
+    max-height: 92vh;
+  }
+
+  .repair-pricing-header,
+  .repair-pricing-add-section,
+  .repair-pricing-labour-section,
+  .repair-pricing-table-wrap,
+  .repair-pricing-footer {
+    padding-inline: 16px;
+  }
+
+  .repair-pricing-input-labels {
+    display: none;
+  }
+
+  .repair-pricing-input-row,
+  .repair-pricing-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .repair-pricing-input-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .repair-pricing-add-button,
+  .repair-pricing-cancel,
+  .repair-pricing-save {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .repair-pricing-labour-input {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+    padding-left: 0;
+  }
+
+  .repair-pricing-labour-input .repair-pricing-money-field {
+    width: 100%;
+  }
+
+  .repair-pricing-table-wrap {
+    overflow-x: auto;
+  }
+
+  .repair-pricing-grid {
+    min-width: 620px;
+  }
+}

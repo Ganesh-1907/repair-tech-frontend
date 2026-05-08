@@ -11,9 +11,11 @@ import {
   Printer,
   Search,
   Trash2,
+  Wrench,
   X,
 } from 'lucide-react';
 import { api } from '../../services/apiClient';
+import RepairModal from './RepairModal';
 import './PlansCustomers.css';
 
 const createDefaultQuotation = (customer = {}) => ({
@@ -127,6 +129,7 @@ const CMCInventoryPage = () => {
   const [activeMenu, setActiveMenu] = useState({ id: null, open: false, x: 0, y: 0, width: 220 });
   const [documentsByContract, setDocumentsByContract] = useState({});
   const [toast, setToast] = useState('');
+  const [repairContract, setRepairContract] = useState(null);
 
   const fetchContracts = useCallback(async () => {
     try {
@@ -400,8 +403,8 @@ const CMCInventoryPage = () => {
                 <button className="menu-item" onClick={() => { setEditingItem(c); setShowModal(true); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><Edit size={14} /> Edit</button>
                 <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><FileEdit size={14} /> CMC Quotation</button>
                 <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><FileText size={14} /> CMC Agreement</button>
-                <button className="menu-item text-red-600" onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>
-                <button className="menu-item" onClick={() => setActiveMenu((p) => ({ ...p, open: false, id: null }))}><X size={14} /> Close</button>
+                <button className="menu-item" onClick={() => { setRepairContract(c); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><Wrench size={14} /> Manage Repair</button>
+                <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>
               </>
             );
           })()}
@@ -421,6 +424,15 @@ const CMCInventoryPage = () => {
         <CustomerDetailModal
           customer={selectedCustomer}
           onClose={() => setShowDetailModal(false)}
+        />
+      )}
+
+      {repairContract && (
+        <RepairModal
+          contract={repairContract}
+          collection="cmcRepairs"
+          onClose={() => setRepairContract(null)}
+          showToast={(msg) => setToast(msg)}
         />
       )}
 
@@ -754,38 +766,234 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
 
 // Existing modals kept as-is
 const CustomerModal = ({ onClose, onSubmit, editingItem, customers }) => {
-  const createBlankDevice = () => ({ type: 'Laptop', brand: '', sn: '' });
+  const createBlankDevice = () => ({ type: 'Laptop', brand: '', sn: '', config: '', status: 'Healthy' });
+
   const getNextContractId = () => {
     const year = new Date().getFullYear();
     const prefix = `CMC-${year}-`;
-    const serials = customers.filter((c) => c.contractId?.startsWith(prefix)).map((c) => parseInt(c.contractId.split('-').pop(), 10)).filter((n) => !Number.isNaN(n));
+    const serials = customers
+      .filter((c) => c.contractId?.startsWith(prefix))
+      .map((c) => parseInt(c.contractId.split('-').pop(), 10))
+      .filter((n) => !Number.isNaN(n));
     const nextSerial = serials.length > 0 ? Math.max(...serials) + 1 : 1001;
     return `${prefix}${nextSerial}`;
   };
 
   const defaults = {
-    name: '', contractId: getNextContractId(), plan: 'Standard CMC', start: new Date().toISOString().split('T')[0], expiry: '', value: '', status: 'Active',
-    authorizedPerson1: '', authorizedPerson2: '', gstin: '', address: '', contact: '', locations: ['Head Office'], devices: [createBlankDevice()],
+    name: '', contractId: getNextContractId(), plan: 'Standard CMC',
+    start: new Date().toISOString().split('T')[0], expiry: '', value: '', status: 'Active',
+    authorizedPerson1: '', authorizedPerson2: '', gstin: '', address: '', contact: '',
+    locations: ['Head Office'], devices: [createBlankDevice()],
   };
-  const [formData, setFormData] = useState(editingItem ? { ...defaults, ...editingItem } : defaults);
+  const [formData, setFormData] = useState(
+    editingItem
+      ? {
+          ...defaults,
+          ...editingItem,
+          locations: Array.isArray(editingItem.locations) && editingItem.locations.length > 0 ? editingItem.locations : defaults.locations,
+          devices: Array.isArray(editingItem.devices) && editingItem.devices.length > 0 ? editingItem.devices : defaults.devices,
+        }
+      : defaults
+  );
+
+  const addDevice = () => setFormData({ ...formData, devices: [...formData.devices, createBlankDevice()] });
+  const removeDevice = (index) => {
+    if (formData.devices.length === 1) { setFormData({ ...formData, devices: [createBlankDevice()] }); return; }
+    setFormData({ ...formData, devices: formData.devices.filter((_, i) => i !== index) });
+  };
+  const updateDevice = (index, field, value) => {
+    const updated = [...formData.devices];
+    updated[index] = { ...updated[index], [field]: value };
+    setFormData({ ...formData, devices: updated });
+  };
+  const addLocation = () => setFormData({ ...formData, locations: [...formData.locations, ''] });
+  const hasPrinter = formData.devices.some((d) => d.type === 'Printer');
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-card amc-enrollment-modal">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card amc-enrollment-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{editingItem ? 'Edit CMC Registry' : 'New CMC Enrollment'}</h3>
           <button className="icon-button" onClick={onClose} style={{ border: 'none' }}><X size={20} /></button>
         </div>
         <div className="modal-body amc-enrollment-body">
           <div style={{ padding: '32px' }}>
-            <div className="form-group"><label>Company / Customer Name</label><input className="form-input" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} /></div>
-            <div className="form-group"><label>CMC ID</label><input className="form-input" value={formData.contractId} readOnly /></div>
-            <div className="form-group"><label>CMC Plan</label><input className="form-input" value={formData.plan} onChange={(e) => setFormData({ ...formData, plan: e.target.value })} /></div>
+
+            {/* 1. Customer Profile */}
+            <div className="form-section">
+              <h4 className="section-title" style={{ fontSize: '16px', color: 'var(--text-color)', marginBottom: '20px' }}>1. Customer Profile</h4>
+              <div className="amc-form-stack">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group">
+                    <label>Company / Customer Name</label>
+                    <input className="form-input" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Enter company name" />
+                  </div>
+                  <div className="form-group">
+                    <label>GST Number</label>
+                    <input className="form-input" value={formData.gstin} onChange={(e) => setFormData({ ...formData, gstin: e.target.value })} placeholder="GSTIN" />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group">
+                    <label>Contact Phone / Email</label>
+                    <input className="form-input" value={formData.contact} onChange={(e) => setFormData({ ...formData, contact: e.target.value })} placeholder="Phone or Email" />
+                  </div>
+                  <div className="form-group">
+                    <label>Authorized Person 1</label>
+                    <input className="form-input" value={formData.authorizedPerson1} onChange={(e) => setFormData({ ...formData, authorizedPerson1: e.target.value })} placeholder="Primary Contact" />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group">
+                    <label>Authorized Person 2</label>
+                    <input className="form-input" value={formData.authorizedPerson2} onChange={(e) => setFormData({ ...formData, authorizedPerson2: e.target.value })} placeholder="Secondary (Optional)" />
+                  </div>
+                  <div />
+                </div>
+                <div className="form-group">
+                  <label>Registered Address</label>
+                  <textarea className="form-input" style={{ height: '60px', paddingTop: '12px' }} value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="Full company address" />
+                </div>
+              </div>
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--slate-100)', margin: '32px 0' }} />
+
+            {/* 2. Contract Details */}
+            <div className="form-section">
+              <h4 className="section-title" style={{ fontSize: '16px', color: 'var(--text-color)', marginBottom: '20px' }}>2. Contract Details</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group">
+                    <label>CMC ID</label>
+                    <input className="form-input" value={formData.contractId} readOnly style={{ background: 'var(--slate-50)', color: 'var(--text-muted)' }} />
+                  </div>
+                  <div className="form-group">
+                    <label>CMC Plan</label>
+                    <select className="form-select" value={formData.plan} onChange={(e) => setFormData({ ...formData, plan: e.target.value })}>
+                      <option>Basic CMC</option>
+                      <option>Standard CMC</option>
+                      <option>Premium CMC</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group">
+                    <label>Expiry Date</label>
+                    <input type="date" className="form-input" value={formData.expiry} onChange={(e) => setFormData({ ...formData, expiry: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Status</label>
+                    <select className="form-select" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+                      <option>Active</option>
+                      <option>Expired</option>
+                      <option>Pending Approval</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid var(--slate-100)', margin: '32px 0' }} />
+
+            {/* 3. Device Registry */}
+            <div className="form-section">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h4 className="section-title" style={{ margin: 0, fontSize: '16px', color: 'var(--text-color)' }}>3. Device Registry</h4>
+              </div>
+              <div className="device-table-wrapper">
+                <table className="device-entry-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th>Type</th>
+                      <th>Brand / Model</th>
+                      <th>Serial Number</th>
+                      <th>Configuration</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.devices.map((device, index) => (
+                      <tr key={index}>
+                        <td>
+                          <select className="form-select" value={device.type} onChange={(e) => updateDevice(index, 'type', e.target.value)}>
+                            <option>Laptop</option>
+                            <option>Desktop</option>
+                            <option>Printer</option>
+                            <option>Server</option>
+                            <option>UPS</option>
+                            <option>Scanner</option>
+                          </select>
+                        </td>
+                        <td>
+                          <input className="form-input" value={device.brand} onChange={(e) => updateDevice(index, 'brand', e.target.value)} placeholder="e.g. Dell Latitude 5420" />
+                        </td>
+                        <td>
+                          <input className="form-input" value={device.sn} onChange={(e) => updateDevice(index, 'sn', e.target.value)} placeholder="S/N" />
+                        </td>
+                        <td>
+                          <input className="form-input" value={device.config} onChange={(e) => updateDevice(index, 'config', e.target.value)} placeholder="e.g. i5, 8GB, 256GB" />
+                        </td>
+                        <td>
+                          <div className="device-row-actions">
+                            <button className="device-action-button delete" title="Delete device row" onClick={() => removeDevice(index)}><Trash2 size={16} /></button>
+                            {index === formData.devices.length - 1 && (
+                              <button className="device-action-button add" title="Add device row" onClick={addDevice}><Plus size={16} /></button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {hasPrinter && (
+              <>
+                <hr style={{ border: 'none', borderTop: '1px solid var(--slate-100)', margin: '32px 0' }} />
+                <div className="form-section" style={{ animation: 'fadeIn 0.3s ease' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h4 className="section-title" style={{ margin: 0, fontSize: '16px', color: 'var(--text-color)' }}>4. Printer Service Locations</h4>
+                    <button className="secondary-button" style={{ height: '36px', fontSize: '13px' }} onClick={addLocation}><Plus size={16} /> Add Location</button>
+                  </div>
+                  <div className="amc-form-stack">
+                    {formData.locations.map((loc, index) => (
+                      <div key={index} className="amc-location-row">
+                        <input
+                          className="form-input"
+                          value={loc}
+                          onChange={(e) => {
+                            const newLocs = [...formData.locations];
+                            newLocs[index] = e.target.value;
+                            setFormData({ ...formData, locations: newLocs });
+                          }}
+                          placeholder="e.g. Floor 2 / Branch"
+                        />
+                        <button
+                          onClick={() => setFormData({ ...formData, locations: formData.locations.filter((_, i) => i !== index) })}
+                          style={{ background: 'transparent', color: 'var(--red)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '4px' }}
+                          title="Remove location"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    {formData.locations.length === 0 && (
+                      <div style={{ textAlign: 'center', padding: '20px', background: 'var(--slate-50)', borderRadius: '12px', border: '1px dashed var(--slate-300)', color: 'var(--text-muted)' }}>
+                        No locations added. Click "Add Location" to start.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+
           </div>
         </div>
         <div className="modal-footer amc-enrollment-footer">
-          <button className="secondary-button" onClick={onClose}>Cancel</button>
-          <button className="primary-button" onClick={() => onSubmit(formData)}>Save Enrollment</button>
+          <button className="secondary-button" onClick={onClose} style={{ minWidth: '120px' }}>Cancel</button>
+          <button className="primary-button" style={{ padding: '0 40px' }} onClick={() => onSubmit(formData)}>Save Enrollment</button>
         </div>
       </div>
     </div>
