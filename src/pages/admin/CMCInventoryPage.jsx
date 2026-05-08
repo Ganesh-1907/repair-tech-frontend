@@ -119,6 +119,7 @@ const createBlankDocDevice = () => ({
 
 const CMCInventoryPage = () => {
   const [customers, setCustomers] = useState([]);
+  const [cmcPlans, setCmcPlans]   = useState([]);
   const [viewMode, setViewMode] = useState('list');
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -134,13 +135,17 @@ const CMCInventoryPage = () => {
   const fetchContracts = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await api.list('cmcContracts');
+      const [data, plans] = await Promise.all([
+        api.list('cmcContracts'),
+        api.list('cmcPlans'),
+      ]);
+      setCmcPlans(Array.isArray(plans) ? plans : []);
       const rows = Array.isArray(data) ? data : [];
       const mapped = rows.map((item) => ({
         ...item,
         name: item.customerName || item.name || 'Unnamed Customer',
         contractId: item.id || item.contractId,
-        plan: item.cmcDetails?.planName || item.plan || 'Standard CMC',
+        plan: item.cmcDetails?.planName || item.plan || '',
         start: item.startDate || item.start,
         expiry: item.expiryDate || item.endDate || item.expiry,
         value: item.contractValue || item.value,
@@ -417,6 +422,7 @@ const CMCInventoryPage = () => {
           onSubmit={handleSave}
           editingItem={editingItem}
           customers={customers}
+          cmcPlans={cmcPlans}
         />
       )}
 
@@ -765,7 +771,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
 };
 
 // Existing modals kept as-is
-const CustomerModal = ({ onClose, onSubmit, editingItem, customers }) => {
+const CustomerModal = ({ onClose, onSubmit, editingItem, customers, cmcPlans = [] }) => {
   const createBlankDevice = () => ({ type: 'Laptop', brand: '', sn: '', config: '', status: 'Healthy' });
 
   const getNextContractId = () => {
@@ -780,7 +786,7 @@ const CustomerModal = ({ onClose, onSubmit, editingItem, customers }) => {
   };
 
   const defaults = {
-    name: '', contractId: getNextContractId(), plan: 'Standard CMC',
+    name: '', contractId: getNextContractId(), plan: '',
     start: new Date().toISOString().split('T')[0], expiry: '', value: '', status: 'Active',
     authorizedPerson1: '', authorizedPerson2: '', gstin: '', address: '', contact: '',
     locations: ['Head Office'], devices: [createBlankDevice()],
@@ -871,9 +877,10 @@ const CustomerModal = ({ onClose, onSubmit, editingItem, customers }) => {
                   <div className="form-group">
                     <label>CMC Plan</label>
                     <select className="form-select" value={formData.plan} onChange={(e) => setFormData({ ...formData, plan: e.target.value })}>
-                      <option>Basic CMC</option>
-                      <option>Standard CMC</option>
-                      <option>Premium CMC</option>
+                      <option value="">— Select Plan —</option>
+                      {cmcPlans.filter(p => p.status !== 'Inactive').map(p => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

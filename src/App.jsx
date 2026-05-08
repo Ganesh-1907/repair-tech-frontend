@@ -38,6 +38,10 @@ import QuoteApprovalPlaceholderPage from './pages/admin/QuoteApprovalPlaceholder
 import CampaignDashboardPage from './pages/admin/CampaignDashboardPage';
 import CampaignJobsPage from './pages/admin/CampaignJobsPage';
 
+// Discounts Module Pages
+import DiscountsDashboardPage from './pages/admin/DiscountsDashboardPage';
+import DiscountsListPage from './pages/admin/DiscountsListPage';
+
 // Rental Module Pages
 import RentalQuotationPage from './pages/admin/RentalQuotationPage';
 import RentalCorporateAgreementPage from './pages/admin/RentalCorporateAgreementPage';
@@ -74,6 +78,8 @@ const existingAdminRouteComponents = {
   '/admin/inventory': Inventory,
   '/inventory': Inventory,
   '/admin/inventory/asset-management': AssetManagementPage,
+  '/admin/discounts/dashboard': DiscountsDashboardPage,
+  '/admin/discounts/codes': DiscountsListPage,
   '/admin/campaign/dashboard': CampaignDashboardPage,
   '/admin/campaign/jobs': CampaignJobsPage,
   '/admin/rental': RentalDashboardPage,
@@ -142,6 +148,11 @@ function App() {
               <Route path="/admin/cmc/plans" element={<Layout><CMCPlansPage /></Layout>} />
               <Route path="/admin/cmc/inventory" element={<Layout><CMCInventoryPage /></Layout>} />
               <Route path="/admin/cmc/reports" element={<Layout><CMCReportsPage /></Layout>} />
+
+              {/* Discounts Module Routes */}
+              <Route path="/admin/discounts" element={<Navigate to="/admin/discounts/dashboard" replace />} />
+              <Route path="/admin/discounts/dashboard" element={<Layout><DiscountsDashboardPage /></Layout>} />
+              <Route path="/admin/discounts/codes" element={<Layout><DiscountsListPage /></Layout>} />
 
               {/* Explicit Campaign Routes */}
               <Route path="/admin/campaign/dashboard" element={<Layout><CampaignDashboardPage /></Layout>} />

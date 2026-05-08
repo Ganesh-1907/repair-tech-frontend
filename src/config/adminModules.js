@@ -19,13 +19,13 @@ const adminModules = [
         description: 'Lead pipeline module shell for upcoming workflow and lifecycle requirements.',
         actions: ['Add', 'View List'],
       },
-      // {
-      //   id: 'admin-discounts',
-      //   label: 'Discounts',
-      //   path: '/admin/discounts',
-      //   description: 'Discount control area prepared for rule configuration and campaign linkage.',
-      //   actions: ['Add', 'Manage'],
-      // },
+      {
+        id: 'admin-discounts',
+        label: 'Discounts',
+        path: '/admin/discounts/dashboard',
+        description: 'Discount and coupon management — create codes, track usage, and measure revenue impact.',
+        actions: ['Add', 'Manage'],
+      },
     ],
   },
   {
@@ -94,6 +94,27 @@ const adminModules = [
         label: 'Asset Lifecycle',
         path: '/admin/inventory/asset-management',
         description: 'Individual tracking for company physical assets.',
+        actions: ['Add', 'View List', 'Manage'],
+      },
+    ],
+  },
+  {
+    id: 'discounts-module',
+    label: 'Discounts & Coupons',
+    icon: 'TicketPercent',
+    children: [
+      {
+        id: 'discounts-dashboard',
+        label: 'Dashboard',
+        path: '/admin/discounts/dashboard',
+        description: 'Overview of coupon usage, active codes, and revenue impact.',
+        actions: ['View List'],
+      },
+      {
+        id: 'discounts-codes',
+        label: 'Coupon Codes',
+        path: '/admin/discounts/codes',
+        description: 'Create and manage all discount coupon codes — Welcome, Campaign, Abandoned Cart, and more.',
         actions: ['Add', 'View List', 'Manage'],
       },
     ],

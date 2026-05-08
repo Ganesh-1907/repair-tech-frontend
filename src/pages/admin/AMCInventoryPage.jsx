@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
-import { 
+import {
   Search, Plus, Filter, Download, MoreVertical,
   Users, Calendar, IndianRupee, Eye, Edit, Trash2, X, FileText, FileEdit, RefreshCw,
   ArrowLeft, Printer, Wrench
@@ -9,10 +9,8 @@ import RepairModal from './RepairModal';
 import './PlansCustomers.css';
 
 const AMCInventoryPage = () => {
-  const [customers, setCustomers] = useState([
-    { id: 1, name: 'Global Tech', contractId: 'AMC-2026-1001', plan: 'Standard AMC', start: '2025-05-15', expiry: '2026-05-15', value: '₹45,000', status: 'Active', gstin: '22AAAAA0000A1Z5', address: '123 Tech Park', authorizedPerson1: 'Mr. John' },
-    { id: 2, name: 'Stellar Bank', contractId: 'AMC-2026-1002', plan: 'Premium AMC', start: '2025-05-19', expiry: '2026-05-19', value: '₹30,000', status: 'Expiring Soon', gstin: '22BBBBB1111B1Z6', address: '456 Fin Plaza', authorizedPerson1: 'Ms. Sarah' },
-  ]);
+  const [customers, setCustomers] = useState([]);
+  const [amcPlans, setAmcPlans]   = useState([]);
 
   const [viewMode, setViewMode] = useState('list'); // 'list', 'quotation', 'agreement'
   const [isLoading, setIsLoading] = useState(true);
@@ -28,14 +26,17 @@ const AMCInventoryPage = () => {
   const fetchContracts = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await api.list('amcContracts');
+      const [data, plans] = await Promise.all([
+        api.list('amcContracts'),
+        api.list('amcPlans'),
+      ]);
+      setAmcPlans(Array.isArray(plans) ? plans : []);
       const rows = Array.isArray(data) ? data : [];
-      // Map backend structure back to frontend expectations if needed
       const mapped = rows.map(item => ({
         ...item,
         name: item.customerName || item.name || 'Unnamed Customer',
         contractId: item.id || item.contractId,
-        plan: item.amcDetails?.planName || item.plan || 'Standard AMC',
+        plan: item.amcDetails?.planName || item.plan || '',
         expiry: item.expiryDate || item.endDate || item.expiry,
         value: item.contractValue || item.value,
         status: item.status || 'Active',
@@ -45,7 +46,7 @@ const AMCInventoryPage = () => {
         address: item.amcDetails?.address || item.address,
         contact: item.amcDetails?.contact || item.contact,
         locations: item.amcDetails?.locations || item.locations || ['Head Office'],
-        devices: item.amcDetails?.devices || item.devices || []
+        devices: item.amcDetails?.devices || item.devices || [],
       }));
       setCustomers(mapped);
     } catch (error) {
@@ -266,11 +267,12 @@ const AMCInventoryPage = () => {
       </div>
 
       {showModal && (
-        <CustomerModal 
-          onClose={() => setShowModal(false)} 
-          onSubmit={handleSave} 
-          editingItem={editingItem} 
+        <CustomerModal
+          onClose={() => setShowModal(false)}
+          onSubmit={handleSave}
+          editingItem={editingItem}
           customers={customers}
+          amcPlans={amcPlans}
         />
       )}
 
@@ -295,7 +297,7 @@ const AMCInventoryPage = () => {
   );
 };
 
-const CustomerModal = ({ onClose, onSubmit, editingItem, customers }) => {
+const CustomerModal = ({ onClose, onSubmit, editingItem, customers, amcPlans = [] }) => {
   const createBlankDevice = () => ({ type: 'Laptop', brand: '', sn: '', config: '', status: 'Healthy' });
   const getNextContractId = () => {
     const year = new Date().getFullYear();
@@ -318,7 +320,7 @@ const CustomerModal = ({ onClose, onSubmit, editingItem, customers }) => {
     const defaults = {
       name: '', 
       contractId: getNextContractId(), 
-      plan: 'Standard AMC', 
+      plan: '',
       start: new Date().toISOString().split('T')[0], 
       expiry: '', 
       value: '', 
@@ -433,9 +435,10 @@ const CustomerModal = ({ onClose, onSubmit, editingItem, customers }) => {
                   <div className="form-group">
                     <label>AMC Plan</label>
                     <select className="form-select" value={formData.plan} onChange={e => setFormData({...formData, plan: e.target.value})}>
-                      <option>Basic AMC</option>
-                      <option>Standard AMC</option>
-                      <option>Premium AMC</option>
+                      <option value="">— Select Plan —</option>
+                      {amcPlans.filter(p => p.status !== 'Inactive').map(p => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>

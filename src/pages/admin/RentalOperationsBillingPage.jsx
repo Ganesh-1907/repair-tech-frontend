@@ -1,44 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Download, Eye, FileCheck2, IndianRupee, Mail, MoreVertical, Plus, Printer, Save, Send, Trash2 } from 'lucide-react';
+import { api } from '../../services/apiClient';
 import './RentalManagement.css';
 import './RentalInvoiceGenerator.css';
+
+const COLLECTION = 'rentalCustomers';
 
 const pageTabs = ['Customers', 'Customer View', 'Device Assignment', 'Replacement', 'Maintenance', 'Quotation', 'Agreement', 'Invoice Generator', 'Payment Tracking'];
 const profileTabs = ['Overview', 'Locations', 'Devices', 'Invoices', 'Payments', 'Maintenance History'];
 const techs = ['Suresh K', 'Rakesh P', 'Aditi M'];
 const plans = ['Minimum Commitment Plan', 'Free Page Limit', 'Tier Pricing / Slab Pricing', 'Multi-Rate Printer Billing'];
 
-const sampleCustomers = [{
-  id: 'CUS-1001',
-  companyName: 'Apex Retail Pvt Ltd',
-  customerType: 'Corporate',
-  authorizedPerson1Name: 'Nikhil Sharma',
-  authorizedPerson1Phone: '9876543210',
-  authorizedPerson1Email: 'nikhil@apexretail.com',
-  authorizedPerson2Name: 'Riya Sen',
-  gstNumber: '29ABCDE1234F1Z6',
-  primaryAddress: 'No. 24, MG Road, Bengaluru',
-  billingAddress: 'No. 24, MG Road, Bengaluru',
-  contactNumber: '9876543210',
-  email: 'ops@apexretail.com',
-  status: 'Active',
-  billingType: 'Smart Billing Plan',
-  outstandingAmount: 26400,
-  locations: [
-    { id: 'LOC-1', locationName: 'Head Office', address: 'No. 24, MG Road', city: 'Bengaluru', state: 'Karnataka', pincode: '560001', contactPerson: 'Nikhil Sharma', contactNumber: '9876543210', isPrimary: true },
-    { id: 'LOC-2', locationName: 'Warehouse', address: 'Peenya Industrial Area', city: 'Bengaluru', state: 'Karnataka', pincode: '560058', contactPerson: 'Riya Sen', contactNumber: '9922001133', isPrimary: false },
-  ],
-  devices: [
-    { id: 'DEV-1', deviceType: 'Printer', brand: 'HP', model: 'LaserJet MFP M440dn', serialNumber: 'HPA440-1122', installationDate: '2026-04-05', customerLocation: 'Head Office', technician: 'Suresh K', billingType: 'Multi-Rate Printer Billing', monthlyRent: 7000, currentMeter: 6800, status: 'Active' },
-    { id: 'DEV-2', deviceType: 'Copier', brand: 'Canon', model: 'IR 2645', serialNumber: 'CAN2645-9921', installationDate: '2026-03-18', customerLocation: 'Warehouse', technician: 'Rakesh P', billingType: 'Minimum Commitment Plan', monthlyRent: 6200, currentMeter: 4300, status: 'Under Maintenance' },
-  ],
-  quotations: [{ id: 'QTN-0019', date: '2026-05-04', validUntil: '2026-05-19', amount: 22800, status: 'Sent' }],
-  agreements: [{ id: 'AGR-0091', type: 'Corporate', startDate: '2026-04-01', endDate: '2027-03-31', status: 'Active' }],
-  invoices: [{ id: 'INV-8854', period: '2026-04', total: 30244, paymentStatus: 'Partially Paid' }],
-  payments: [{ id: 'PAY-1111', invoiceId: 'INV-8854', amount: 12000, mode: 'Bank Transfer', date: '2026-05-02' }],
-  maintenanceHistory: [{ id: 'MNT-2200', visitDate: '2026-05-01', technician: 'Suresh K', issue: 'Paper jam', status: 'Completed' }],
-  replacements: [],
-}];
 
 const emptyCustomer = { companyName: '', customerType: 'Corporate', authorizedPerson1Name: '', authorizedPerson1Phone: '', authorizedPerson1Email: '', authorizedPerson2Name: '', authorizedPerson2Phone: '', authorizedPerson2Email: '', gstNumber: '', primaryAddress: '', billingAddress: '', contactNumber: '', email: '', notes: '', locations: [], additionalAddresses: [] };
 const emptyDevice = { deviceType: 'Printer', brand: '', model: '', serialNumber: '', installationDate: '', customerLocation: '', technician: '', billingType: 'Multi-Rate Printer Billing', monthlyRent: '', meterStart: '', currentMeter: '', quantity: '1', deviceStatus: 'Active', notes: '' };
@@ -125,7 +97,8 @@ const ActionMenu = ({ items }) => {
 const RentalOperationsBillingPage = () => {
   const [activeTab, setActiveTab] = useState('Customers');
   const [activeProfileTab, setActiveProfileTab] = useState('Overview');
-  const [customers, setCustomers] = useState(sampleCustomers);
+  const [customers, setCustomers] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
@@ -166,6 +139,34 @@ const RentalOperationsBillingPage = () => {
   const visibleTabs = activeTab === 'Customers' ? ['Customers'] : (hasOpenedCustomer ? pageTabs : ['Customers']);
   const tell = (msg) => { setToast(msg); setTimeout(() => setToast(''), 2200); };
   const goToCustomers = () => setActiveTab('Customers');
+
+  // ── Backend helpers ──
+  const fetchCustomers = useCallback(async () => {
+    setLoadingCustomers(true);
+    try {
+      const data = await api.list(COLLECTION);
+      setCustomers(Array.isArray(data) ? data : []);
+    } catch {
+      tell('Failed to load customers. Check backend connection.');
+    } finally {
+      setLoadingCustomers(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
+
+  // Persist the full updated customer document to backend
+  const persistCustomer = useCallback(async (updatedCustomer) => {
+    try {
+      const saved = updatedCustomer.id
+        ? await api.update(COLLECTION, updatedCustomer.id, updatedCustomer)
+        : await api.create(COLLECTION, updatedCustomer);
+      return saved;
+    } catch {
+      tell('Failed to save to backend. Changes may not persist.');
+      return updatedCustomer;
+    }
+  }, []);
   const closeCustomerModal = () => {
     setCustomerFormOpen(false);
     setEditingCustomerId(null);
@@ -190,7 +191,7 @@ const RentalOperationsBillingPage = () => {
     }));
   };
 
-  const saveCustomer = () => {
+  const saveCustomer = async () => {
     if (!customerForm.companyName || !customerForm.authorizedPerson1Name || !customerForm.primaryAddress || !customerForm.contactNumber || !customerForm.email) return tell('Please fill required customer fields.');
     if (customerForm.customerType === 'Corporate' && !customerForm.gstNumber) return tell('GST is required for corporate customers.');
     const additionalAddresses = (customerForm.additionalAddresses || [])
@@ -222,16 +223,24 @@ const RentalOperationsBillingPage = () => {
       })),
     ];
     if (editingCustomerId) {
-      setCustomers((rows) => rows.map((row) => row.id === editingCustomerId ? {
-        ...row,
-        ...customerForm,
-        locations: generatedLocations,
-        additionalAddresses,
-      } : row));
+      const existing = customers.find((r) => r.id === editingCustomerId) || {};
+      const updated = { ...existing, ...customerForm, locations: generatedLocations, additionalAddresses };
+      setCustomers((rows) => rows.map((row) => row.id === editingCustomerId ? updated : row));
+      persistCustomer(updated);
       tell('Customer updated.');
     } else {
-      const next = { ...customerForm, id: `CUS-${Math.floor(Math.random() * 9000 + 1000)}`, status: 'Pending', billingType: 'Smart Billing Plan', outstandingAmount: 0, locations: generatedLocations, additionalAddresses, devices: [], quotations: [], agreements: [], invoices: [], payments: [], maintenanceHistory: [], replacements: [] };
-      setCustomers((c) => [next, ...c]);
+      const next = {
+        ...customerForm,
+        id: `CUS-${Date.now().toString().slice(-6)}`,
+        status: 'Pending',
+        billingType: 'Smart Billing Plan',
+        outstandingAmount: 0,
+        locations: generatedLocations,
+        additionalAddresses,
+        devices: [], quotations: [], agreements: [], invoices: [], payments: [], maintenanceHistory: [], replacements: [],
+      };
+      const saved = await persistCustomer(next);
+      setCustomers((c) => [saved || next, ...c]);
       tell('Customer saved.');
     }
     closeCustomerModal();
@@ -279,7 +288,12 @@ const RentalOperationsBillingPage = () => {
         status: row.status,
       }));
     });
-    setCustomers((rows) => rows.map((c) => c.id === selected.id ? { ...c, devices: [...c.devices, ...expanded] } : c));
+    setCustomers((rows) => {
+      const next = rows.map((c) => c.id === selected.id ? { ...c, devices: [...(c.devices || []), ...expanded] } : c);
+      const updated = next.find((c) => c.id === selected.id);
+      if (updated) persistCustomer(updated);
+      return next;
+    });
     setDeviceBatch([]);
     tell(`${expanded.length} devices saved.`);
   };
@@ -308,7 +322,12 @@ const RentalOperationsBillingPage = () => {
       workDone: maintenanceForm.workDone,
       parts: maintenanceParts.filter((row) => row.item),
     };
-    setCustomers((rows) => rows.map((row) => row.id === selected.id ? { ...row, maintenanceHistory: [nextEntry, ...(row.maintenanceHistory || [])] } : row));
+    setCustomers((rows) => {
+      const next = rows.map((row) => row.id === selected.id ? { ...row, maintenanceHistory: [nextEntry, ...(row.maintenanceHistory || [])] } : row);
+      const updated = next.find((c) => c.id === selected.id);
+      if (updated) persistCustomer(updated);
+      return next;
+    });
     tell('Service report saved.');
   };
 
@@ -327,6 +346,11 @@ const RentalOperationsBillingPage = () => {
       const rep = { id: `REP-${Date.now()}`, oldDeviceId: old.id, newDeviceId: added.id, replacementDate: replacementForm.replacementDate, oldClosingReading: Number(replacementForm.oldClosingReading), newStartingReading: Number(replacementForm.newStartReading || 0), reason: replacementForm.reason };
       return { ...c, devices: [...updated, added], replacements: [...(c.replacements || []), rep] };
     }));
+    setCustomers((rows) => {
+      const updatedCustomer = rows.find((c) => c.id === selected.id);
+      if (updatedCustomer) persistCustomer(updatedCustomer);
+      return rows;
+    });
     tell('Replacement confirmed with billing split metadata.');
   };
 
@@ -376,6 +400,11 @@ const RentalOperationsBillingPage = () => {
       }];
       return { ...row, invoices, payments, outstandingAmount: Math.max(Number(row.outstandingAmount || 0) - paidAmount, 0) };
     }));
+    setCustomers((rows) => {
+      const updatedCustomer = rows.find((c) => c.id === selected.id);
+      if (updatedCustomer) persistCustomer(updatedCustomer);
+      return rows;
+    });
 
     setPaymentForm((current) => ({
       ...current,
@@ -388,7 +417,12 @@ const RentalOperationsBillingPage = () => {
   };
   const removeDevice = (deviceId) => {
     if (!selected) return;
-    setCustomers((rows) => rows.map((row) => row.id === selected.id ? { ...row, devices: row.devices.filter((device) => device.id !== deviceId) } : row));
+    setCustomers((rows) => {
+      const next = rows.map((row) => row.id === selected.id ? { ...row, devices: (row.devices || []).filter((device) => device.id !== deviceId) } : row);
+      const updated = next.find((c) => c.id === selected.id);
+      if (updated) persistCustomer(updated);
+      return next;
+    });
     tell('Device removed.');
   };
   const editDevice = (device) => {
@@ -454,7 +488,7 @@ const RentalOperationsBillingPage = () => {
     tell('Agreement saved.');
   };
 
-  const customerRows = customers.map((c) => ({ ...c, activeDevicesCount: c.devices.filter((d) => d.status === 'Active').length }));
+  const customerRows = customers.map((c) => ({ ...c, activeDevicesCount: (c.devices || []).filter((d) => d.status === 'Active').length }));
   const invoiceCustomers = useMemo(() => customers.filter((row) => {
     const matchesSearch = `${row.companyName} ${row.gstNumber || ''}`.toLowerCase().includes(invoiceCustomerSearch.toLowerCase());
     const hasPending = (row.invoices || []).some((inv) => inv.paymentStatus === 'Unpaid' || inv.paymentStatus === 'Partially Paid');
@@ -647,7 +681,7 @@ const RentalOperationsBillingPage = () => {
                 },
               ]}
               rows={customerRows}
-              emptyText="No customers found."
+              emptyText={loadingCustomers ? 'Loading customers…' : 'No customers found. Click "+ Add Customer" to create one.'}
             />
           </div>
           {customerFormOpen && (

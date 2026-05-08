@@ -51,7 +51,6 @@ const InventoryManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [stockType, setStockType] = useState('All');
   const [assetStatus, setAssetStatus] = useState('All');
-  const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [notice, setNotice] = useState('');
 
@@ -125,17 +124,7 @@ const InventoryManagement = () => {
   };
 
   const lowStock = Number(stats.lowStock || items.filter((item) => item.type === 'Sales' && Number(item.currentStock) <= Number(item.minStock)).length);
-  const isInventoryModalOpen = showInventoryModal || searchParams.get('add') === '1';
   const isAssetModalOpen = showAssetModal || searchParams.get('asset') === '1';
-
-  const closeInventoryModal = () => {
-    setShowInventoryModal(false);
-    if (searchParams.get('add') === '1') {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete('add');
-      setSearchParams(nextParams, { replace: true });
-    }
-  };
 
   const closeAssetModal = () => {
     setShowAssetModal(false);
@@ -159,9 +148,6 @@ const InventoryManagement = () => {
         <div className="inventory-hero-actions">
           <button className="inventory-icon-button" onClick={handleReset} title="Reset stock inventory">
             <RefreshCcw size={18} />
-          </button>
-          <button className="inventory-secondary-button" onClick={() => setShowInventoryModal(true)}>
-            <Plus size={17} /> Add Inventory
           </button>
           <button className="inventory-primary-button" onClick={() => setShowAssetModal(true)}>
             <Plus size={17} /> Add Asset
@@ -223,16 +209,6 @@ const InventoryManagement = () => {
           </>
         )}
       </section>
-
-      {isInventoryModalOpen && (
-        <AddInventoryModal
-          onClose={closeInventoryModal}
-          onSave={async () => {
-            await loadData();
-            closeInventoryModal();
-          }}
-        />
-      )}
 
       {isAssetModalOpen && (
         <AddAssetModal
@@ -429,92 +405,6 @@ const AddAssetModal = ({ onClose, onSave }) => {
       <Field label="Add-on Parts">
         <textarea value={formData.addOnParts} onChange={(event) => update('addOnParts', event.target.value)} placeholder="Extra tray, duplex unit, RAM upgrade, docking station..." />
       </Field>
-    </Modal>
-  );
-};
-
-const AddInventoryModal = ({ onClose, onSave }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'Sales',
-    sku: '',
-    category: '',
-    supplier: '',
-    purchasePrice: '',
-    sellingPrice: '',
-    currentStock: '',
-    minStock: '5',
-    unit: 'pcs',
-  });
-  const [errors, setErrors] = useState({});
-
-  const update = (field, value) => setFormData((current) => ({ ...current, [field]: value }));
-
-  const handleSave = async () => {
-    const nextErrors = {};
-    if (!formData.name.trim()) nextErrors.name = 'Item name is required';
-    if (!formData.category.trim()) nextErrors.category = 'Category is required';
-    if (formData.sellingPrice === '') nextErrors.sellingPrice = 'Selling price is required';
-    if (formData.type === 'Sales' && formData.currentStock === '') nextErrors.currentStock = 'Current stock is required';
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
-
-    await inventoryService.addItem({
-      ...formData,
-      isStockDependent: formData.type === 'Sales',
-      currentStock: formData.type === 'Sales' ? Number(formData.currentStock) : 0,
-      minStock: formData.type === 'Sales' ? Number(formData.minStock || 0) : 0,
-      purchasePrice: Number(formData.purchasePrice || 0),
-      sellingPrice: Number(formData.sellingPrice || 0),
-      status: 'Active',
-    });
-    await onSave();
-  };
-
-  return (
-    <Modal title="Add Inventory" subtitle="Add spare parts, saleable stock, or service line items." onClose={onClose} onSave={handleSave} saveLabel="Save Inventory">
-      <div className="inventory-segment">
-        {['Sales', 'Service'].map((type) => (
-          <button key={type} className={formData.type === type ? 'active' : ''} onClick={() => update('type', type)}>
-            {type}
-          </button>
-        ))}
-      </div>
-      <Field label="Item Name" error={errors.name}>
-        <input value={formData.name} onChange={(event) => update('name', event.target.value)} placeholder="Toner cartridge, SSD, display panel..." />
-      </Field>
-      <div className="inventory-form-grid two">
-        <Field label="SKU">
-          <input value={formData.sku} onChange={(event) => update('sku', event.target.value)} placeholder="SKU-001" />
-        </Field>
-        <Field label="Category" error={errors.category}>
-          <input value={formData.category} onChange={(event) => update('category', event.target.value)} placeholder="Printer Spares" />
-        </Field>
-      </div>
-      <Field label="Supplier / Vendor">
-        <input value={formData.supplier} onChange={(event) => update('supplier', event.target.value)} placeholder="Vendor name" />
-      </Field>
-      <div className="inventory-form-grid two">
-        <Field label="Purchase Cost">
-          <input type="number" value={formData.purchasePrice} onChange={(event) => update('purchasePrice', event.target.value)} placeholder="0" />
-        </Field>
-        <Field label="Selling Price" error={errors.sellingPrice}>
-          <input type="number" value={formData.sellingPrice} onChange={(event) => update('sellingPrice', event.target.value)} placeholder="0" />
-        </Field>
-      </div>
-      {formData.type === 'Sales' && (
-        <div className="inventory-form-grid three">
-          <Field label="Current Stock" error={errors.currentStock}>
-            <input type="number" value={formData.currentStock} onChange={(event) => update('currentStock', event.target.value)} placeholder="0" />
-          </Field>
-          <Field label="Min Alert">
-            <input type="number" value={formData.minStock} onChange={(event) => update('minStock', event.target.value)} placeholder="5" />
-          </Field>
-          <Field label="Unit">
-            <input value={formData.unit} onChange={(event) => update('unit', event.target.value)} placeholder="pcs" />
-          </Field>
-        </div>
-      )}
     </Modal>
   );
 };

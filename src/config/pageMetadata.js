@@ -46,7 +46,6 @@ const basePageMetadata = [
     subtitle: 'Track stock levels, purchases, and alerts.',
     searchPlaceholder: 'Search inventory, parts, stock alerts...',
     searchParam: 'q',
-    primaryAction: { label: 'Add Item', to: '/inventory?add=1', icon: 'plus' },
   },
   {
     path: '/billing',
