@@ -68,6 +68,13 @@ const adminModules = [
         description: 'Search, filter, add, view, and edit expenses via popups.',
         actions: ['Add', 'View List', 'Manage'],
       },
+      {
+        id: 'payments-listing',
+        label: 'Payments Listing',
+        path: '/admin/expenses/payments',
+        description: 'All income payments collected by staff or added by admin.',
+        actions: ['Add', 'View List', 'Manage'],
+      },
     ],
   },
   {

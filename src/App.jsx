@@ -27,6 +27,7 @@ import AMCInventoryPage from './pages/admin/AMCInventoryPage';
 // Admin Module Pages
 import ExpensesManagementPage from './pages/admin/ExpensesManagementPage';
 import ExpensesListPage from './pages/admin/ExpensesListPage';
+import PaymentsListPage from './pages/admin/PaymentsListPage';
 import StaffTechnicianManagementPage from './pages/admin/StaffTechnicianManagementPage';
 import StaffListingPage from './pages/admin/StaffListingPage';
 import StaffPortalTasksPage from './pages/admin/StaffPortalTasksPage';
@@ -71,6 +72,7 @@ const existingAdminRouteComponents = {
   '/admin/leads': Leads,
   '/admin/expenses/dashboard': ExpensesManagementPage,
   '/admin/expenses/list': ExpensesListPage,
+  '/admin/expenses/payments': PaymentsListPage,
   '/admin/staff/dashboard': StaffTechnicianManagementPage,
   '/admin/staff/list': StaffListingPage,
   '/admin/staff-management': StaffTechnicianManagementPage,
