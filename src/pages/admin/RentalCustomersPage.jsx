@@ -16,20 +16,14 @@ import {
   AlertCircle,
   ChevronRight,
   User,
-  Moon,
-  Sun,
   FileText,
   ClipboardCheck,
   Printer,
   Send,
   Copy,
-  ArrowRight,
-  Settings,
-  Check,
+  ArrowRight,  Check,
   Building2,
-  UserCheck,
-  DollarSign,
-  Monitor,
+  UserCheck,  Monitor,
   Zap,
   ShieldCheck,
   Package
@@ -37,15 +31,11 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import './RentalCustomerManagement.css';
 import './RentalDocuments.css';
+import { api } from '../../services/apiClient';
 
 const RentalCustomersPage = () => {
   // --- Local State ---
-  const [customers, setCustomers] = useState([
-    { id: 'RC-1001', type: 'Corporate', name: 'Global Tech Solutions', person1: 'Rahul Verma', person2: 'Priya Shah', gst: '23ABCDE1234F1Z5', phone: '9876543210', email: 'ops@globaltech.com', locations: 2, status: 'Active' },
-    { id: 'RC-1002', type: 'Individual', name: 'Nikita Sharma', person1: 'Nikita Sharma', person2: '—', gst: '—', phone: '9988776655', email: 'nikita@example.com', locations: 1, status: 'Active' },
-    { id: 'RC-1003', type: 'Corporate', name: 'Stellar Bank', person1: 'Amit Singh', person2: 'Neha Rao', gst: '27ABCDE5678G2Z9', phone: '9876501234', email: 'admin@stellarbank.com', locations: 4, status: 'Pending' },
-    { id: 'RC-1004', type: 'Corporate', name: 'Apex Retail', person1: 'Karan Mehta', person2: 'Riya Kapoor', gst: '29ABCDE8910H3Z1', phone: '9867543210', email: 'support@apexretail.com', locations: 3, status: 'Inactive' },
-  ]);
+  const [customers, setCustomers] = useState([]);
 
   const [documents, setDocuments] = useState({
     quotations: [
@@ -61,12 +51,10 @@ const RentalCustomersPage = () => {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [headerSearch, setHeaderSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('All Types');
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [activeDocTab, setActiveDocTab] = useState('Quotations');
   const [openMenuId, setOpenMenuId] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,7 +62,6 @@ const RentalCustomersPage = () => {
   const [currentCustomer, setCurrentCustomer] = useState(null);
   
   // Doc Builder Modals
-  const [isQuotationModalOpen, setIsQuotationModalOpen] = useState(false);
   const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
   const [agreementType, setAgreementType] = useState('Corporate'); // Corporate, Individual
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
@@ -88,6 +75,30 @@ const RentalCustomersPage = () => {
   const [toasts, setToasts] = useState([]);
 
   // --- Helpers ---
+
+  const loadCustomers = async () => {
+    const rows = await api.list('rentalCustomers');
+    setCustomers(rows.map((row) => ({
+      id: row.id,
+      type: row.customerType || 'Corporate',
+      name: row.companyName || row.customerName || '',
+      person1: row.authorizedPerson1 || row.customerName || '',
+      person2: row.authorizedPerson2 || '-',
+      gst: row.gstNumber || '-',
+      phone: row.contactNumber || '',
+      email: row.email || '',
+      address: row.address || '',
+      locations: Array.isArray(row.locations) ? row.locations.length : Number(row.locations || 0),
+      status: row.status || 'Active',
+      raw: row,
+    })));
+  };
+
+  useEffect(() => {
+    loadCustomers().catch(() => {
+      addToast('Failed to load customers', 'info');
+    });
+  }, []);
   const addToast = (message, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -98,13 +109,6 @@ const RentalCustomersPage = () => {
 
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
-      const globalMatch = 
-        c.name.toLowerCase().includes(headerSearch.toLowerCase()) ||
-        c.id.toLowerCase().includes(headerSearch.toLowerCase()) ||
-        c.phone.includes(headerSearch) ||
-        c.email.toLowerCase().includes(headerSearch.toLowerCase()) ||
-        c.gst.toLowerCase().includes(headerSearch.toLowerCase());
-
       const filterMatch = 
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.phone.includes(searchTerm) ||
@@ -114,13 +118,12 @@ const RentalCustomersPage = () => {
       const typeMatch = typeFilter === 'All Types' || c.type === typeFilter;
       const statusMatch = statusFilter === 'All Status' || c.status === statusFilter;
 
-      return globalMatch && filterMatch && typeMatch && statusMatch;
+      return filterMatch && typeMatch && statusMatch;
     });
-  }, [customers, searchTerm, headerSearch, typeFilter, statusFilter]);
+  }, [customers, searchTerm, typeFilter, statusFilter]);
 
   const resetFilters = () => {
     setSearchTerm('');
-    setHeaderSearch('');
     setTypeFilter('All Types');
     setStatusFilter('All Status');
     addToast('Filters reset successfully', 'info');
@@ -132,70 +135,69 @@ const RentalCustomersPage = () => {
 
   const handleDelete = (id) => {
     if (window.confirm('Delete this customer?')) {
-      setCustomers(prev => prev.filter(c => c.id !== id));
-      addToast('Customer deleted');
+      api.remove('rentalCustomers', id)
+        .then(() => {
+          addToast('Customer deleted');
+          return loadCustomers();
+        })
+        .catch(() => addToast('Failed to delete customer', 'info'));
     }
   };
 
-  const handleSaveCustomer = (e) => {
+  const handleSaveCustomer = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData.entries());
-    if (modalMode === 'Add') {
-      const newId = `RC-${1000 + customers.length + 1}`;
-      setCustomers(prev => [...prev, { ...data, id: newId, locations: parseInt(data.locations) || 0 }]);
-      addToast('Customer added');
-    } else {
-      setCustomers(prev => prev.map(c => c.id === currentCustomer.id ? { ...c, ...data } : c));
-      addToast('Customer updated');
-    }
-    setIsModalOpen(false);
-  };
-
-  // --- Quotation Logic ---
-  const initQuotation = (customer = null) => {
-    const qtn = {
-      id: `QTN-${Math.floor(100000 + Math.random() * 900000)}`,
-      date: new Date().toISOString().split('T')[0],
-      customerType: customer?.type || 'Corporate',
-      customerName: customer?.name || '',
-      companyName: customer?.name || '',
-      address: 'Registered Address, City, PIN',
-      contactPerson: customer?.person1 || '',
-      phone: customer?.phone || '',
-      email: customer?.email || '',
-      productName: 'Laptop i5',
-      deviceType: 'Laptop',
-      model: 'ThinkPad E14',
-      specs: 'i5, 16GB RAM, 512GB SSD',
-      serial: '',
-      qty: 1,
-      rentMonth: 1500,
-      rentDay: 150,
-      minPeriod: 3,
-      deposit: 3000,
-      installation: 500,
-      delivery: 200,
-      gstPercent: 18,
-      paymentTerms: 'Advance',
-      slaTime: 4,
-      terms: 'The rental charges are exclusive of GST. Security deposit is refundable.',
-      paymentPolicy: 'Advance payment required for first month.',
-      deliveryPolicy: 'Delivery within 24 hours of confirmation.',
-      supportPolicy: 'Technical support available 24/7.',
-      status: 'Draft'
+    const payload = {
+      customerType: data.type,
+      companyName: data.name,
+      customerName: data.name,
+      authorizedPerson1: data.name,
+      authorizedPerson2: '',
+      gstNumber: '',
+      address: data.address || '',
+      contactNumber: data.phone || '',
+      email: data.email || '',
+      billingAddress: data.address || '',
+      locations: [],
+      status: 'Active',
     };
-    setCurrentDoc(qtn);
-    setIsQuotationModalOpen(true);
+    try {
+      if (modalMode === 'Add') {
+        await api.create('rentalCustomers', payload);
+        addToast('Customer added');
+      } else if (currentCustomer?.id) {
+        await api.update('rentalCustomers', currentCustomer.id, {
+          ...(currentCustomer.raw || {}),
+          ...payload,
+          id: currentCustomer.id,
+        });
+        addToast('Customer updated');
+      }
+      await loadCustomers();
+      setIsModalOpen(false);
+    } catch (error) {
+      addToast('Unable to save customer', 'info');
+    }
   };
 
-  const saveQuotation = () => {
-    setDocuments(prev => ({
-      ...prev,
-      quotations: [currentDoc, ...prev.quotations.filter(q => q.id !== currentDoc.id)]
-    }));
-    addToast('Quotation saved');
-    setIsQuotationModalOpen(false);
+  const goToQuotations = (customer = null) => {
+    if (!customer) {
+      window.location.href = '/admin/rental/quotations';
+      return;
+    }
+    const params = new URLSearchParams({
+      customerId: customer.id || '',
+      customerName: customer.name || '',
+      contactPerson: customer.person1 || '',
+      customerAddress: customer.address || '',
+      gstin: customer.gst || '',
+    });
+    window.location.href = `/admin/rental/quotations?${params.toString()}`;
+  };
+
+  const openCustomerProcess = (customerId) => {
+    window.location.href = `/admin/rental/customers/${customerId}`;
   };
 
   // --- Agreement Logic ---
@@ -271,52 +273,14 @@ const RentalCustomersPage = () => {
   };
 
   return (
-    <div className={`customer-page ${isDarkMode ? 'dark' : ''}`}>
-      {/* --- Global Header --- */}
-      <header className="customer-header no-print">
-        <div className="customer-header-left">
-          <h1>Customer Management</h1>
-          <p>Manage customer profiles, contracts, and documents.</p>
-        </div>
-        <div className="customer-header-actions">
-          <div className="relative">
-            <input type="text" className="customer-search" placeholder="Search..." value={headerSearch} onChange={e => setHeaderSearch(e.target.value)} />
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          </div>
-          <button className="icon-button" onClick={() => setIsDarkMode(!isDarkMode)}>
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-          <div className="admin-profile-chip">
-            <div className="admin-avatar">A</div>
-            <div className="admin-info"><span>Admin User</span><small>System Admin</small></div>
-          </div>
-        </div>
-      </header>
-
-      {/* --- Breadcrumb & Actions --- */}
-      <section className="breadcrumb-card no-print">
-        <div className="breadcrumb">
-          <span>Admin</span> <ChevronRight size={14} /> <span>Rental Management</span> <ChevronRight size={14} /> <strong>Customers</strong>
-        </div>
-        <div className="flex justify-between items-end">
-          <div>
-            <h2 className="text-xl font-extrabold m-0">Customer Management</h2>
-            <p className="text-slate-500 text-sm m-0 mt-1">Repository of rental clients and their documents.</p>
-          </div>
-          <div className="flex gap-3">
-            <button className="secondary-button" onClick={() => initQuotation()}><Plus size={18} /> Add Quotation</button>
-            <button className="secondary-button" onClick={() => setIsTypeSelectorOpen(true)}><Plus size={18} /> Add Agreement</button>
-            <button className="primary-button" onClick={() => { setModalMode('Add'); setCurrentCustomer(null); setIsModalOpen(true); }}><Plus size={18} /> Add Customer</button>
-          </div>
-        </div>
-      </section>
-
+    <div className="customer-page">
       {/* --- Filters --- */}
       <section className="filter-card no-print">
         <div className="relative flex-1 min-w-[280px]">
           <input type="text" className="filter-search" placeholder="Search customer, phone, GST..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
         </div>
+        <button className="primary-button" onClick={() => { setModalMode('Add'); setCurrentCustomer(null); setIsModalOpen(true); }}><Plus size={18} /> Add Customer</button>
         <select className="filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
           <option>All Types</option><option>Corporate</option><option>Individual</option>
         </select>
@@ -347,7 +311,14 @@ const RentalCustomersPage = () => {
                   <td>
                     <div className="customer-cell">
                       <div className="customer-avatar">{c.name.charAt(0)}</div>
-                      <div className="font-bold text-slate-800">{c.name}</div>
+                      <button
+                        type="button"
+                        className="font-bold text-slate-800 hover:text-indigo-600"
+                        onClick={() => openCustomerProcess(c.id)}
+                        style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
+                      >
+                        {c.name}
+                      </button>
                     </div>
                   </td>
                   <td className="text-slate-600">{c.person1}</td>
@@ -361,9 +332,9 @@ const RentalCustomersPage = () => {
                       </button>
                       {openMenuId === c.id && (
                         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="menu-panel">
-                          <button className="menu-item" onClick={() => initQuotation(c)}><FileText size={14} /> Create Quotation</button>
+                          <button className="menu-item" onClick={() => goToQuotations(c)}><FileText size={14} /> Create Quotation</button>
+                          <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> Open Process</button>
                           <button className="menu-item" onClick={() => initAgreement(c.type, c)}><ClipboardCheck size={14} /> Create Agreement</button>
-                          <button className="menu-item" onClick={() => { setActiveDocTab(`${c.type} Agreements`); document.getElementById('documents-section').scrollIntoView({behavior:'smooth'}); setOpenMenuId(null); }}><Eye size={14} /> View Documents</button>
                           <div className="h-px bg-slate-100 my-1"></div>
                           <button className="menu-item" onClick={() => { setModalMode('Edit'); setCurrentCustomer(c); setIsModalOpen(true); setOpenMenuId(null); }}><Edit2 size={14} /> Edit</button>
                           <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button>
@@ -377,123 +348,6 @@ const RentalCustomersPage = () => {
           </table>
         </div>
       </section>
-
-      {/* --- Customer Documents Section --- */}
-      <section id="documents-section" className="documents-card no-print">
-        <div className="documents-toolbar">
-          <div>
-            <h3 className="text-xl font-extrabold m-0">Customer Documents</h3>
-            <p className="text-slate-500 text-sm m-0">Create quotations, rental agreements, and printable forms.</p>
-          </div>
-          <div className="flex gap-3">
-            <button className="secondary-button" onClick={() => initQuotation()}><Plus size={18} /> Add Quotation</button>
-            <button className="secondary-button" onClick={() => setIsTypeSelectorOpen(true)}><Plus size={18} /> Add Agreement</button>
-            <button className="icon-button" title="Export"><Download size={18} /></button>
-          </div>
-        </div>
-
-        <div className="documents-tabs">
-          {['Quotations', 'Corporate Agreements', 'Individual Agreements'].map(tab => (
-            <button key={tab} className={`documents-tab ${activeDocTab === tab ? 'active' : ''}`} onClick={() => setActiveDocTab(tab)}>{tab}</button>
-          ))}
-        </div>
-
-        <div className="data-table-wrapper">
-          <table className="documents-table">
-            <thead>
-              <tr><th>Doc No</th><th>Type</th><th>Customer</th><th>Created Date</th><th>Status</th><th className="text-center">Actions</th></tr>
-            </thead>
-            <tbody>
-              {documents[activeDocTab === 'Quotations' ? 'quotations' : activeDocTab === 'Corporate Agreements' ? 'corporateAgreements' : 'individualAgreements'].map(doc => (
-                <tr key={doc.id}>
-                  <td className="font-mono text-xs font-black text-indigo-600">{doc.id}</td>
-                  <td>{activeDocTab.split(' ')[0]}</td>
-                  <td className="font-bold">{doc.customerName}</td>
-                  <td>{doc.date}</td>
-                  <td><span className={`status-badge status-${doc.status.toLowerCase()}`}>{doc.status}</span></td>
-                  <td className="text-center">
-                    <div className="flex justify-center gap-2">
-                      <button className="icon-button" onClick={() => activeDocTab === 'Quotations' ? initQuotation() : initAgreement(activeDocTab.split(' ')[0])}><Edit2 size={14} /></button>
-                      <button className="icon-button" onClick={() => window.print()}><Printer size={14} /></button>
-                      <button className="icon-button" onClick={() => addToast('Duplicate ready')}><Copy size={14} /></button>
-                      <button className="icon-button danger" onClick={() => addToast('Deleted')}><Trash2 size={14} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* --- Quotation Builder Modal --- */}
-      <AnimatePresence>
-        {isQuotationModalOpen && (
-          <div className="modal-overlay" onClick={() => setIsQuotationModalOpen(false)}>
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="document-modal" onClick={e => e.stopPropagation()}>
-              <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 no-print">
-                <h2 className="!m-0">Create Rental Quotation</h2>
-                <div className="flex gap-3">
-                  <button className="secondary-button" onClick={() => setIsQuotationModalOpen(false)}>Cancel</button>
-                  <button className="primary-button !bg-emerald-600" onClick={saveQuotation}><Check size={18} /> Save Draft</button>
-                </div>
-              </div>
-              <div className="document-form-layout">
-                <div className="document-form-panel no-print">
-                  <div className="document-section-card">
-                    <h3><User size={18} /> Customer Details</h3>
-                    <div className="document-form-grid">
-                      <div className="document-field"><label>Customer Name</label><input value={currentDoc.customerName} onChange={e => setCurrentDoc({...currentDoc, customerName: e.target.value})} /></div>
-                      <div className="document-field"><label>Company Name</label><input value={currentDoc.companyName} onChange={e => setCurrentDoc({...currentDoc, companyName: e.target.value})} /></div>
-                      <div className="document-field full"><label>Address</label><input value={currentDoc.address} onChange={e => setCurrentDoc({...currentDoc, address: e.target.value})} /></div>
-                    </div>
-                  </div>
-                  <div className="document-section-card">
-                    <h3><Package size={18} /> Product Details</h3>
-                    <div className="document-form-grid">
-                      <div className="document-field"><label>Model</label><input value={currentDoc.model} onChange={e => setCurrentDoc({...currentDoc, model: e.target.value})} /></div>
-                      <div className="document-field"><label>Quantity</label><input type="number" value={currentDoc.qty} onChange={e => setCurrentDoc({...currentDoc, qty: e.target.value})} /></div>
-                    </div>
-                  </div>
-                  <div className="document-section-card">
-                    <h3><DollarSign size={18} /> Rental Pricing</h3>
-                    <div className="document-form-grid">
-                      <div className="document-field"><label>Rent / Month</label><input type="number" value={currentDoc.rentMonth} onChange={e => setCurrentDoc({...currentDoc, rentMonth: e.target.value})} /></div>
-                      <div className="document-field"><label>Security Deposit</label><input type="number" value={currentDoc.deposit} onChange={e => setCurrentDoc({...currentDoc, deposit: e.target.value})} /></div>
-                    </div>
-                  </div>
-                  <div className="document-section-card">
-                    <h3><Settings size={18} /> Editable Terms</h3>
-                    <div className="document-field full"><label>Terms & Conditions</label><textarea value={currentDoc.terms} onChange={e => setCurrentDoc({...currentDoc, terms: e.target.value})} /></div>
-                  </div>
-                </div>
-                <div className="document-preview-panel">
-                  <div className="quotation-preview-paper">
-                    <h1>RENTAL QUOTATION</h1>
-                    <div className="flex justify-between mb-8">
-                      <div><strong>To:</strong><br/>{currentDoc.companyName}<br/>{currentDoc.address}</div>
-                      <div className="text-right"><strong>No:</strong> {currentDoc.id}<br/><strong>Date:</strong> {currentDoc.date}</div>
-                    </div>
-                    <table>
-                      <thead><tr><th>Product</th><th>Description</th><th>Qty</th><th>Rent (Month)</th></tr></thead>
-                      <tbody>
-                        <tr><td>{currentDoc.productName}</td><td>{currentDoc.model}<br/><small>{currentDoc.specs}</small></td><td>{currentDoc.qty}</td><td>₹{currentDoc.rentMonth}</td></tr>
-                      </tbody>
-                    </table>
-                    <div className="my-6">
-                      <p>Security Deposit: <strong>₹{currentDoc.deposit}</strong></p>
-                      <p>Minimum Period: <strong>{currentDoc.minPeriod} Months</strong></p>
-                      <p>Payment Terms: <strong>{currentDoc.paymentTerms}</strong></p>
-                    </div>
-                    <div className="mt-8 border-t pt-4"><h3>Terms & Conditions</h3><p className="text-sm whitespace-pre-wrap">{currentDoc.terms}</p></div>
-                    <div className="signature-block"><div className="sig-line">Authorized Signatory</div></div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* --- Agreement Builder Modal --- */}
       <AnimatePresence>
@@ -616,3 +470,4 @@ const RentalCustomersPage = () => {
 };
 
 export default RentalCustomersPage;
+

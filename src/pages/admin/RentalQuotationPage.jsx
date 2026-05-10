@@ -1,429 +1,656 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Calculator,
-  FileText,
-  IndianRupee,
-  Mail,
-  MoreVertical,
-  Plus,
+  ArrowLeft,
+  Eye,
+  Edit,
   Printer,
-  Save,
-  Send,
+  Plus,
   Trash2,
-  X,
+  Send,
+  Save,
+  Check,
+  User,
+  MapPin,
+  Calendar,
+  Wrench,
+  Package2,
+  Sparkles,
 } from 'lucide-react';
-import AdminPageHeader from '../../components/common/AdminPageHeader';
-import { calculateRentalQuotation, rentalQuotationService } from '../../services/rentalQuotationService';
+import './PlansCustomers.css';
+import './RentalWorkflow.css';
+import { rentalQuotationService } from '../../services/rentalQuotationService';
 
-const emptyProduct = {
-  id: 1,
-  productName: 'Laptop i5',
-  model: 'Dell Latitude 5400',
-  specs: 'i5, 8GB RAM, 256GB SSD',
+const DEVICE_OPTIONS = ['Desktop', 'Laptop', 'Priner', 'CCTV', 'Server'];
+
+const createDevice = (idx = 0) => ({
+  id: Date.now() + idx,
+  device: 'Desktop',
+  type: '',
+  brand: '',
+  model: '',
+  inputField: '',
+  specs: '',
   serialNo: '',
   quantity: 1,
-};
+  rentalPrice: 0,
+  rentalUnit: 'Per Month',
+  billingFrequency: 'Monthly',
+  installationRequirements: '',
+  accessories: '',
+  remarks: '',
+});
 
-const initialForm = {
-  customerName: '',
+const buildDefaultQuote = (params) => ({
+  date: new Date().toISOString().split('T')[0],
+  number: `RQT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+  customerName: params.get('customerName') || '',
+  customerId: params.get('customerId') || '',
+  contactPerson: params.get('contactPerson') || '',
+  customerAddress: params.get('customerAddress') || '',
+  customerLocation: params.get('customerAddress') || '',
+  gstin: params.get('gstin') || '',
   customerPhone: '',
   customerEmail: '',
-  customerAddress: '',
-  rentalFrequency: 'Monthly',
-  rentalPrice: 1500,
-  minimumPeriod: 3,
-  securityDeposit: 3000,
+  installationDate: new Date().toISOString().split('T')[0],
+  assignedTechnician: 'Unassigned',
+  minimumRentalPeriod: '3 Months',
+  securityDeposit: 0,
   installationCharges: 0,
   deliveryCharges: 0,
-  gstRate: 18,
+  gstType: 'Exclusive',
+  gstPercent: 18,
   paymentTerms: 'Advance',
-  sla: '4 business hours',
-  validityDays: 7,
-  notes: '',
-};
+  slaResponse: '4-8 Working Hours',
+  resolutionTime: '24-48 Working Hours',
+  validity: '30 Days',
+  scope: ['Preventive maintenance support', 'Remote support', 'On-site visit support'],
+  exclusions: ['Physical damage', 'Consumables and accessories'],
+});
 
-const formatCurrency = (value) => `INR ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
-
-const statusClass = {
-  Draft: 'status-draft',
-  Sent: 'status-assigned',
-  Approved: 'status-completed',
-  Rejected: 'status-overdue',
-  Converted: 'status-completed',
-  Expired: 'status-overdue',
-};
+const formatCurrency = (value) => `INR ${Number(value || 0).toLocaleString('en-IN')}`;
 
 const RentalQuotationPage = () => {
-  const [form, setForm] = useState(initialForm);
-  const [products, setProducts] = useState([emptyProduct]);
-  const [quotations, setQuotations] = useState([]);
+  const params = new URLSearchParams(window.location.search);
+  const [mode, setMode] = useState('form');
+  const [quoteData, setQuoteData] = useState(() => buildDefaultQuote(params));
+  const [devices, setDevices] = useState([createDevice()]);
+  const [quotationId, setQuotationId] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState('');
-  const [errors, setErrors] = useState({});
-  const [activeDropdownId, setActiveDropdownId] = useState(null);
+  const [activity, setActivity] = useState([]);
+  const [workflow, setWorkflow] = useState({
+    quotationSaved: false,
+    quotationSent: false,
+    quotationApproved: false,
+    agreementId: '',
+    assetsCount: 0,
+    installationReady: false,
+    meterReady: false,
+    invoiceReady: false,
+  });
 
   useEffect(() => {
-    rentalQuotationService.listQuotations().then(setQuotations);
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.member-action-menu') && !event.target.closest('.action-trigger-btn')) {
-        setActiveDropdownId(null);
+    const loadExistingQuotation = async () => {
+      const queryQuotationId = params.get('quotationId');
+      const queryCustomerId = params.get('customerId');
+      let existing = null;
+      if (queryQuotationId) {
+        existing = await rentalQuotationService.listQuotations()
+          .then((rows) => rows.find((row) => row.id === queryQuotationId) || null);
+      } else if (queryCustomerId) {
+        existing = await rentalQuotationService.getQuotationByCustomer(queryCustomerId);
       }
+      if (!existing) return;
+
+      setQuotationId(existing.id || '');
+      setQuoteData((prev) => ({
+        ...prev,
+        ...existing,
+        date: existing.quoteDate || existing.date || prev.date,
+        number: existing.quotationNo || existing.number || prev.number,
+        minimumRentalPeriod: existing.minimumPeriod ? `${existing.minimumPeriod} Months` : (existing.minimumRentalPeriod || prev.minimumRentalPeriod),
+        gstPercent: Number(existing.gstRate ?? existing.gstPercent ?? prev.gstPercent),
+      }));
+      setDevices(
+        Array.isArray(existing.products) && existing.products.length
+          ? existing.products.map((row, idx) => ({
+            ...createDevice(idx),
+            ...row,
+            id: row.id || `${existing.id}-${idx}`,
+            quantity: Number(row.quantity || 1),
+            rentalPrice: Number(row.rentalPrice || 0),
+            rentalUnit: row.rentalUnit || 'Per Month',
+          }))
+          : [createDevice()]
+      );
+      setWorkflow((prev) => ({
+        ...prev,
+        quotationSaved: true,
+        quotationSent: existing.status === 'Sent' || existing.status === 'Approved' || existing.status === 'Converted',
+        quotationApproved: existing.status === 'Approved' || existing.status === 'Converted',
+        agreementId: existing.agreementId || '',
+        assetsCount: Number(existing.assetsCount || 0),
+        installationReady: existing.installationStatus === 'Pending' || existing.installationStatus === 'Ready',
+        meterReady: existing.onboardingStatus === 'Assets Registered',
+        invoiceReady: existing.onboardingStatus === 'Assets Registered',
+      }));
+      pushActivity(`Loaded existing quotation ${existing.id} for this customer.`);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+
+    loadExistingQuotation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const totals = useMemo(() => calculateRentalQuotation(form), [form]);
-  const primaryProduct = products[0] || emptyProduct;
+  const subtotal = useMemo(
+    () => devices.reduce((sum, d) => sum + Number(d.quantity || 0) * Number(d.rentalPrice || 0), 0),
+    [devices]
+  );
+  const gstAmount = quoteData.gstType === 'Exclusive'
+    ? (subtotal + Number(quoteData.installationCharges || 0) + Number(quoteData.deliveryCharges || 0)) * (Number(quoteData.gstPercent || 0) / 100)
+    : 0;
+  const grandTotal = subtotal
+    + Number(quoteData.securityDeposit || 0)
+    + Number(quoteData.installationCharges || 0)
+    + Number(quoteData.deliveryCharges || 0)
+    + gstAmount;
 
-  const updateForm = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: '' }));
+  const workflowSteps = useMemo(() => {
+    const steps = [
+      { id: 'saved', label: 'Quotation Saved', done: workflow.quotationSaved },
+      { id: 'sent', label: 'Quotation Sent', done: workflow.quotationSent },
+      { id: 'approved', label: 'Quotation Approved', done: workflow.quotationApproved },
+      { id: 'agreement', label: 'Agreement Created', done: Boolean(workflow.agreementId) },
+      { id: 'assets', label: 'Assets Registered', done: workflow.assetsCount > 0 },
+      { id: 'installation', label: 'Installation Ready', done: workflow.installationReady },
+      { id: 'meter', label: 'Meter Billing Ready', done: workflow.meterReady },
+      { id: 'invoice', label: 'Invoice Generation Ready', done: workflow.invoiceReady },
+    ];
+    const activeIndex = steps.findIndex((s) => !s.done);
+    return { steps, activeIndex: activeIndex === -1 ? steps.length - 1 : activeIndex };
+  }, [workflow]);
+
+  const pushActivity = (text) => {
+    const ts = new Date();
+    const time = `${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`;
+    setActivity((prev) => [{ id: Date.now() + Math.random(), text, time }, ...prev].slice(0, 8));
   };
 
-  const updateProduct = (id, field, value) => {
-    setProducts((current) => current.map((product) => (
-      product.id === id ? { ...product, [field]: value } : product
-    )));
+  const updateDevice = (id, field, value) => {
+    setDevices((prev) => prev.map((d) => (d.id === id ? { ...d, [field]: value } : d)));
   };
 
-  const addProduct = () => {
-    setProducts((current) => [
-      ...current,
-      {
-        ...emptyProduct,
-        id: Date.now(),
-        productName: '',
-        model: '',
-        specs: '',
-        serialNo: '',
-      },
-    ]);
+  const addDevice = () => {
+    setDevices((prev) => [...prev, createDevice(prev.length)]);
+    pushActivity('Added a new device row to quotation.');
   };
 
-  const validate = () => {
-    const nextErrors = {};
-    if (!form.customerName.trim()) nextErrors.customerName = 'Customer name is required.';
-    if (!form.customerPhone.trim()) nextErrors.customerPhone = 'Phone number is required.';
-    if (!primaryProduct.productName.trim()) nextErrors.productName = 'Product name is required.';
-    if (Number(form.rentalPrice) <= 0) nextErrors.rentalPrice = 'Rental price must be greater than zero.';
-    if (Number(form.minimumPeriod) <= 0) nextErrors.minimumPeriod = 'Minimum period is required.';
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+  const removeDevice = (id) => {
+    setDevices((prev) => (prev.length > 1 ? prev.filter((d) => d.id !== id) : prev));
+    pushActivity('Removed a device row from quotation.');
   };
 
-  const saveQuotation = async (status = 'Draft') => {
-    if (!validate()) return;
-    const quotation = await rentalQuotationService.saveQuotation({
-      ...form,
-      productName: primaryProduct.productName,
-      products,
-      status,
+  const updateListItem = (key, index, value) => {
+    setQuoteData((prev) => {
+      const next = [...prev[key]];
+      next[index] = value;
+      return { ...prev, [key]: next };
     });
-    if (status === 'Sent') {
-      await rentalQuotationService.markSent(quotation.id);
-    }
-    setQuotations(await rentalQuotationService.listQuotations());
-    setNotice(`Quotation ${quotation.id} ${status === 'Sent' ? 'saved and sent' : 'saved as draft'}.`);
   };
 
-  const runQuotationAction = async (quotationId, action) => {
+  const removeListItem = (key, index) => {
+    setQuoteData((prev) => ({ ...prev, [key]: prev[key].filter((_, i) => i !== index) }));
+  };
+
+  const addListItem = (key, value) => {
+    setQuoteData((prev) => ({ ...prev, [key]: [...prev[key], value] }));
+  };
+
+  const buildPayload = (status = 'Draft', source = quoteData) => ({
+    id: quotationId || undefined,
+    status,
+    customerId: source.customerId || undefined,
+    customerName: source.customerName,
+    customerAddress: source.customerAddress,
+    customerLocation: source.customerLocation || source.customerAddress || 'Primary Location',
+    customerPhone: source.customerPhone,
+    customerEmail: source.customerEmail,
+    gstin: source.gstin,
+    quotationNo: source.number,
+    quoteDate: source.date,
+    minimumPeriod: Number(String(source.minimumRentalPeriod || '0').split(' ')[0]) || 0,
+    securityDeposit: Number(source.securityDeposit || 0),
+    installationCharges: Number(source.installationCharges || 0),
+    deliveryCharges: Number(source.deliveryCharges || 0),
+    gstRate: Number(source.gstPercent || 0),
+    paymentTerms: source.paymentTerms,
+    slaResponse: source.slaResponse,
+    resolutionTime: source.resolutionTime,
+    validity: source.validity,
+    installationDate: source.installationDate,
+    assignedTechnician: source.assignedTechnician || 'Unassigned',
+    scope: source.scope,
+    exclusions: source.exclusions,
+    products: devices.map((d) => ({
+      device: d.device,
+      type: d.type,
+      brand: d.brand,
+      model: d.model,
+      inputField: d.inputField,
+      specs: d.specs,
+      serialNo: d.serialNo,
+      quantity: Number(d.quantity || 0),
+      rentalPrice: Number(d.rentalPrice || 0),
+      rentalUnit: d.rentalUnit,
+      billingFrequency: d.billingFrequency,
+      installationRequirements: d.installationRequirements,
+      accessories: d.accessories,
+      remarks: d.remarks,
+    })),
+  });
+
+  const saveQuotation = async (status = 'Draft', source = quoteData) => {
+    setIsSaving(true);
+    setNotice('');
     try {
-      if (action === 'approve') await rentalQuotationService.markApproved(quotationId);
-      if (action === 'reject') await rentalQuotationService.markRejected(quotationId);
-      if (action === 'customer') await rentalQuotationService.convertToCustomer(quotationId);
-      if (action === 'contract') await rentalQuotationService.convertToContract(quotationId);
-      setQuotations(await rentalQuotationService.listQuotations());
-      setNotice(`Quotation ${quotationId} updated.`);
+      const saved = await rentalQuotationService.saveQuotation(buildPayload(status, source));
+      setQuotationId(saved.id);
+      setWorkflow((prev) => ({
+        ...prev,
+        quotationSaved: true,
+        quotationSent: prev.quotationSent || status === 'Sent',
+      }));
+      setNotice(`Quotation ${saved.id} saved as ${status}.`);
+      pushActivity(`Quotation ${saved.id} saved as ${status}.`);
+      return saved;
     } catch (error) {
-      setNotice(error.message);
+      setNotice(error.message || 'Failed to save quotation.');
+      return null;
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  const sendQuotation = async () => {
+    const saved = await saveQuotation('Draft');
+    if (!saved?.id) return;
+    setIsSaving(true);
+    try {
+      await rentalQuotationService.markSent(saved.id);
+      setWorkflow((prev) => ({ ...prev, quotationSent: true }));
+      setNotice(`Quotation ${saved.id} marked as Sent.`);
+      pushActivity(`Quotation ${saved.id} sent to customer.`);
+    } catch (error) {
+      setNotice(error.message || 'Failed to send quotation.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const approveQuotation = async () => {
+    const normalized = {
+      ...quoteData,
+      customerName: quoteData.customerName || 'Unnamed Customer',
+      customerLocation: quoteData.customerLocation || quoteData.customerAddress || 'Primary Location',
+      assignedTechnician: quoteData.assignedTechnician || 'Unassigned',
+    };
+    setQuoteData((prev) => ({
+      ...prev,
+      ...normalized,
+    }));
+    const saved = await saveQuotation('Sent', normalized);
+    if (!saved?.id) return;
+    setIsSaving(true);
+    try {
+      const result = await rentalQuotationService.markApproved(saved.id);
+      const resolvedCustomerId = result?.customer?.id || quoteData.customerId || '';
+      setWorkflow((prev) => ({
+        ...prev,
+        quotationApproved: true,
+        agreementId: result.agreement?.id || '',
+        assetsCount: result.assets?.length || 0,
+        installationReady: (result.assets?.length || 0) > 0,
+        meterReady: (result.assets?.length || 0) > 0,
+        invoiceReady: (result.assets?.length || 0) > 0,
+      }));
+      setNotice(`${result.message} Agreement: ${result.agreement?.id || '-'}, Assets: ${result.assets?.length || 0}. Redirecting to customer workflow...`);
+      pushActivity(`Quotation approved. Agreement ${result.agreement?.id || '-'} created and ${result.assets?.length || 0} asset(s) registered.`);
+      if (resolvedCustomerId) {
+        setTimeout(() => {
+          window.location.href = `/admin/rental/customers/${resolvedCustomerId}`;
+        }, 900);
+      }
+    } catch (error) {
+      setNotice(error.message || 'Failed to approve quotation.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const workflowBadge = workflow.invoiceReady
+    ? 'Invoice Ready'
+    : workflow.quotationApproved
+      ? 'Approved'
+      : workflow.quotationSent
+        ? 'Sent'
+        : workflow.quotationSaved
+          ? 'Draft Saved'
+          : 'In Progress';
+
+  const isDeviceValid = (device) =>
+    Boolean(device.device) && Number(device.quantity || 0) > 0 && Number(device.rentalPrice || 0) >= 0;
+  const hasValidCustomer = Boolean(quoteData.customerName?.trim());
+  const hasValidDevices = devices.length > 0 && devices.every(isDeviceValid);
+  const canSend = hasValidCustomer && hasValidDevices && !workflow.quotationApproved;
+  const canApprove = workflow.quotationSent && !workflow.quotationApproved;
+
+  if (mode === 'preview') {
+    return (
+      <div className="document-view-container rental-workflow-page">
+        <HeaderBar
+          title="Quotation Preview"
+          quotationId={quotationId}
+          customerName={quoteData.customerName}
+          badge={workflowBadge}
+          onBack={() => setMode('form')}
+          onSaveDraft={() => saveQuotation('Draft')}
+          onSend={sendQuotation}
+          onApprove={approveQuotation}
+          onPreview={null}
+          loading={isSaving}
+          primaryLabel="Print Quotation"
+          onPrimary={() => window.print()}
+        />
+
+        {notice ? <div className="success-banner no-print" role="status"><span>{notice}</span></div> : null}
+
+        <div className="document-paper">
+          <div className="paper-header">
+            <div className="company-info">
+              <h2 style={{ color: 'var(--secondary)', margin: 0 }}>RepairTech Solutions</h2>
+              <p>Rental Management Division</p>
+            </div>
+            <div className="doc-type" style={{ textAlign: 'right' }}>
+              <h1 style={{ margin: 0, fontSize: '28px' }}>RENTAL QUOTATION</h1>
+              <p><strong>Date:</strong> {quoteData.date}</p>
+              <p><strong>Quote #:</strong> {quoteData.number}</p>
+            </div>
+          </div>
+
+          <div className="paper-body">
+            <div className="info-grid">
+              <div className="info-block">
+                <strong>BILL TO:</strong>
+                <p className="client-name">{quoteData.customerName || '-'}</p>
+                <p>{quoteData.contactPerson || '-'}</p>
+                <p>{quoteData.customerAddress || '-'}</p>
+                <p><strong>GSTIN:</strong> {quoteData.gstin || '-'}</p>
+              </div>
+              <div className="info-block" style={{ textAlign: 'right' }}>
+                <strong>SLA DETAILS:</strong>
+                <p>Response: {quoteData.slaResponse}</p>
+                <p>Resolution: {quoteData.resolutionTime}</p>
+                <p>Validity: {quoteData.validity}</p>
+                <p>Payment Terms: {quoteData.paymentTerms}</p>
+              </div>
+            </div>
+
+            <div className="doc-section">
+              <h3 className="section-heading">ASSET REGISTRY & COVERAGE</h3>
+              <table className="doc-table">
+                <thead>
+                  <tr>
+                    <th>Device</th><th>Type</th><th>Brand</th><th>Model</th><th>Input Field</th><th>S/N</th><th>Qty</th><th style={{ textAlign: 'right' }}>Unit Price</th><th style={{ textAlign: 'right' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {devices.map((d) => (
+                    <tr key={d.id}>
+                      <td>{d.device}</td><td>{d.type || '-'}</td><td>{d.brand || '-'}</td><td>{d.model || '-'}</td><td>{d.inputField || '-'}</td><td>{d.serialNo || '-'}</td><td>{d.quantity}</td><td style={{ textAlign: 'right' }}>{formatCurrency(d.rentalPrice)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(d.quantity * d.rentalPrice)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>Rental Subtotal</td><td style={{ textAlign: 'right' }}>{formatCurrency(subtotal)}</td></tr>
+                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>Security Deposit</td><td style={{ textAlign: 'right' }}>{formatCurrency(quoteData.securityDeposit)}</td></tr>
+                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>Installation Charges</td><td style={{ textAlign: 'right' }}>{formatCurrency(quoteData.installationCharges)}</td></tr>
+                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>Delivery Charges</td><td style={{ textAlign: 'right' }}>{formatCurrency(quoteData.deliveryCharges)}</td></tr>
+                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>GST ({quoteData.gstPercent}%) - {quoteData.gstType}</td><td style={{ textAlign: 'right' }}>{formatCurrency(gstAmount)}</td></tr>
+                  <tr style={{ fontSize: '18px', color: 'var(--secondary)' }}><td colSpan="8" style={{ textAlign: 'right', fontWeight: 'bold' }}>GRAND TOTAL</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(grandTotal)}</td></tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="admin-module-page rental-quotation-page">
-      {notice && (
-        <div className="success-banner" role="status">
-          <span>{notice}</span>
-          <button className="icon-btn" onClick={() => setNotice('')} aria-label="Dismiss quotation message">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-
-      <AdminPageHeader
-        title="Rental Quotation"
-        description="Create rental quotes with product details, monthly/day pricing, deposits, charges, GST, payment terms, and SLA."
-        breadcrumbs={['Admin', 'Rental Management', 'Quotation']}
-        actions={[
-          { label: 'Save Draft', icon: Save, onClick: () => saveQuotation('Draft') },
-          { label: 'Send Quotation', icon: Send, onClick: () => saveQuotation('Sent') },
-          { label: 'Print', variant: 'secondary', icon: Printer, onClick: () => window.print() },
-        ]}
+    <div className="document-view-container rental-workflow-page">
+      <HeaderBar
+        title="Quotation Settings"
+        quotationId={quotationId}
+        customerName={quoteData.customerName}
+        badge={workflowBadge}
+        canSend={canSend}
+        canApprove={canApprove}
+        onBack={() => window.location.href = '/admin/rental/customers'}
+        onSaveDraft={() => saveQuotation('Draft')}
+        onSend={sendQuotation}
+        onApprove={approveQuotation}
+        onPreview={() => setMode('preview')}
+        loading={isSaving}
+        primaryLabel=""
+        onPrimary={null}
       />
 
-      <div className="rental-quote-layout">
-        <div className="rental-quote-main">
-          <div className="card">
-            <div className="card-header">
-              <div>
-                <h3>Customer Details</h3>
-                <p>Basic customer and contact information for quotation sharing.</p>
-              </div>
-            </div>
-            <div className="form-grid">
-              <div className="form-group">
-                <label htmlFor="rental-quote-customer">Customer Name</label>
-                <input id="rental-quote-customer" value={form.customerName} onChange={(event) => updateForm('customerName', event.target.value)} aria-invalid={Boolean(errors.customerName)} />
-                {errors.customerName && <span className="form-error">{errors.customerName}</span>}
-              </div>
-              <div className="form-group">
-                <label htmlFor="rental-quote-phone">Phone Number</label>
-                <input id="rental-quote-phone" value={form.customerPhone} onChange={(event) => updateForm('customerPhone', event.target.value.replace(/\D/g, '').slice(0, 10))} aria-invalid={Boolean(errors.customerPhone)} />
-                {errors.customerPhone && <span className="form-error">{errors.customerPhone}</span>}
-              </div>
-              <div className="form-group">
-                <label htmlFor="rental-quote-email">Email</label>
-                <input id="rental-quote-email" type="email" value={form.customerEmail} onChange={(event) => updateForm('customerEmail', event.target.value)} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="rental-quote-address">Address / Location</label>
-                <input id="rental-quote-address" value={form.customerAddress} onChange={(event) => updateForm('customerAddress', event.target.value)} />
-              </div>
-            </div>
-          </div>
+      {notice ? <div className="success-banner no-print" role="status"><span>{notice}</span></div> : null}
 
-          <div className="card overflow-hidden">
-            <div className="card-header">
-              <div>
-                <h3>Product Details</h3>
-                <p>Model and specs are captured now; serial number can remain optional.</p>
-              </div>
-              <button className="btn btn-sm btn-secondary" onClick={addProduct}><Plus size={14} /> Add Product</button>
+      <div className="quotation-form-card">
+        <div className="workflow-grid">
+          <section className="workflow-card customer-card">
+            <div className="section-head">
+              <h3><User size={16} /> Customer Details</h3>
+              <button className="secondary-button" onClick={approveQuotation} disabled={isSaving || !canApprove}>{isSaving ? 'Processing...' : 'Approve & Start Agreement'}</button>
             </div>
-            {errors.productName && <div className="inline-error">{errors.productName}</div>}
-            <table className="leads-table rental-product-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Model</th>
-                  <th>Specs</th>
-                  <th>Serial No</th>
-                  <th>Qty</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td><input className="table-input" value={product.productName} onChange={(event) => updateProduct(product.id, 'productName', event.target.value)} /></td>
-                    <td><input className="table-input" value={product.model} onChange={(event) => updateProduct(product.id, 'model', event.target.value)} /></td>
-                    <td><input className="table-input" value={product.specs} onChange={(event) => updateProduct(product.id, 'specs', event.target.value)} /></td>
-                    <td><input className="table-input" placeholder="Optional" value={product.serialNo} onChange={(event) => updateProduct(product.id, 'serialNo', event.target.value)} /></td>
-                    <td><input className="table-input center" type="number" min="1" value={product.quantity} onChange={(event) => updateProduct(product.id, 'quantity', Number(event.target.value) || 1)} /></td>
-                    <td>
-                      <button className="icon-btn danger" onClick={() => setProducts(products.filter((item) => item.id !== product.id))} disabled={products.length === 1} aria-label="Remove product">
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            <div className="customer-hero">
+              <div className="avatar">{(quoteData.customerName || 'C').slice(0, 1).toUpperCase()}</div>
+              <div>
+                <h4>{quoteData.customerName || 'Customer Name'}</h4>
+                <p>{quoteData.contactPerson || 'Contact person'}</p>
+              </div>
+            </div>
+            <div className="form-two-col">
+              <FloatingField label="Customer Name" value={quoteData.customerName} onChange={(v) => setQuoteData({ ...quoteData, customerName: v })} />
+              <FloatingField label="Contact Person" value={quoteData.contactPerson} onChange={(v) => setQuoteData({ ...quoteData, contactPerson: v })} />
+              <FloatingField label="Address" value={quoteData.customerAddress} onChange={(v) => setQuoteData({ ...quoteData, customerAddress: v })} />
+              <FloatingField label="Customer Location" value={quoteData.customerLocation} onChange={(v) => setQuoteData({ ...quoteData, customerLocation: v })} />
+              <FloatingField type="date" label="Installation Date" value={quoteData.installationDate} onChange={(v) => setQuoteData({ ...quoteData, installationDate: v })} icon={<Calendar size={14} />} />
+              <FloatingField label="Assigned Technician" value={quoteData.assignedTechnician} onChange={(v) => setQuoteData({ ...quoteData, assignedTechnician: v })} icon={<Wrench size={14} />} />
+            </div>
+            <div className="meta-line"><MapPin size={14} /> {quoteData.customerLocation || 'Location not set yet'}</div>
+          </section>
 
-          <div className="card">
-            <div className="card-header">
-              <div>
-                <h3>Commercial Terms</h3>
-                <p>Rental price, deposit, charges, GST, payment terms, and support SLA.</p>
-              </div>
+          <section className="workflow-card">
+            <div className="section-head">
+              <h3><Package2 size={16} /> Product Details</h3>
+              <button className="fab-add" onClick={addDevice}><Plus size={15} /> Add Device</button>
             </div>
-            <div className="form-grid">
-              <div className="form-group">
-                <label htmlFor="rental-frequency">Rental Price Type</label>
-                <select id="rental-frequency" value={form.rentalFrequency} onChange={(event) => updateForm('rentalFrequency', event.target.value)}>
-                  <option>Monthly</option>
-                  <option>Daily</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="rental-price">Rental Price</label>
-                <input id="rental-price" type="number" min="0" value={form.rentalPrice} onChange={(event) => updateForm('rentalPrice', event.target.value)} aria-invalid={Boolean(errors.rentalPrice)} />
-                {errors.rentalPrice && <span className="form-error">{errors.rentalPrice}</span>}
-              </div>
-              <div className="form-group">
-                <label htmlFor="minimum-period">Minimum Rental Period</label>
-                <input id="minimum-period" type="number" min="1" value={form.minimumPeriod} onChange={(event) => updateForm('minimumPeriod', event.target.value)} aria-invalid={Boolean(errors.minimumPeriod)} />
-                {errors.minimumPeriod && <span className="form-error">{errors.minimumPeriod}</span>}
-              </div>
-              <div className="form-group">
-                <label htmlFor="security-deposit">Security Deposit</label>
-                <input id="security-deposit" type="number" min="0" value={form.securityDeposit} onChange={(event) => updateForm('securityDeposit', event.target.value)} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="installation-charges">Installation Charges</label>
-                <input id="installation-charges" type="number" min="0" value={form.installationCharges} onChange={(event) => updateForm('installationCharges', event.target.value)} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="delivery-charges">Delivery Charges</label>
-                <input id="delivery-charges" type="number" min="0" value={form.deliveryCharges} onChange={(event) => updateForm('deliveryCharges', event.target.value)} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="gst-rate">GST %</label>
-                <input id="gst-rate" type="number" min="0" value={form.gstRate} onChange={(event) => updateForm('gstRate', event.target.value)} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="payment-terms">Payment Terms</label>
-                <select id="payment-terms" value={form.paymentTerms} onChange={(event) => updateForm('paymentTerms', event.target.value)}>
-                  <option>Advance</option>
-                  <option>Monthly</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="sla">SLA Response Time</label>
-                <select id="sla" value={form.sla} onChange={(event) => updateForm('sla', event.target.value)}>
-                  <option>4 business hours</option>
-                  <option>8 business hours</option>
-                  <option>Next business day</option>
-                  <option>48 hours</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="validity">Validity Days</label>
-                <input id="validity" type="number" min="1" value={form.validityDays} onChange={(event) => updateForm('validityDays', event.target.value)} />
-              </div>
-              <div className="form-group">
-                <label htmlFor="quote-notes">Notes</label>
-                <textarea id="quote-notes" rows={3} value={form.notes} onChange={(event) => updateForm('notes', event.target.value)} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <aside className="rental-quote-side">
-          <div className="card rental-quote-preview">
-            <div className="card-header">
-              <div>
-                <h3>Quotation Preview</h3>
-                <p>Example-ready pricing summary.</p>
-              </div>
-              <Calculator size={18} className="icon-primary" />
-            </div>
-            <div className="quote-preview-title">
-              <FileText size={20} />
-              <div>
-                <strong>{primaryProduct.productName || 'Product'}</strong>
-                <span>{formatCurrency(form.rentalPrice)} / {form.rentalFrequency === 'Monthly' ? 'month' : 'day'}</span>
-              </div>
-            </div>
-            <div className="detail-list">
-              <div><span>Deposit</span><strong>{formatCurrency(form.securityDeposit)}</strong></div>
-              <div><span>Min period</span><strong>{form.minimumPeriod} {form.rentalFrequency === 'Monthly' ? 'months' : 'days'}</strong></div>
-              <div><span>Installation</span><strong>{formatCurrency(form.installationCharges)}</strong></div>
-              <div><span>Delivery</span><strong>{formatCurrency(form.deliveryCharges)}</strong></div>
-              <div><span>GST</span><strong>{formatCurrency(totals.gstAmount)}</strong></div>
-              <div><span>Payment terms</span><strong>{form.paymentTerms}</strong></div>
-              <div><span>SLA</span><strong>{form.sla}</strong></div>
-            </div>
-            <div className="rental-total-box">
-              <span>Quotation Total</span>
-              <strong>{formatCurrency(totals.total)}</strong>
-            </div>
-            <div className="admin-chip-row">
-              <button className="btn btn-secondary btn-full" onClick={() => setNotice('Email quotation placeholder prepared.')}><Mail size={16} /> Email</button>
-            </div>
-          </div>
-        </aside>
-      </div>
-
-      <div className="card overflow-hidden">
-        <div className="card-header">
-          <div>
-            <h3>Recent Rental Quotations</h3>
-            <p>Draft and sent quotation records.</p>
-          </div>
-        </div>
-        <table className="leads-table">
-          <thead>
-            <tr>
-              <th>Quotation No</th>
-              <th>Customer</th>
-              <th>Product</th>
-              <th>Rental</th>
-              <th>Deposit</th>
-              <th>Min Period</th>
-              <th>Created</th>
-              <th>Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quotations.map((quotation) => (
-              <tr key={quotation.id}>
-                <td className="bold">{quotation.id}</td>
-                <td>{quotation.customerName}<span className="company-name">{quotation.customerPhone}</span></td>
-                <td>{quotation.productName}</td>
-                <td>{formatCurrency(quotation.rentalPrice)} / {quotation.rentalFrequency === 'Monthly' ? 'month' : 'day'}</td>
-                <td>{formatCurrency(quotation.securityDeposit)}</td>
-                <td>{quotation.minimumPeriod}</td>
-                <td>{quotation.createdAt}</td>
-                <td><span className={`status-pill ${statusClass[quotation.status] || 'status-draft'}`}>{quotation.status}</span></td>
-                <td>
-                  <div style={{ position: 'relative' }}>
-                    <button
-                      type="button"
-                      className="icon-btn action-trigger-btn"
-                      aria-label={`Open actions for ${quotation.id}`}
-                      onClick={() => setActiveDropdownId(activeDropdownId === quotation.id ? null : quotation.id)}
-                    >
-                      <MoreVertical size={16} />
-                    </button>
-                    {activeDropdownId === quotation.id && (
-                      <div className="account-dropdown member-action-menu" style={{ top: '100%', right: 0, width: '160px', zIndex: 50 }}>
-                        <button
-                          type="button"
-                          className="account-menu-item"
-                          onClick={() => {
-                            setActiveDropdownId(null);
-                            runQuotationAction(quotation.id, 'approve');
-                          }}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          className="account-menu-item"
-                          onClick={() => {
-                            setActiveDropdownId(null);
-                            runQuotationAction(quotation.id, 'customer');
-                          }}
-                        >
-                          To Customer
-                        </button>
-                        <button
-                          type="button"
-                          className="account-menu-item"
-                          onClick={() => {
-                            setActiveDropdownId(null);
-                            runQuotationAction(quotation.id, 'contract');
-                          }}
-                        >
-                          To Contract
-                        </button>
-                      </div>
-                    )}
+            <div className="product-stack">
+              {devices.map((d) => (
+                <article className="device-card" key={d.id}>
+                  <div className="device-top">
+                    <div className="device-badge">{d.device}</div>
+                    <div className="rent-badge">{formatCurrency(d.rentalPrice)} / {d.rentalUnit === 'Per Day' ? 'Day' : 'Month'}</div>
+                    <button className="icon-button" style={{ color: 'var(--red)' }} onClick={() => removeDevice(d.id)}><Trash2 size={14} /></button>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <div className="form-two-col three">
+                    <FloatingSelect label="Device" value={d.device} onChange={(v) => updateDevice(d.id, 'device', v)} options={DEVICE_OPTIONS} />
+                    <FloatingField label="Type" value={d.type} onChange={(v) => updateDevice(d.id, 'type', v)} />
+                    <FloatingField label="Brand" value={d.brand} onChange={(v) => updateDevice(d.id, 'brand', v)} />
+                    <FloatingField label="Model" value={d.model} onChange={(v) => updateDevice(d.id, 'model', v)} />
+                    <FloatingField label="Input Field" value={d.inputField} onChange={(v) => updateDevice(d.id, 'inputField', v)} />
+                    <FloatingField label="Specs" value={d.specs} onChange={(v) => updateDevice(d.id, 'specs', v)} />
+                    <FloatingField label="Serial No" value={d.serialNo} onChange={(v) => updateDevice(d.id, 'serialNo', v)} />
+                    <FloatingField type="number" label="Qty" value={d.quantity} onChange={(v) => updateDevice(d.id, 'quantity', Number(v) || 0)} />
+                    <FloatingField type="number" label="Rental Price" value={d.rentalPrice} onChange={(v) => updateDevice(d.id, 'rentalPrice', Number(v) || 0)} />
+                    <FloatingSelect label="Rental Unit" value={d.rentalUnit} onChange={(v) => updateDevice(d.id, 'rentalUnit', v)} options={['Per Month', 'Per Day']} />
+                    <FloatingSelect label="Billing Frequency" value={d.billingFrequency} onChange={(v) => updateDevice(d.id, 'billingFrequency', v)} options={['Monthly', 'Quarterly', 'Yearly', 'Daily']} />
+                    <FloatingField label="Installation Notes" value={d.installationRequirements} onChange={(v) => updateDevice(d.id, 'installationRequirements', v)} />
+                    <FloatingField label="Accessories" value={d.accessories} onChange={(v) => updateDevice(d.id, 'accessories', v)} />
+                    <FloatingField label="Remarks" value={d.remarks} onChange={(v) => updateDevice(d.id, 'remarks', v)} />
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="workflow-card">
+            <div className="section-head"><h3><Sparkles size={16} /> Scope of Work</h3></div>
+            <EditableList
+              items={quoteData.scope}
+              onChange={(i, v) => updateListItem('scope', i, v)}
+              onRemove={(i) => removeListItem('scope', i)}
+              onAdd={() => addListItem('scope', 'New scope point')}
+              addLabel="Add Scope Point"
+            />
+          </section>
+
+          <section className="workflow-card">
+            <div className="section-head"><h3><Sparkles size={16} /> Pricing Summary</h3></div>
+            <div className="form-two-col">
+              <FloatingField label="Minimum Rental Period" value={quoteData.minimumRentalPeriod} onChange={(v) => setQuoteData({ ...quoteData, minimumRentalPeriod: v })} />
+              <FloatingSelect label="Payment Terms" value={quoteData.paymentTerms} onChange={(v) => setQuoteData({ ...quoteData, paymentTerms: v })} options={['Advance', 'Monthly']} />
+              <FloatingField type="number" label="Security Deposit" value={quoteData.securityDeposit} onChange={(v) => setQuoteData({ ...quoteData, securityDeposit: Number(v) || 0 })} />
+              <FloatingField type="number" label="Installation Charges" value={quoteData.installationCharges} onChange={(v) => setQuoteData({ ...quoteData, installationCharges: Number(v) || 0 })} />
+              <FloatingField type="number" label="Delivery Charges" value={quoteData.deliveryCharges} onChange={(v) => setQuoteData({ ...quoteData, deliveryCharges: Number(v) || 0 })} />
+              <FloatingSelect label="GST Type" value={quoteData.gstType} onChange={(v) => setQuoteData({ ...quoteData, gstType: v })} options={['Exclusive', 'Inclusive']} />
+              <FloatingField type="number" label="GST %" value={quoteData.gstPercent} onChange={(v) => setQuoteData({ ...quoteData, gstPercent: Number(v) || 0 })} />
+              <FloatingField label="SLA Response" value={quoteData.slaResponse} onChange={(v) => setQuoteData({ ...quoteData, slaResponse: v })} />
+              <FloatingField label="Resolution Time" value={quoteData.resolutionTime} onChange={(v) => setQuoteData({ ...quoteData, resolutionTime: v })} />
+              <FloatingField label="Validity" value={quoteData.validity} onChange={(v) => setQuoteData({ ...quoteData, validity: v })} />
+            </div>
+            <div className="price-total">Estimated Grand Total: <strong>{formatCurrency(grandTotal)}</strong></div>
+          </section>
+
+          <section className="workflow-card">
+            <div className="section-head"><h3><Sparkles size={16} /> Exclusions</h3></div>
+            <EditableList
+              items={quoteData.exclusions}
+              onChange={(i, v) => updateListItem('exclusions', i, v)}
+              onRemove={(i) => removeListItem('exclusions', i)}
+              onAdd={() => addListItem('exclusions', 'New exclusion point')}
+              addLabel="Add Exclusion Point"
+            />
+          </section>
+
+          <section className="workflow-card activity-card">
+            <div className="section-head"><h3>Activity Timeline</h3></div>
+            <div className="timeline-list">
+              {activity.length === 0 ? <p className="empty-hint">No activity yet. Start with Save Draft or Send.</p> : null}
+              {activity.map((row) => (
+                <div key={row.id} className="timeline-row">
+                  <span className="dot" />
+                  <div>
+                    <p>{row.text}</p>
+                    <small>{row.time}</small>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );
 };
+
+const HeaderBar = ({
+  title, quotationId, customerName, badge, onBack, onSaveDraft, onSend, onApprove, onPreview, loading, primaryLabel, onPrimary, canSend, canApprove,
+}) => (
+  <div className="sticky-head no-print">
+    <div className="left">
+      <button className="back-button" onClick={onBack}><ArrowLeft size={18} /> Back</button>
+      <div>
+        <h1>{title}</h1>
+        <p>Quotation ID: <strong>{quotationId || 'Not generated'}</strong> | Customer: <strong>{customerName || '-'}</strong></p>
+      </div>
+      <span className="status-pill">{badge}</span>
+    </div>
+    <div className="right">
+      <button className="secondary-button" onClick={onSaveDraft} disabled={loading}><Save size={15} /> {loading ? 'Saving...' : 'Save Draft'}</button>
+      <button className="secondary-button" onClick={onSend} disabled={loading || !canSend}><Send size={15} /> Send</button>
+      <button className="secondary-button" onClick={onApprove} disabled={loading || !canApprove}><Check size={15} /> Approve & Start</button>
+      {onPreview ? <button className="primary-button" onClick={onPreview} disabled={loading}><Eye size={15} /> Generate Preview</button> : null}
+      {onPrimary ? <button className="primary-button" onClick={onPrimary}>{primaryLabel}</button> : null}
+    </div>
+  </div>
+);
+
+const WorkflowChain = ({ steps, activeIndex }) => (
+  <section className="workflow-chain-card no-print">
+    <div className="workflow-chain desktop">
+      {steps.map((step, index) => {
+        const state = step.done ? 'done' : index === activeIndex ? 'active' : 'pending';
+        const connector = index < steps.length - 1
+          ? (steps[index + 1].done ? 'done' : index === activeIndex ? 'active' : 'pending')
+          : null;
+        return (
+          <div className="workflow-node-wrap" key={step.id}>
+            <div className={`workflow-node ${state}`}>{step.done ? <Check size={14} /> : null}</div>
+            <span className={`workflow-label ${state}`}>{step.label}</span>
+            {connector ? <span className={`workflow-connector ${connector}`} /> : null}
+          </div>
+        );
+      })}
+    </div>
+
+    <div className="workflow-chain mobile">
+      {steps.map((step, index) => {
+        const state = step.done ? 'done' : index === activeIndex ? 'active' : 'pending';
+        return (
+          <div className="workflow-mobile-row" key={`m-${step.id}`}>
+            <div className="workflow-mobile-rail">
+              <div className={`workflow-node ${state}`}>{step.done ? <Check size={12} /> : null}</div>
+              {index < steps.length - 1 ? <span className={`workflow-connector-vertical ${steps[index + 1].done ? 'done' : index === activeIndex ? 'active' : 'pending'}`} /> : null}
+            </div>
+            <div className="workflow-mobile-copy">
+              <p>{step.label}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+);
+
+const FloatingField = ({ label, value, onChange, type = 'text', icon = null }) => (
+  <div className="floating-field">
+    {icon ? <span className="field-icon">{icon}</span> : null}
+    <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder=" " className={icon ? 'with-icon' : ''} />
+    <label>{label}</label>
+  </div>
+);
+
+const FloatingSelect = ({ label, value, onChange, options }) => (
+  <div className="floating-field">
+    <select value={value} onChange={(e) => onChange(e.target.value)}>
+      {options.map((option) => <option key={option}>{option}</option>)}
+    </select>
+    <label>{label}</label>
+  </div>
+);
+
+const EditableList = ({ items, onChange, onRemove, onAdd, addLabel }) => (
+  <div className="edit-list">
+    {items.map((item, i) => (
+      <div key={`${item}-${i}`} className="edit-row">
+        <input className="form-input" value={item} onChange={(e) => onChange(i, e.target.value)} />
+        <button className="icon-button" style={{ color: 'var(--red)' }} onClick={() => onRemove(i)}><Trash2 size={14} /></button>
+      </div>
+    ))}
+    <button className="secondary-button" style={{ borderStyle: 'dashed' }} onClick={onAdd}><Plus size={14} /> {addLabel}</button>
+  </div>
+);
 
 export default RentalQuotationPage;

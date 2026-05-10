@@ -47,11 +47,14 @@ import DiscountsListPage from './pages/admin/DiscountsListPage';
 import RentalQuotationPage from './pages/admin/RentalQuotationPage';
 import RentalCorporateAgreementPage from './pages/admin/RentalCorporateAgreementPage';
 import RentalIndividualAgreementPage from './pages/admin/RentalIndividualAgreementPage';
-import RentalDashboardPage from './pages/admin/RentalDashboardPage';
+import RentalCustomersPage from './pages/admin/RentalCustomersPage';
+import RentalPlansPage from './pages/admin/RentalPlansPage';
+import RentalAssetsInstallationsPage from './pages/admin/RentalAssetsInstallationsPage';
+import RentalBillingInvoicesPage from './pages/admin/RentalBillingInvoicesPage';
+import RentalMaintenanceAlertsPage from './pages/admin/RentalMaintenanceAlertsPage';
 import RentalCustomerDetailPage from './pages/admin/RentalCustomerDetailPage';
 import RentalAssetDetailPage from './pages/admin/RentalAssetDetailPage';
 import RentalBillingGeneratePage from './pages/admin/RentalBillingGeneratePage';
-import RentalOperationsBillingPage from './pages/admin/RentalOperationsBillingPage';
 
 // CMC Module Pages
 import CMCDashboardPage from './pages/admin/CMCDashboardPage';
@@ -84,9 +87,22 @@ const existingAdminRouteComponents = {
   '/admin/discounts/codes': DiscountsListPage,
   '/admin/campaign/dashboard': CampaignDashboardPage,
   '/admin/campaign/jobs': CampaignJobsPage,
-  '/admin/rental': RentalDashboardPage,
-  '/admin/rental/dashboard': RentalDashboardPage,
-  '/admin/rental/customers': RentalOperationsBillingPage,
+  '/admin/rental': RentalCustomersPage,
+  '/admin/rental/dashboard': RentalCustomersPage,
+  '/admin/rental/plans': RentalPlansPage,
+  '/admin/rental/inventory': RentalCustomersPage,
+  '/admin/rental/customers': RentalCustomersPage,
+  '/admin/rental/customers-directory': RentalCustomersPage,
+  '/admin/rental/quotations': RentalQuotationPage,
+  '/admin/rental/agreements': RentalCustomersPage,
+  '/admin/rental/agreements/corporate': RentalCorporateAgreementPage,
+  '/admin/rental/agreements/individual': RentalIndividualAgreementPage,
+  '/admin/rental/assets-installations': RentalAssetsInstallationsPage,
+  '/admin/rental/billing-invoices': RentalBillingInvoicesPage,
+  '/admin/rental/billing-generate': RentalBillingGeneratePage,
+  '/admin/rental/maintenance-alerts': RentalMaintenanceAlertsPage,
+  '/admin/rental/operations-billing': RentalCustomersPage,
+  '/admin/rental/reports': RentalCustomersPage,
   '/admin/amc/dashboard': AMCDashboardPage,
   '/admin/amc/plans': AMCPlansPage,
   '/admin/amc/quotations': AMCQuotationPage,
@@ -127,16 +143,28 @@ function App() {
               <Route path="/admin/expenses/:expenseId" element={<ExpenseLegacyViewRedirect />} />
 
               {/* Explicit Rental Routes */}
-              <Route path="/admin/rental/dashboard" element={<Layout><RentalDashboardPage /></Layout>} />
-              <Route path="/admin/rental/customers" element={<Layout><RentalOperationsBillingPage /></Layout>} />
+              <Route path="/admin/rental" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/dashboard" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/plans" element={<Layout><RentalPlansPage /></Layout>} />
+              <Route path="/admin/rental/inventory" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/customers" element={<Layout><RentalCustomersPage /></Layout>} />
+              <Route path="/admin/rental/customers-directory" element={<Layout><RentalCustomersPage /></Layout>} />
+              <Route path="/admin/rental/quotations" element={<Layout><RentalQuotationPage /></Layout>} />
+              <Route path="/admin/rental/agreements" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/agreements/corporate" element={<Layout><RentalCorporateAgreementPage /></Layout>} />
+              <Route path="/admin/rental/agreements/individual" element={<Layout><RentalIndividualAgreementPage /></Layout>} />
+              <Route path="/admin/rental/assets-installations" element={<Layout><RentalAssetsInstallationsPage /></Layout>} />
+              <Route path="/admin/rental/billing-invoices" element={<Layout><RentalBillingInvoicesPage /></Layout>} />
+              <Route path="/admin/rental/billing-generate" element={<Layout><RentalBillingGeneratePage /></Layout>} />
+              <Route path="/admin/rental/maintenance-alerts" element={<Layout><RentalMaintenanceAlertsPage /></Layout>} />
+              <Route path="/admin/rental/reports" element={<Navigate to="/admin/rental/customers" replace />} />
               <Route path="/admin/rental/customers/:customerId" element={<Layout><RentalCustomerDetailPage /></Layout>} />
               <Route path="/admin/rental/assets/:assetId" element={<Layout><RentalAssetDetailPage /></Layout>} />
               <Route path="/admin/rental/billing/generate" element={<Layout><RentalBillingGeneratePage /></Layout>} />
-              <Route path="/admin/rental/documents-contracts" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/documents-contracts" element={<Navigate to="/admin/rental/agreements" replace />} />
               <Route path="/admin/rental/operations-billing" element={<Navigate to="/admin/rental/customers" replace />} />
-              <Route path="/admin/rental/assets" element={<Navigate to="/admin/rental/customers" replace />} />
-              <Route path="/admin/rental/billing" element={<Navigate to="/admin/rental/customers" replace />} />
-              <Route path="/admin/rental/maintenance-alerts" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/assets" element={<Navigate to="/admin/rental/assets-installations" replace />} />
+              <Route path="/admin/rental/billing" element={<Navigate to="/admin/rental/billing-invoices" replace />} />
 
               {/* Explicit AMC Routes */}
               <Route path="/admin/amc/dashboard" element={<Layout><AMCDashboardPage /></Layout>} />
@@ -180,7 +208,7 @@ function App() {
               <Route path="/workflow" element={<Layout><Workflow /></Layout>} />
               <Route path="/billing" element={<Layout><Billing /></Layout>} />
               <Route path="/inventory" element={<Layout><Inventory /></Layout>} />
-              <Route path="/rental" element={<Layout><RentalDashboardPage /></Layout>} />
+              <Route path="/rental" element={<Layout><RentalCustomersPage /></Layout>} />
               <Route path="/cmc" element={<Layout><CMCReport /></Layout>} />
               <Route path="/amc" element={<Layout><AMCReport /></Layout>} />
               <Route path="/expenses" element={<Layout><Expenses /></Layout>} />

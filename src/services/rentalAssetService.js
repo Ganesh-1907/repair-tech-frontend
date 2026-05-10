@@ -16,7 +16,13 @@ export const rentalAssetService = {
     if (payload?.installationDate && payload?.serialNumber !== undefined && !String(payload.serialNumber).trim()) {
       throw new Error('Serial number is required after installation.');
     }
-    return payload.id ? api.update('rentalAssets', payload.id, payload) : api.create('rentalAssets', payload);
+    const normalized = {
+      ...payload,
+      serialNumber: payload?.serialNumber && String(payload.serialNumber).trim()
+        ? String(payload.serialNumber).trim()
+        : undefined,
+    };
+    return normalized.id ? api.update('rentalAssets', normalized.id, normalized) : api.create('rentalAssets', normalized);
   },
 
   async generateDeliveryChallan(assetId) {
