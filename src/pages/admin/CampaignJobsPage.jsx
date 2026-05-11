@@ -7,6 +7,7 @@ import {
   Eye, ClipboardList, Pencil
 } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { campaignService } from '../../services/campaignServices';
 import { campaignJobWorkflowService } from '../../services/campaignJobWorkflowService';
 import { staffManagementService } from '../../services/staffManagementService';
 import './CampaignModule.css';
@@ -23,6 +24,13 @@ const PROBLEMS = ['Screen Issue', 'Battery Issue', 'SSD Upgrade', 'Keyboard Issu
 const ACCESSORIES = ['Charger', 'Bag/Case', 'Mouse', 'Keyboard', 'Power Adapter', 'USB Dongle'];
 const DELIVERY_TYPES = ['Pickup from Office', 'Return to College', 'Doorstep Delivery'];
 const PAYMENT_MODES = ['UPI', 'Cash', 'Online Link'];
+
+const normalizeCampaignOption = (campaign = {}) => ({
+  ...campaign,
+  id: campaign.id || campaign._id || '',
+  name: campaign.name || campaign.campaignName || campaign.campaign || '',
+  status: campaign.status || 'Planned',
+});
 
 const STATUS_ORDER = [
   'Received at office', 'Diagnosis in progress', 'Waiting for parts',
@@ -60,6 +68,7 @@ const CampaignJobsPage = () => {
 
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [campaigns, setCampaigns] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [pricingTemplates, setPricingTemplates] = useState([]);
   const [inventoryParts, setInventoryParts] = useState([]);
@@ -75,8 +84,19 @@ const CampaignJobsPage = () => {
 
   const [qeOpen, setQeOpen] = useState(false);
   const [qeEditJob, setQeEditJob] = useState(null); // null = create mode, job object = edit mode
-  const [qeForm, setQeForm] = useState({ name: '', phone: '', deviceType: '', brand: '', serial: '', problem: '', notes: '' });
+  const [qeForm, setQeForm] = useState({ campaignId: '', name: '', phone: '', deviceType: '', brand: '', serial: '', problem: '', notes: '' });
   const [qeLoading, setQeLoading] = useState(false);
+  const quickEntryCampaigns = campaigns.filter((campaign) => (
+    campaign.name && (campaign.startDate || campaign.endDate || campaign.description || campaign.address)
+  ));
+  const resetQeForm = () => setQeForm({ campaignId: '', name: '', phone: '', deviceType: '', brand: '', serial: '', problem: '', notes: '' });
+
+  const loadCampaignOptions = useCallback(async () => {
+    const rows = await campaignService.listCampaigns();
+    const normalized = rows.map(normalizeCampaignOption);
+    setCampaigns(normalized);
+    return normalized;
+  }, []);
 
   const cleanDeviceModel = (val) => {
     if (!val) return '';
@@ -85,9 +105,19 @@ const CampaignJobsPage = () => {
     return val;
   };
 
-  const openQeForEdit = useCallback((job) => {
+  const openQeForCreate = useCallback(async () => {
+    setQeEditJob(null);
+    resetQeForm();
+    setQeOpen(true);
+    await loadCampaignOptions().catch(() => {});
+  }, [loadCampaignOptions]);
+
+  const openQeForEdit = useCallback(async (job) => {
+    const latestCampaigns = await loadCampaignOptions().catch(() => campaigns);
+    const campaignId = job.campaignId || latestCampaigns.find((campaign) => campaign.name === job.campaignSource)?.id || '';
     setQeEditJob(job);
     setQeForm({
+      campaignId,
       name: job.customerName || job.customer || '',
       phone: job.phoneNumber || job.phone || '',
       deviceType: job.deviceType || job.device || '',
@@ -97,7 +127,7 @@ const CampaignJobsPage = () => {
       notes: job.problemNotes || '',
     });
     setQeOpen(true);
-  }, []);
+  }, [campaigns, loadCampaignOptions]);
 
   const loadJobs = useCallback(async () => {
     setLoading(true);
@@ -111,13 +141,16 @@ const CampaignJobsPage = () => {
     }
   }, [campaignFilter, showToast]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadJobs(); }, [loadJobs]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadCampaignOptions().catch(() => {});
     campaignJobWorkflowService.getPricingTemplates().then(setPricingTemplates).catch(() => {});
     staffManagementService.getStaffList().then(setStaffList).catch(() => {});
     campaignJobWorkflowService.listInventoryParts().then(setInventoryParts).catch(() => {});
-  }, []);
+  }, [loadCampaignOptions]);
 
   useEffect(() => {
     const h = (e) => { if (actionRef.current && !actionRef.current.contains(e.target)) setOpenActionId(null); };
@@ -145,13 +178,17 @@ const CampaignJobsPage = () => {
   const closeQe = () => {
     setQeOpen(false);
     setQeEditJob(null);
-    setQeForm({ name: '', phone: '', deviceType: '', brand: '', serial: '', problem: '', notes: '' });
+    resetQeForm();
   };
 
   const handleCreateJob = async () => {
     setQeLoading(true);
     try {
+      const selectedCampaign = quickEntryCampaigns.find((campaign) => campaign.id === qeForm.campaignId);
+      if (!selectedCampaign) throw new Error('Please select a campaign.');
       const created = await campaignJobWorkflowService.createJob({
+        campaignId: selectedCampaign?.id || '',
+        campaignSource: selectedCampaign?.name || '',
         name: qeForm.name, phoneNumber: qeForm.phone,
         deviceType: qeForm.deviceType, problem: qeForm.problem,
         problemNotes: qeForm.notes,
@@ -165,7 +202,11 @@ const CampaignJobsPage = () => {
   const handleUpdateJob = async () => {
     setQeLoading(true);
     try {
+      const selectedCampaign = quickEntryCampaigns.find((campaign) => campaign.id === qeForm.campaignId);
+      if (!selectedCampaign) throw new Error('Please select a campaign.');
       await campaignJobWorkflowService.updateJob(qeEditJob.id, {
+        campaignId: selectedCampaign?.id || '',
+        campaignSource: selectedCampaign?.name || '',
         name: qeForm.name, phoneNumber: qeForm.phone,
         deviceType: qeForm.deviceType, brand: qeForm.brand,
         serial: qeForm.serial, problem: qeForm.problem, notes: qeForm.notes,
@@ -211,7 +252,7 @@ const CampaignJobsPage = () => {
           </div>
           <div className="flex gap-3">
             <button className="icon-button" onClick={loadJobs}><RefreshCcw size={18} className={loading ? 'animate-spin' : ''}/></button>
-            <button className="primary-button" onClick={() => { setQeEditJob(null); setQeForm({ name: '', phone: '', deviceType: '', brand: '', serial: '', problem: '', notes: '' }); setQeOpen(true); }}>
+            <button className="primary-button" onClick={openQeForCreate}>
               <Plus size={18}/> Quick Entry
             </button>
           </div>
@@ -257,7 +298,7 @@ const CampaignJobsPage = () => {
           <div className="flex flex-col items-center justify-center py-16 text-slate-400">
             <ClipboardList size={36} className="mb-2 opacity-30"/>
             <p className="text-sm font-semibold">No jobs found. Use Quick Entry to add your first walk-in.</p>
-            <button className="primary-button mt-4" onClick={() => { setQeEditJob(null); setQeOpen(true); }}><Plus size={16}/> Quick Entry</button>
+            <button className="primary-button mt-4" onClick={openQeForCreate}><Plus size={16}/> Quick Entry</button>
           </div>
         ) : (
           <div className="campaign-table-scroll">
@@ -375,7 +416,7 @@ const CampaignJobsPage = () => {
       <AnimatePresence>
         {qeOpen && (
           <div className="modal-overlay" onClick={closeQe}>
-            <Motion.div className="modal-card !max-w-lg" onClick={(e) => e.stopPropagation()}
+            <Motion.div className="modal-card quick-entry-modal" onClick={(e) => e.stopPropagation()}
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}>
@@ -393,9 +434,16 @@ const CampaignJobsPage = () => {
               </div>
 
               <div className="modal-body">
-                <div className="form-grid">
+                <div className="form-grid quick-entry-grid">
                   <div className="form-field"><label>Customer Name *</label>
                     <input placeholder="Full name" value={qeForm.name} onChange={(e) => setQeForm((f) => ({ ...f, name: e.target.value }))}/>
+                  </div>
+                  <div className="form-field"><label>Campaign</label>
+                    <select value={qeForm.campaignId} onChange={(e) => setQeForm((f) => ({ ...f, campaignId: e.target.value }))}>
+                      <option value="" disabled hidden>Select campaign...</option>
+                      {quickEntryCampaigns.map((campaign) => <option key={campaign.id} value={campaign.id}>{campaign.name}</option>)}
+                      {quickEntryCampaigns.length === 0 && <option value="" disabled>No campaigns found</option>}
+                    </select>
                   </div>
                   <div className="form-field"><label>Phone Number * (10 digits)</label>
                     <input type="tel" placeholder="9XXXXXXXXX" maxLength={10} value={qeForm.phone}
@@ -431,11 +479,11 @@ const CampaignJobsPage = () => {
               <div className="modal-footer">
                 <div className="flex-1"/>
                 {qeEditJob ? (
-                  <button className="primary-button" disabled={!qeForm.name || qeForm.phone.length < 10 || !qeForm.deviceType || !qeForm.problem || qeLoading} onClick={handleUpdateJob}>
+                  <button className="primary-button" disabled={!qeForm.campaignId || !qeForm.name || qeForm.phone.length < 10 || !qeForm.deviceType || !qeForm.problem || qeLoading} onClick={handleUpdateJob}>
                     {qeLoading ? <Loader2 size={14} className="animate-spin"/> : <Pencil size={14}/>} Save Changes
                   </button>
                 ) : (
-                  <button className="primary-button" disabled={!qeForm.name || qeForm.phone.length < 10 || !qeForm.deviceType || !qeForm.problem || qeLoading} onClick={handleCreateJob}>
+                  <button className="primary-button" disabled={!qeForm.campaignId || !qeForm.name || qeForm.phone.length < 10 || !qeForm.deviceType || !qeForm.problem || qeLoading} onClick={handleCreateJob}>
                     {qeLoading ? <Loader2 size={14} className="animate-spin"/> : <Plus size={14}/>} Create Ticket
                   </button>
                 )}

@@ -277,6 +277,52 @@
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
+.campaign-form-modal {
+  width: min(92vw, 860px) !important;
+  max-width: min(92vw, 860px) !important;
+  max-height: 88vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.campaign-form-modal .modal-body {
+  overflow-y: auto;
+}
+
+.campaign-form-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 20px 24px !important;
+}
+
+.campaign-form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.quick-entry-modal {
+  width: min(92vw, 860px) !important;
+  max-width: min(92vw, 860px) !important;
+  max-height: 88vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.quick-entry-modal .modal-body {
+  overflow-y: auto;
+}
+
+.quick-entry-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 20px 24px !important;
+}
+
+.quick-entry-grid .full {
+  grid-column: 1 / -1;
+}
+
 .campaign-job-drawer {
   position: fixed;
   top: 0;
@@ -888,6 +934,20 @@
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .dashboard-grid { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
+  .campaign-form-modal {
+    width: min(94vw, 640px) !important;
+    max-width: min(94vw, 640px) !important;
+  }
+  .quick-entry-modal {
+    width: min(94vw, 640px) !important;
+    max-width: min(94vw, 640px) !important;
+  }
+  .campaign-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .quick-entry-grid {
+    grid-template-columns: 1fr !important;
+  }
   .table-card,
   .campaign-table-scroll { overflow-x: auto; }
   .data-table { min-width: 800px; }

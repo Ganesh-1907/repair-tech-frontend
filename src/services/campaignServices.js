@@ -23,6 +23,13 @@ export const campaignService = {
   async saveCampaign(payload) {
     if (payload.id) return api.update('campaigns', payload.id, payload);
     return api.create('campaigns', {
+      name: '',
+      description: '',
+      startDate: '',
+      endDate: '',
+      location: '',
+      address: '',
+      status: 'Planned',
       leads: 0,
       conversions: 0,
       revenue: 0,
@@ -74,7 +81,9 @@ export const leadService = {
     const ticketId = makeId('TKT');
     const jobId = makeId('JOB');
     const campaigns = await api.list('campaigns');
-    const campaign = campaigns.find((entry) => entry.name === payload.campaignSource) || campaigns[0];
+    const campaign = campaigns.find((entry) => entry.id === payload.campaignId)
+      || campaigns.find((entry) => entry.name === payload.campaignSource)
+      || null;
     const campaignSource = payload.campaignSource || campaign?.name || 'Walk-in';
     const job = {
       id: jobId,

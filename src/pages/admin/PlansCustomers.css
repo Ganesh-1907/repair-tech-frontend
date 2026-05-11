@@ -1146,3 +1146,518 @@
     print-color-adjust: exact !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   AMC New Contract Page
+   ═══════════════════════════════════════════════════════════ */
+
+.amc-new-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--bg-color, #f8fafc);
+}
+
+.amc-new-page-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 18px 40px;
+  background: var(--card-bg, #fff);
+  border-bottom: 1px solid var(--slate-100, #f1f5f9);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.amc-new-page-title {
+  flex: 1;
+}
+
+.amc-new-page-title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.amc-new-page-title p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.amc-new-page-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.amc-new-page-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 28px 40px 48px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-error-banner {
+  margin: 0 40px;
+  padding: 12px 20px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ─── Form Cards ──────────────────────────────────────────── */
+
+.amc-form-card {
+  background: var(--card-bg, #fff);
+  border-radius: 16px;
+  border: 1px solid var(--slate-200, #e2e8f0);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.amc-form-card-header {
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--slate-200, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.amc-form-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Section 1 — Customer / Company: blue */
+.amc-form-card.card-customer {
+  border-color: #bfdbfe;
+}
+.amc-form-card.card-customer .amc-form-card-header {
+  background: linear-gradient(to right, #eff6ff, #dbeafe);
+  border-bottom-color: #bfdbfe;
+}
+.amc-form-card.card-customer .amc-form-section-title {
+  color: #1d4ed8;
+}
+
+/* Section 2 — Contract Details: emerald */
+.amc-form-card.card-contract {
+  border-color: #a7f3d0;
+}
+.amc-form-card.card-contract .amc-form-card-header {
+  background: linear-gradient(to right, #ecfdf5, #d1fae5);
+  border-bottom-color: #a7f3d0;
+}
+.amc-form-card.card-contract .amc-form-section-title {
+  color: #065f46;
+}
+
+/* Section 3 — Device Registry: violet */
+.amc-form-card.card-devices {
+  border-color: #c4b5fd;
+}
+.amc-form-card.card-devices .amc-form-card-header,
+.amc-form-card.card-devices .device-registry-header {
+  background: linear-gradient(to right, #f5f3ff, #ede9fe);
+  border-bottom-color: #c4b5fd;
+}
+.amc-form-card.card-devices .amc-form-section-title {
+  color: #5b21b6;
+}
+
+.amc-form-card-body {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ─── Form Grids ──────────────────────────────────────────── */
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-row-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 760px) {
+  .form-row-2,
+  .form-row-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Contact Sections ────────────────────────────────────── */
+
+.contact-section {
+  padding: 16px 20px;
+  background: var(--slate-50, #f8fafc);
+  border-radius: 12px;
+  border: 1px solid var(--slate-100, #f1f5f9);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.secondary-contact-section {
+  background: #fafafa;
+  border-style: dashed;
+}
+
+.contact-section-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--secondary, #334155);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.optional-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ─── Field Error States ──────────────────────────────────── */
+
+.field-error {
+  display: block;
+  font-size: 12px;
+  color: #dc2626;
+  margin-top: 4px;
+}
+
+.has-error .form-input,
+.has-error .form-select {
+  border-color: #fca5a5 !important;
+  background: #fff5f5;
+}
+
+/* ─── Device Accordion ────────────────────────────────────── */
+
+.device-accordion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.empty-devices-hint {
+  text-align: center;
+  padding: 32px 20px;
+  background: var(--slate-50, #f8fafc);
+  border-radius: 12px;
+  border: 1px dashed var(--slate-300, #cbd5e1);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.device-accordion {
+  border: 1px solid var(--slate-200, #e2e8f0);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.device-accordion.open {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: #f5f3ff;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.accordion-header:hover {
+  background: #ede9fe;
+}
+
+.device-accordion.open .accordion-header {
+  background: #ede9fe;
+  border-bottom: 1px solid #c4b5fd;
+}
+
+.accordion-title-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.accordion-device-index {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.accordion-device-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.accordion-device-summary {
+  font-size: 13px;
+  color: var(--text-color);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.accordion-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.accordion-type-select {
+  height: 38px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0 32px 0 14px;
+  min-width: 160px;
+  border-radius: 20px;
+  border: 1.5px solid #c4b5fd;
+  background-color: #fff;
+  color: var(--text-color);
+  cursor: pointer;
+  appearance: auto;
+}
+
+.accordion-type-select:focus {
+  outline: none;
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+}
+
+.accordion-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 14px;
+  height: 32px;
+  background: #fff0f0;
+  color: #dc2626;
+  border: 1.5px solid #fca5a5;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.accordion-remove-btn:hover {
+  background: #fee2e2;
+  border-color: #dc2626;
+}
+
+/* Rounder, taller selects inside the AMC/CMC new page */
+.amc-new-page .form-select {
+  height: 42px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.amc-new-page .accordion-type-select {
+  height: 38px;
+}
+
+.accordion-chevron {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
+.accordion-body {
+  padding: 20px 18px 20px;
+  background: #fff;
+  border-top: 1px solid #c4b5fd;
+}
+
+.accordion-add-device-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 14px;
+  height: 32px;
+  background: var(--primary, #4f46e5);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+
+.accordion-add-device-btn:hover {
+  opacity: 0.88;
+}
+
+/* ─── Device Field Sections ───────────────────────────────── */
+
+.device-fields-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.device-fields-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  align-items: end;
+}
+
+@media (max-width: 760px) {
+  .device-fields-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.desktop-subsection {
+  padding: 16px;
+  background: #faf5ff;
+  border-radius: 10px;
+  border: 1px solid #e9d5ff;
+}
+
+.subsection-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6d28d9;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 14px;
+}
+
+/* ─── Config Table (Laptop) ───────────────────────────────── */
+
+.config-table-section {
+  border: 1px solid var(--slate-200, #e2e8f0);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.config-table-header {
+  padding: 10px 14px;
+  background: #ede9fe;
+  border-bottom: 1px solid #c4b5fd;
+}
+
+.config-table-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5b21b6;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.config-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.config-table th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #5b21b6;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #f5f3ff;
+  border-bottom: 1px solid #ddd6fe;
+}
+
+.config-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--slate-100, #f1f5f9);
+  vertical-align: middle;
+}
+
+.config-table tr:last-child td {
+  border-bottom: none;
+}
+
+.config-table .form-input {
+  height: 34px;
+  font-size: 13px;
+}
+
+/* ─── Specs (CCTV) ────────────────────────────────────────── */
+
+.specs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.specs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.specs-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.spec-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spec-row .form-input {
+  flex: 1;
+}
+
+/* ─── Form Footer ─────────────────────────────────────────── */
+
+.amc-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 8px;
+}

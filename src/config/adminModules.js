@@ -139,6 +139,13 @@ const adminModules = [
         actions: ['View List'],
       },
       {
+        id: 'campaigns-listing',
+        label: 'Campaigns',
+        path: '/admin/campaign/campaigns',
+        description: 'Create and manage campaign name, description, dates, location, and address.',
+        actions: ['Add', 'View List', 'Manage'],
+      },
+      {
         id: 'campaign-jobs',
         label: 'Walk-ins & Jobs',
         path: '/admin/campaign/jobs',

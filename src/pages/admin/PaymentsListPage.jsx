@@ -1,9 +1,65 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, X, Edit, Eye, MoreVertical } from 'lucide-react';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { usePrivacy } from '../../context/PrivacyContext';
 import { expenseManagementService } from '../../services/expenseManagementService';
 import { api } from '../../services/apiClient';
+
+const ActionMenu = ({ items }) => {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos]   = useState({ top: 0, left: 0 });
+  const btnRef  = useRef(null);
+  const menuRef = useRef(null);
+
+  const openMenu = () => {
+    const rect = btnRef.current.getBoundingClientRect();
+    const menuW = 160;
+    const left  = rect.right - menuW < 8 ? rect.left : rect.right - menuW;
+    setPos({ top: rect.bottom + 4, left: Math.max(8, left) });
+    setOpen(true);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target) && !btnRef.current.contains(e.target))
+        setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <>
+      <button ref={btnRef} className="icon-btn" onClick={() => open ? setOpen(false) : openMenu()}>
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div ref={menuRef} style={{
+          position: 'fixed', top: pos.top, left: pos.left, width: 160,
+          background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 9999, padding: '4px 0',
+        }}>
+          {items.map((item) => (
+            <button key={item.label} onClick={() => { item.onClick(); setOpen(false); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                width: '100%', padding: '8px 14px', border: 'none',
+                background: 'none', cursor: 'pointer', fontSize: 13,
+                color: item.danger ? '#dc2626' : '#0f172a', textAlign: 'left',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+              onMouseLeave={e => e.currentTarget.style.background = 'none'}
+            >
+              {item.icon && <item.icon size={13} />}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  );
+};
 
 const formatDateLabel = (value) => {
   if (!value) return '-';
@@ -32,7 +88,6 @@ const PaymentsListPage = () => {
   const [sourceFilter, setSourceFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [notice, setNotice] = useState('');
   const [errors, setErrors] = useState({});
   const [modalMode, setModalMode] = useState('');
@@ -47,16 +102,6 @@ const PaymentsListPage = () => {
   useEffect(() => {
     loadPayments();
     api.list('staff').then((rows) => setStaffList(Array.isArray(rows) ? rows : []));
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest('.member-action-menu') && !event.target.closest('.action-trigger-btn')) {
-        setActiveDropdownId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const filtered = useMemo(() => payments.filter((row) => {
@@ -257,24 +302,10 @@ const PaymentsListPage = () => {
                 <td><strong style={{ color: '#15803d' }}>{formatCurrency(row.amount)}</strong></td>
                 <td>{row.paymentMode || '-'}</td>
                 <td>
-                  <div style={{ position: 'relative' }}>
-                    <button type="button" className="icon-btn action-trigger-btn"
-                      onClick={() => setActiveDropdownId(activeDropdownId === row.id ? null : row.id)}>
-                      <MoreVertical size={16} />
-                    </button>
-                    {activeDropdownId === row.id && (
-                      <div className="account-dropdown member-action-menu" style={{ top: '100%', right: 0, width: 160, zIndex: 50 }}>
-                        <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openView(row); }}>
-                          <Eye size={14} className="icon-muted" /> View
-                        </button>
-                        {row.source === 'admin' && (
-                          <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openEdit(row); }}>
-                            <Edit size={14} className="icon-muted" /> Edit
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <ActionMenu items={[
+                    { label: 'View', icon: Eye, onClick: () => openView(row) },
+                    ...(row.source === 'admin' ? [{ label: 'Edit', icon: Edit, onClick: () => openEdit(row) }] : []),
+                  ]} />
                 </td>
               </tr>
             ))}

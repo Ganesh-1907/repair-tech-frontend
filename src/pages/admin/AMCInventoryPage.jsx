@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search, Plus, Filter, Download, MoreVertical,
   Users, Calendar, IndianRupee, Eye, Edit, Trash2, X, FileText, FileEdit, RefreshCw,
@@ -9,6 +10,7 @@ import RepairModal from './RepairModal';
 import './PlansCustomers.css';
 
 const AMCInventoryPage = () => {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
   const [amcPlans, setAmcPlans]   = useState([]);
 
@@ -192,8 +194,8 @@ const AMCInventoryPage = () => {
           <p>Registry of all active AMC contracts, customers, and associated assets.</p>
         </div>
         <div className="plans-header-actions">
-           <button className="primary-button" onClick={() => { setEditingItem(null); setShowModal(true); }}>
-              <Plus size={18} /> Add New AMC Device
+           <button className="primary-button" onClick={() => navigate('/admin/amc/new')}>
+              <Plus size={18} /> Add New AMC
             </button>
         </div>
       </header>

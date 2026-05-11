@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Download, Eye, FileCheck2, IndianRupee, Mail, MoreVertical, Plus, Printer, Save, Send, Trash2 } from 'lucide-react';
 import { api } from '../../services/apiClient';
 import './RentalManagement.css';
@@ -95,6 +96,7 @@ const ActionMenu = ({ items }) => {
 };
 
 const RentalOperationsBillingPage = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Customers');
   const [activeProfileTab, setActiveProfileTab] = useState('Overview');
   const [customers, setCustomers] = useState([]);
@@ -661,7 +663,7 @@ const RentalOperationsBillingPage = () => {
 
       {activeTab === 'Customers' && (
         <div className="rm-section-stack">
-          <Header title="Rental Customers" subtitle="Primary address listing with compact CRM actions" actions={[{ label: '+ Add Customer', icon: Plus, onClick: () => { setEditingCustomerId(null); setCustomerForm({ ...emptyCustomer, additionalAddresses: [] }); setCustomerFormOpen(true); } }, { label: 'Generate Invoice', icon: FileCheck2, onClick: () => selected ? setActiveTab('Invoice Generator') : tell('Open a customer first to generate invoice.') }, { label: 'Export Customers', icon: Download, secondary: true, onClick: () => tell('Export started.') }]} />
+          <Header title="Rental Customers" subtitle="Primary address listing with compact CRM actions" actions={[{ label: '+ Add Customer', icon: Plus, onClick: () => navigate('/admin/rental/new') }, { label: 'Generate Invoice', icon: FileCheck2, onClick: () => selected ? setActiveTab('Invoice Generator') : tell('Open a customer first to generate invoice.') }, { label: 'Export Customers', icon: Download, secondary: true, onClick: () => tell('Export started.') }]} />
           <div className="rm-card">
             <DataTable
               columns={[
