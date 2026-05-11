@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   Eye,
-  Edit,
   Printer,
   Plus,
   Trash2,
@@ -36,6 +35,11 @@ const createDevice = (idx = 0) => ({
   rentalPrice: 0,
   rentalUnit: 'Per Month',
   billingFrequency: 'Monthly',
+  pricingType: 'Meter Based',
+  billingBasis: 'Meter Based Billing',
+  meterConfig: 'Single Rate',
+  meterRate: 0,
+  freeUnits: 0,
   installationRequirements: '',
   accessories: '',
   remarks: '',
@@ -91,6 +95,12 @@ const RentalQuotationPage = () => {
     invoiceReady: false,
   });
 
+  function pushActivity(text) {
+    const ts = new Date();
+    const time = `${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`;
+    setActivity((prev) => [{ id: Date.now() + Math.random(), text, time }, ...prev].slice(0, 8));
+  }
+
   useEffect(() => {
     const loadCustomerDeviceOptions = async () => {
       const customerId = params.get('customerId');
@@ -144,6 +154,11 @@ const RentalQuotationPage = () => {
             quantity: Number(row.quantity || 1),
             rentalPrice: Number(row.rentalPrice || 0),
             rentalUnit: row.rentalUnit || 'Per Month',
+            pricingType: row.pricingType || row?.pricing?.pricingType || 'Meter Based',
+            billingBasis: row.billingBasis || row?.pricing?.billingBasis || 'Meter Based Billing',
+            meterConfig: row.meterConfig || row?.pricing?.meterConfig || 'Single Rate',
+            meterRate: Number(row.meterRate ?? row?.pricing?.meterRate ?? 0),
+            freeUnits: Number(row.freeUnits ?? row?.pricing?.freeUnits ?? 0),
           }))
           : [createDevice()]
       );
@@ -177,6 +192,10 @@ const RentalQuotationPage = () => {
     + Number(quoteData.installationCharges || 0)
     + Number(quoteData.deliveryCharges || 0)
     + gstAmount;
+  const meterBasedDeviceCount = useMemo(
+    () => devices.filter((row) => String(row.billingBasis || '').toLowerCase().includes('meter')).length,
+    [devices]
+  );
 
   const workflowSteps = useMemo(() => {
     const steps = [
@@ -192,12 +211,6 @@ const RentalQuotationPage = () => {
     const activeIndex = steps.findIndex((s) => !s.done);
     return { steps, activeIndex: activeIndex === -1 ? steps.length - 1 : activeIndex };
   }, [workflow]);
-
-  const pushActivity = (text) => {
-    const ts = new Date();
-    const time = `${ts.toLocaleDateString()} ${ts.toLocaleTimeString()}`;
-    setActivity((prev) => [{ id: Date.now() + Math.random(), text, time }, ...prev].slice(0, 8));
-  };
 
   const updateDevice = (id, field, value) => {
     setDevices((prev) => prev.map((d) => (d.id === id ? { ...d, [field]: value } : d)));
@@ -266,6 +279,18 @@ const RentalQuotationPage = () => {
       rentalPrice: Number(d.rentalPrice || 0),
       rentalUnit: d.rentalUnit,
       billingFrequency: d.billingFrequency,
+      pricingType: d.pricingType,
+      billingBasis: d.billingBasis,
+      meterConfig: d.meterConfig,
+      meterRate: Number(d.meterRate || 0),
+      freeUnits: Number(d.freeUnits || 0),
+      pricing: {
+        pricingType: d.pricingType,
+        billingBasis: d.billingBasis,
+        meterConfig: d.meterConfig,
+        meterRate: Number(d.meterRate || 0),
+        freeUnits: Number(d.freeUnits || 0),
+      },
       installationRequirements: d.installationRequirements,
       accessories: d.accessories,
       remarks: d.remarks,
@@ -340,7 +365,7 @@ const RentalQuotationPage = () => {
       pushActivity(`Quotation approved. Agreement ${result.agreement?.id || '-'} created and ${result.assets?.length || 0} asset(s) registered.`);
       if (resolvedCustomerId) {
         setTimeout(() => {
-          window.location.href = `/admin/rental/customers/${resolvedCustomerId}`;
+          window.location.assign(`/admin/rental/customers/${resolvedCustomerId}`);
         }, 900);
       }
     } catch (error) {
@@ -386,6 +411,7 @@ const RentalQuotationPage = () => {
         />
 
         {notice ? <div className="success-banner no-print" role="status"><span>{notice}</span></div> : null}
+        <WorkflowChain steps={workflowSteps.steps} activeIndex={workflowSteps.activeIndex} />
 
         <div className="document-paper">
           <div className="paper-header">
@@ -423,23 +449,23 @@ const RentalQuotationPage = () => {
               <table className="doc-table">
                 <thead>
                   <tr>
-                    <th>Device</th><th>Type</th><th>Brand</th><th>Model</th><th>Input Field</th><th>S/N</th><th>Qty</th><th style={{ textAlign: 'right' }}>Unit Price</th><th style={{ textAlign: 'right' }}>Total</th>
+                    <th>Device</th><th>Type</th><th>Brand</th><th>Model</th><th>Input Field</th><th>S/N</th><th>Qty</th><th>Pricing Type</th><th>Meter Config</th><th style={{ textAlign: 'right' }}>Unit Price</th><th style={{ textAlign: 'right' }}>Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {devices.map((d) => (
                     <tr key={d.id}>
-                      <td>{d.device}</td><td>{d.type || '-'}</td><td>{d.brand || '-'}</td><td>{d.model || '-'}</td><td>{d.inputField || '-'}</td><td>{d.serialNo || '-'}</td><td>{d.quantity}</td><td style={{ textAlign: 'right' }}>{formatCurrency(d.rentalPrice)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(d.quantity * d.rentalPrice)}</td>
+                      <td>{d.device}</td><td>{d.type || '-'}</td><td>{d.brand || '-'}</td><td>{d.model || '-'}</td><td>{d.inputField || '-'}</td><td>{d.serialNo || '-'}</td><td>{d.quantity}</td><td>{d.pricingType || '-'}</td><td>{d.meterConfig || '-'}</td><td style={{ textAlign: 'right' }}>{formatCurrency(d.rentalPrice)}</td><td style={{ textAlign: 'right' }}>{formatCurrency(d.quantity * d.rentalPrice)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>Rental Subtotal</td><td style={{ textAlign: 'right' }}>{formatCurrency(subtotal)}</td></tr>
-                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>Security Deposit</td><td style={{ textAlign: 'right' }}>{formatCurrency(quoteData.securityDeposit)}</td></tr>
-                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>Installation Charges</td><td style={{ textAlign: 'right' }}>{formatCurrency(quoteData.installationCharges)}</td></tr>
-                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>Delivery Charges</td><td style={{ textAlign: 'right' }}>{formatCurrency(quoteData.deliveryCharges)}</td></tr>
-                  <tr><td colSpan="8" style={{ textAlign: 'right' }}>GST ({quoteData.gstPercent}%) - {quoteData.gstType}</td><td style={{ textAlign: 'right' }}>{formatCurrency(gstAmount)}</td></tr>
-                  <tr style={{ fontSize: '18px', color: 'var(--secondary)' }}><td colSpan="8" style={{ textAlign: 'right', fontWeight: 'bold' }}>GRAND TOTAL</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(grandTotal)}</td></tr>
+                  <tr><td colSpan="10" style={{ textAlign: 'right' }}>Rental Subtotal</td><td style={{ textAlign: 'right' }}>{formatCurrency(subtotal)}</td></tr>
+                  <tr><td colSpan="10" style={{ textAlign: 'right' }}>Security Deposit</td><td style={{ textAlign: 'right' }}>{formatCurrency(quoteData.securityDeposit)}</td></tr>
+                  <tr><td colSpan="10" style={{ textAlign: 'right' }}>Installation Charges</td><td style={{ textAlign: 'right' }}>{formatCurrency(quoteData.installationCharges)}</td></tr>
+                  <tr><td colSpan="10" style={{ textAlign: 'right' }}>Delivery Charges</td><td style={{ textAlign: 'right' }}>{formatCurrency(quoteData.deliveryCharges)}</td></tr>
+                  <tr><td colSpan="10" style={{ textAlign: 'right' }}>GST ({quoteData.gstPercent}%) - {quoteData.gstType}</td><td style={{ textAlign: 'right' }}>{formatCurrency(gstAmount)}</td></tr>
+                  <tr style={{ fontSize: '18px', color: 'var(--secondary)' }}><td colSpan="10" style={{ textAlign: 'right', fontWeight: 'bold' }}>GRAND TOTAL</td><td style={{ textAlign: 'right', fontWeight: 'bold' }}>{formatCurrency(grandTotal)}</td></tr>
                 </tfoot>
               </table>
             </div>
@@ -458,7 +484,7 @@ const RentalQuotationPage = () => {
         badge={workflowBadge}
         canSend={canSend}
         canApprove={canApprove}
-        onBack={() => window.location.href = '/admin/rental/customers'}
+        onBack={() => window.location.assign('/admin/rental/customers')}
         onSaveDraft={() => saveQuotation('Draft')}
         onSend={sendQuotation}
         onApprove={approveQuotation}
@@ -469,6 +495,7 @@ const RentalQuotationPage = () => {
       />
 
       {notice ? <div className="success-banner no-print" role="status"><span>{notice}</span></div> : null}
+      <WorkflowChain steps={workflowSteps.steps} activeIndex={workflowSteps.activeIndex} />
 
       <div className="quotation-form-card">
         <div className="workflow-grid">
@@ -520,6 +547,11 @@ const RentalQuotationPage = () => {
                     <FloatingField type="number" label="Rental Price" value={d.rentalPrice} onChange={(v) => updateDevice(d.id, 'rentalPrice', Number(v) || 0)} />
                     <FloatingSelect label="Rental Unit" value={d.rentalUnit} onChange={(v) => updateDevice(d.id, 'rentalUnit', v)} options={['Per Month', 'Per Day']} />
                     <FloatingSelect label="Billing Frequency" value={d.billingFrequency} onChange={(v) => updateDevice(d.id, 'billingFrequency', v)} options={['Monthly', 'Quarterly', 'Yearly', 'Daily']} />
+                    <FloatingSelect label="Pricing Type" value={d.pricingType} onChange={(v) => updateDevice(d.id, 'pricingType', v)} options={['Meter Based', 'Fixed Rental', 'Hybrid']} />
+                    <FloatingSelect label="Billing Basis" value={d.billingBasis} onChange={(v) => updateDevice(d.id, 'billingBasis', v)} options={['Meter Based Billing', 'Minimum Commitment Billing', 'Flat Rental Billing']} />
+                    <FloatingSelect label="Meter Config" value={d.meterConfig} onChange={(v) => updateDevice(d.id, 'meterConfig', v)} options={['Single Rate', 'Tier / Slab Pricing', 'Multi-Rate A4/A3']} />
+                    <FloatingField type="number" label="Meter Rate" value={d.meterRate} onChange={(v) => updateDevice(d.id, 'meterRate', Number(v) || 0)} />
+                    <FloatingField type="number" label="Free Units" value={d.freeUnits} onChange={(v) => updateDevice(d.id, 'freeUnits', Number(v) || 0)} />
                     <FloatingField label="Installation Notes" value={d.installationRequirements} onChange={(v) => updateDevice(d.id, 'installationRequirements', v)} />
                     <FloatingField label="Accessories" value={d.accessories} onChange={(v) => updateDevice(d.id, 'accessories', v)} />
                     <FloatingField label="Remarks" value={d.remarks} onChange={(v) => updateDevice(d.id, 'remarks', v)} />
@@ -554,7 +586,12 @@ const RentalQuotationPage = () => {
               <FloatingField label="Resolution Time" value={quoteData.resolutionTime} onChange={(v) => setQuoteData({ ...quoteData, resolutionTime: v })} />
               <FloatingField label="Validity" value={quoteData.validity} onChange={(v) => setQuoteData({ ...quoteData, validity: v })} />
             </div>
-            <div className="price-total">Estimated Grand Total: <strong>{formatCurrency(grandTotal)}</strong></div>
+            <div className="price-total">
+              Estimated Grand Total: <strong>{formatCurrency(grandTotal)}</strong>
+              <div style={{ marginTop: 6, fontSize: 12 }}>
+                Meter-Based Devices: <strong>{meterBasedDeviceCount}</strong> / {devices.length}
+              </div>
+            </div>
           </section>
 
           <section className="workflow-card">
