@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Download,
@@ -118,6 +119,7 @@ const createBlankDocDevice = () => ({
 });
 
 const CMCInventoryPage = () => {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
   const [cmcPlans, setCmcPlans]   = useState([]);
   const [viewMode, setViewMode] = useState('list');
@@ -330,8 +332,8 @@ const CMCInventoryPage = () => {
           <p>Registry of all active CMC contracts, customers, and associated assets.</p>
         </div>
         <div className="plans-header-actions">
-          <button className="primary-button" onClick={() => { setEditingItem(null); setShowModal(true); }}>
-            <Plus size={18} /> Add New CMC Device
+          <button className="primary-button" onClick={() => navigate('/admin/cmc/new')}>
+            <Plus size={18} /> Add New CMC
           </button>
         </div>
       </header>

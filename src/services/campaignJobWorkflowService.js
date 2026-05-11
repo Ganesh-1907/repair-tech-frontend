@@ -179,6 +179,8 @@ export const campaignJobWorkflowService = {
       serialNumber: String(payload?.serialNumber || payload?.serial || '').trim(),
       problem: String(payload?.problem || '').trim(),
       problemNotes: String(payload?.problemNotes || payload?.notes || '').trim(),
+      campaignId: String(payload?.campaignId || '').trim(),
+      campaignSource: String(payload?.campaignSource || '').trim(),
     };
     if (!patch.customerName) throw new Error('Customer name is required.');
     if (!phonePattern.test(patch.phoneNumber)) throw new Error('Valid phone number is required.');
@@ -265,6 +267,7 @@ export const campaignJobWorkflowService = {
       deviceType,
       problem,
       problemNotes: payload.problemNotes || '',
+      campaignId: payload.campaignId || '',
       campaignSource: payload.campaignSource || '',
     });
     ensureWorkflowState(created.jobCardId);

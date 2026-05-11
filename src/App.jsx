@@ -23,6 +23,7 @@ import AMCReportsPage from './pages/admin/AMCReportsPage';
 import AMCAgreementsPage from './pages/admin/AMCAgreementsPage';
 import AMCQuotationPage from './pages/admin/AMCQuotationPage';
 import AMCInventoryPage from './pages/admin/AMCInventoryPage';
+import AMCNewContractPage from './pages/admin/AMCNewContractPage';
 
 // Admin Module Pages
 import ExpensesManagementPage from './pages/admin/ExpensesManagementPage';
@@ -37,6 +38,7 @@ import AssetManagementPage from './pages/admin/AssetManagementPage';
 import AssetDetailPage from './pages/admin/AssetDetailPage';
 import QuoteApprovalPlaceholderPage from './pages/admin/QuoteApprovalPlaceholderPage';
 import CampaignDashboardPage from './pages/admin/CampaignDashboardPage';
+import CampaignsListingPage from './pages/admin/CampaignsListingPage';
 import CampaignJobsPage from './pages/admin/CampaignJobsPage';
 
 // Discounts Module Pages
@@ -55,11 +57,14 @@ import RentalMaintenanceAlertsPage from './pages/admin/RentalMaintenanceAlertsPa
 import RentalCustomerDetailPage from './pages/admin/RentalCustomerDetailPage';
 import RentalAssetDetailPage from './pages/admin/RentalAssetDetailPage';
 import RentalBillingGeneratePage from './pages/admin/RentalBillingGeneratePage';
+import RentalOperationsBillingPage from './pages/admin/RentalOperationsBillingPage';
+import RentalNewCustomerPage from './pages/admin/RentalNewCustomerPage';
 
 // CMC Module Pages
 import CMCDashboardPage from './pages/admin/CMCDashboardPage';
 import CMCPlansPage from './pages/admin/CMCPlansPage';
 import CMCInventoryPage from './pages/admin/CMCInventoryPage';
+import CMCNewContractPage from './pages/admin/CMCNewContractPage';
 import CMCReportsPage from './pages/admin/CMCReportsPage';
 
 import { adminRouteEntries } from './config/adminModules';
@@ -86,6 +91,7 @@ const existingAdminRouteComponents = {
   '/admin/discounts/dashboard': DiscountsDashboardPage,
   '/admin/discounts/codes': DiscountsListPage,
   '/admin/campaign/dashboard': CampaignDashboardPage,
+  '/admin/campaign/campaigns': CampaignsListingPage,
   '/admin/campaign/jobs': CampaignJobsPage,
   '/admin/rental': RentalCustomersPage,
   '/admin/rental/dashboard': RentalCustomersPage,
@@ -158,6 +164,7 @@ function App() {
               <Route path="/admin/rental/billing-generate" element={<Layout><RentalBillingGeneratePage /></Layout>} />
               <Route path="/admin/rental/maintenance-alerts" element={<Layout><RentalMaintenanceAlertsPage /></Layout>} />
               <Route path="/admin/rental/reports" element={<Navigate to="/admin/rental/customers" replace />} />
+              <Route path="/admin/rental/new" element={<Layout><RentalNewCustomerPage /></Layout>} />
               <Route path="/admin/rental/customers/:customerId" element={<Layout><RentalCustomerDetailPage /></Layout>} />
               <Route path="/admin/rental/assets/:assetId" element={<Layout><RentalAssetDetailPage /></Layout>} />
               <Route path="/admin/rental/billing/generate" element={<Layout><RentalBillingGeneratePage /></Layout>} />
@@ -170,6 +177,7 @@ function App() {
               <Route path="/admin/amc/dashboard" element={<Layout><AMCDashboardPage /></Layout>} />
               <Route path="/admin/amc/plans" element={<Layout><AMCPlansPage /></Layout>} />
               <Route path="/admin/amc/inventory" element={<Layout><AMCInventoryPage /></Layout>} />
+              <Route path="/admin/amc/new" element={<Layout><AMCNewContractPage /></Layout>} />
               <Route path="/admin/amc/reports" element={<Layout><AMCReportsPage /></Layout>} />
 
               {/* CMC Module Redirects & Explicit Routes */}
@@ -177,6 +185,7 @@ function App() {
               <Route path="/admin/cmc/dashboard" element={<Layout><CMCDashboardPage /></Layout>} />
               <Route path="/admin/cmc/plans" element={<Layout><CMCPlansPage /></Layout>} />
               <Route path="/admin/cmc/inventory" element={<Layout><CMCInventoryPage /></Layout>} />
+              <Route path="/admin/cmc/new" element={<Layout><CMCNewContractPage /></Layout>} />
               <Route path="/admin/cmc/reports" element={<Layout><CMCReportsPage /></Layout>} />
 
               {/* Discounts Module Routes */}
@@ -186,6 +195,7 @@ function App() {
 
               {/* Explicit Campaign Routes */}
               <Route path="/admin/campaign/dashboard" element={<Layout><CampaignDashboardPage /></Layout>} />
+              <Route path="/admin/campaign/campaigns" element={<Layout><CampaignsListingPage /></Layout>} />
               <Route path="/admin/campaign/jobs" element={<Layout><CampaignJobsPage /></Layout>} />
 
               {/* Dynamic Admin Routes */}
