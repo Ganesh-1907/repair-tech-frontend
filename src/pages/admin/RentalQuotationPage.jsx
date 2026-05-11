@@ -19,8 +19,9 @@ import {
 import './PlansCustomers.css';
 import './RentalWorkflow.css';
 import { rentalQuotationService } from '../../services/rentalQuotationService';
+import { api } from '../../services/apiClient';
 
-const DEVICE_OPTIONS = ['Desktop', 'Laptop', 'Priner', 'CCTV', 'Server'];
+const DEFAULT_DEVICE_OPTIONS = ['Desktop', 'Laptop', 'Printer', 'CCTV', 'Server'];
 
 const createDevice = (idx = 0) => ({
   id: Date.now() + idx,
@@ -74,6 +75,7 @@ const RentalQuotationPage = () => {
   const [mode, setMode] = useState('form');
   const [quoteData, setQuoteData] = useState(() => buildDefaultQuote(params));
   const [devices, setDevices] = useState([createDevice()]);
+  const [deviceOptions, setDeviceOptions] = useState(DEFAULT_DEVICE_OPTIONS);
   const [quotationId, setQuotationId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState('');
@@ -88,6 +90,28 @@ const RentalQuotationPage = () => {
     meterReady: false,
     invoiceReady: false,
   });
+
+  useEffect(() => {
+    const loadCustomerDeviceOptions = async () => {
+      const customerId = params.get('customerId');
+      if (!customerId) return;
+
+      try {
+        const customer = await api.get('rentalCustomers', customerId);
+        const customerDevices = Array.isArray(customer?.devices) ? customer.devices : [];
+        const fromCustomer = customerDevices
+          .map((device) => String(device?.device || device?.deviceType || '').trim())
+          .filter(Boolean);
+        const merged = [...new Set([...fromCustomer, ...DEFAULT_DEVICE_OPTIONS])];
+        if (merged.length) setDeviceOptions(merged);
+      } catch {
+        setDeviceOptions(DEFAULT_DEVICE_OPTIONS);
+      }
+    };
+
+    loadCustomerDeviceOptions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const loadExistingQuotation = async () => {
@@ -485,7 +509,7 @@ const RentalQuotationPage = () => {
                     <button className="icon-button" style={{ color: 'var(--red)' }} onClick={() => removeDevice(d.id)}><Trash2 size={14} /></button>
                   </div>
                   <div className="form-two-col three">
-                    <FloatingSelect label="Device" value={d.device} onChange={(v) => updateDevice(d.id, 'device', v)} options={DEVICE_OPTIONS} />
+                    <FloatingSelect label="Device" value={d.device} onChange={(v) => updateDevice(d.id, 'device', v)} options={deviceOptions} />
                     <FloatingField label="Type" value={d.type} onChange={(v) => updateDevice(d.id, 'type', v)} />
                     <FloatingField label="Brand" value={d.brand} onChange={(v) => updateDevice(d.id, 'brand', v)} />
                     <FloatingField label="Model" value={d.model} onChange={(v) => updateDevice(d.id, 'model', v)} />

@@ -33,6 +33,8 @@ import './RentalCustomerManagement.css';
 import './RentalDocuments.css';
 import { api } from '../../services/apiClient';
 
+const DEVICE_OPTIONS = ['Desktop', 'Laptop', 'Printer', 'CCTV', 'Server'];
+
 const emptyAuthorizedPerson = () => ({
   name: '',
   designation: '',
@@ -53,7 +55,8 @@ const emptyLocation = () => ({
 
 const emptyDevice = () => ({
   id: `DEV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-  deviceType: '',
+  device: '',
+  type: '',
   brand: '',
   model: '',
   serialNumber: '',
@@ -249,7 +252,12 @@ const RentalCustomersPage = () => {
         person1: { ...emptyAuthorizedPerson(), ...person1 },
         person2: { ...emptyAuthorizedPerson(), ...person2 },
         locations: locations.map((loc) => ({ ...emptyLocation(), ...loc })),
-        devices: devices.map((dev) => ({ ...emptyDevice(), ...dev })),
+        devices: devices.map((dev) => ({
+          ...emptyDevice(),
+          ...dev,
+          device: dev.device || dev.deviceType || '',
+          type: dev.type || '',
+        })),
         status: raw.status || customer.status || 'Active',
       });
     }
@@ -272,15 +280,6 @@ const RentalCustomersPage = () => {
     customerForm.locations.forEach((location, index) => {
       if (!location.locationName.trim()) nextErrors[`locationName-${index}`] = 'Location name is required.';
       if (!location.address.trim()) nextErrors[`locationAddress-${index}`] = 'Location address is required.';
-    });
-
-    customerForm.devices.forEach((device, index) => {
-      if (!device.deviceType.trim()) nextErrors[`deviceType-${index}`] = 'Device type is required.';
-      if (!device.model.trim()) nextErrors[`deviceModel-${index}`] = 'Device model is required.';
-      if (!device.serialNumber.trim()) nextErrors[`serialNumber-${index}`] = 'Serial number is required.';
-      if (!device.rentalStartDate) nextErrors[`rentalStartDate-${index}`] = 'Rental start date is required.';
-      if (!String(device.monthlyRent).trim()) nextErrors[`monthlyRent-${index}`] = 'Monthly rent is required.';
-      if (!device.locationId) nextErrors[`locationId-${index}`] = 'Assigned location is required.';
     });
 
     setCustomerFormErrors(nextErrors);
@@ -335,7 +334,17 @@ const RentalCustomersPage = () => {
       notes: customerForm.notes,
       authorizedPersons: [customerForm.person1, customerForm.person2].filter((person) => person.name.trim() || person.phone.trim()),
       locations: customerForm.locations,
-      devices: customerForm.devices,
+      devices: customerForm.devices.filter((device) => (
+        String(device.device || '').trim()
+        || String(device.type || '').trim()
+        || String(device.brand || '').trim()
+        || String(device.model || '').trim()
+        || String(device.serialNumber || '').trim()
+        || String(device.rentalStartDate || '').trim()
+        || String(device.monthlyRent || '').trim()
+        || String(device.locationId || '').trim()
+        || String(device.remarks || '').trim()
+      )),
       status: customerForm.status || 'Active',
     };
     try {
@@ -721,13 +730,14 @@ const RentalCustomersPage = () => {
                           {customerForm.devices.length > 1 && <button type="button" className="icon-button" onClick={() => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.filter((row) => row.id !== device.id) }))}><Trash2 size={14} /></button>}
                         </div>
                         <div className="form-grid">
-                          <div className="form-field"><label>Device Type <span className="field-required">*</span></label><input value={device.deviceType} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, deviceType: e.target.value } : row)) }))} />{customerFormErrors[`deviceType-${index}`] && <small className="field-error">{customerFormErrors[`deviceType-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Device <span className="field-optional">(Optional)</span></label><select value={device.device} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, device: e.target.value } : row)) }))}><option value="">Select device</option>{DEVICE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select>{customerFormErrors[`deviceType-${index}`] && <small className="field-error">{customerFormErrors[`deviceType-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Type <span className="field-optional">(Optional)</span></label><input value={device.type} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, type: e.target.value } : row)) }))} /></div>
                           <div className="form-field"><label>Brand</label><input value={device.brand} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, brand: e.target.value } : row)) }))} /></div>
-                          <div className="form-field"><label>Model <span className="field-required">*</span></label><input value={device.model} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, model: e.target.value } : row)) }))} />{customerFormErrors[`deviceModel-${index}`] && <small className="field-error">{customerFormErrors[`deviceModel-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Serial Number <span className="field-required">*</span></label><input value={device.serialNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, serialNumber: e.target.value } : row)) }))} />{customerFormErrors[`serialNumber-${index}`] && <small className="field-error">{customerFormErrors[`serialNumber-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Rental Start Date <span className="field-required">*</span></label><input type="date" value={device.rentalStartDate} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, rentalStartDate: e.target.value } : row)) }))} />{customerFormErrors[`rentalStartDate-${index}`] && <small className="field-error">{customerFormErrors[`rentalStartDate-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Monthly Rent <span className="field-required">*</span></label><input type="number" min="0" value={device.monthlyRent} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, monthlyRent: e.target.value } : row)) }))} />{customerFormErrors[`monthlyRent-${index}`] && <small className="field-error">{customerFormErrors[`monthlyRent-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Location Assigned <span className="field-required">*</span></label><select value={device.locationId} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, locationId: e.target.value } : row)) }))}><option value="">Select location</option>{customerForm.locations.map((location) => <option key={location.id} value={location.id}>{location.locationName || 'Unnamed Location'}</option>)}</select>{customerFormErrors[`locationId-${index}`] && <small className="field-error">{customerFormErrors[`locationId-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Model <span className="field-optional">(Optional)</span></label><input value={device.model} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, model: e.target.value } : row)) }))} />{customerFormErrors[`deviceModel-${index}`] && <small className="field-error">{customerFormErrors[`deviceModel-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Serial Number <span className="field-optional">(Optional)</span></label><input value={device.serialNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, serialNumber: e.target.value } : row)) }))} />{customerFormErrors[`serialNumber-${index}`] && <small className="field-error">{customerFormErrors[`serialNumber-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Rental Start Date <span className="field-optional">(Optional)</span></label><input type="date" value={device.rentalStartDate} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, rentalStartDate: e.target.value } : row)) }))} />{customerFormErrors[`rentalStartDate-${index}`] && <small className="field-error">{customerFormErrors[`rentalStartDate-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Monthly Rent <span className="field-optional">(Optional)</span></label><input type="number" min="0" value={device.monthlyRent} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, monthlyRent: e.target.value } : row)) }))} />{customerFormErrors[`monthlyRent-${index}`] && <small className="field-error">{customerFormErrors[`monthlyRent-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Location Assigned <span className="field-optional">(Optional)</span></label><select value={device.locationId} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, locationId: e.target.value } : row)) }))}><option value="">Select location</option>{customerForm.locations.map((location) => <option key={location.id} value={location.id}>{location.locationName || 'Unnamed Location'}</option>)}</select>{customerFormErrors[`locationId-${index}`] && <small className="field-error">{customerFormErrors[`locationId-${index}`]}</small>}</div>
                           <div className="form-field"><label>Status</label><select value={device.status} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, status: e.target.value } : row)) }))}><option>Active</option><option>Inactive</option><option>Under Repair</option></select></div>
                           <div className="form-field full"><label>Remarks</label><textarea value={device.remarks} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, remarks: e.target.value } : row)) }))} /></div>
                         </div>
