@@ -29,7 +29,9 @@ export const AuthProvider = ({ children }) => {
       setUser(data.user || getMockUser());
       return { success: true, user: data.user || getMockUser() };
     } catch (error) {
-      const message = error?.response?.data?.message || 'Unable to sign in. Please try again.';
+      const message = error?.response?.data?.message
+        || (error?.request ? 'Unable to reach backend server. Please confirm backend is running on port 5000.' : null)
+        || 'Unable to sign in. Please try again.';
       return { success: false, message };
     }
   };
