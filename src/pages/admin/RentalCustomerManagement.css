@@ -402,6 +402,89 @@
   overflow-y: auto;
 }
 
+.customer-form-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.customer-form-tab {
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  color: #334155;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.customer-form-tab.active {
+  background: #e0e7ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+
+.section-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 18px;
+  background: #fcfdff;
+}
+
+.section-card h3 {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mini-section-card {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.mini-section-card h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.inline-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.field-required {
+  color: #dc2626;
+  font-weight: 800;
+}
+
+.field-optional {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.field-error {
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .modal-card h2 {
   margin: 0 0 8px;
   font-size: 24px;
@@ -529,4 +612,17 @@
   color: #64748b;
   text-transform: uppercase;
   font-weight: 700;
+}
+
+@media (max-width: 1024px) {
+  .modal-card {
+    width: 96vw;
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -33,6 +33,37 @@ import './RentalCustomerManagement.css';
 import './RentalDocuments.css';
 import { api } from '../../services/apiClient';
 
+const emptyAuthorizedPerson = () => ({
+  name: '',
+  designation: '',
+  phone: '',
+  email: '',
+  idProofName: '',
+});
+
+const emptyLocation = () => ({
+  id: `LOC-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+  locationName: '',
+  address: '',
+  contactPerson: '',
+  phone: '',
+  email: '',
+  remarks: '',
+});
+
+const emptyDevice = () => ({
+  id: `DEV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+  deviceType: '',
+  brand: '',
+  model: '',
+  serialNumber: '',
+  rentalStartDate: '',
+  monthlyRent: '',
+  locationId: '',
+  status: 'Active',
+  remarks: '',
+});
+
 const RentalCustomersPage = () => {
   // --- Local State ---
   const [customers, setCustomers] = useState([]);
@@ -60,6 +91,27 @@ const RentalCustomersPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('Add'); // Add, Edit, View
   const [currentCustomer, setCurrentCustomer] = useState(null);
+  const [activeCustomerTab, setActiveCustomerTab] = useState('profile');
+  const [customerFormErrors, setCustomerFormErrors] = useState({});
+  const [customerForm, setCustomerForm] = useState({
+    companyName: '',
+    customerType: 'Corporate',
+    gstNumber: '',
+    billingAddress: '',
+    shippingAddress: '',
+    city: '',
+    state: '',
+    pincode: '',
+    primaryContactNumber: '',
+    alternateContactNumber: '',
+    email: '',
+    notes: '',
+    person1: emptyAuthorizedPerson(),
+    person2: emptyAuthorizedPerson(),
+    locations: [emptyLocation()],
+    devices: [emptyDevice()],
+    status: 'Active',
+  });
   
   // Doc Builder Modals
   const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
@@ -144,23 +196,147 @@ const RentalCustomersPage = () => {
     }
   };
 
-  const handleSaveCustomer = async (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const data = Object.fromEntries(formData.entries());
-    const payload = {
-      customerType: data.type,
-      companyName: data.name,
-      customerName: data.name,
-      authorizedPerson1: data.name,
-      authorizedPerson2: '',
+  const openCustomerModal = (mode, customer = null) => {
+    setModalMode(mode);
+    setCurrentCustomer(customer);
+    setActiveCustomerTab('profile');
+    setCustomerFormErrors({});
+    if (!customer) {
+      setCustomerForm({
+        companyName: '',
+        customerType: 'Corporate',
+        gstNumber: '',
+        billingAddress: '',
+        shippingAddress: '',
+        city: '',
+        state: '',
+        pincode: '',
+        primaryContactNumber: '',
+        alternateContactNumber: '',
+        email: '',
+        notes: '',
+        person1: emptyAuthorizedPerson(),
+        person2: emptyAuthorizedPerson(),
+        locations: [emptyLocation()],
+        devices: [emptyDevice()],
+        status: 'Active',
+      });
+    } else {
+      const raw = customer.raw || {};
+      const locations = Array.isArray(raw.locations) && raw.locations.length ? raw.locations : [emptyLocation()];
+      const devices = Array.isArray(raw.devices) && raw.devices.length ? raw.devices : [emptyDevice()];
+      const person1 = raw.authorizedPersons?.[0] || {
+        ...emptyAuthorizedPerson(),
+        name: raw.authorizedPerson1 || '',
+      };
+      const person2 = raw.authorizedPersons?.[1] || {
+        ...emptyAuthorizedPerson(),
+        name: raw.authorizedPerson2 || '',
+      };
+      setCustomerForm({
+        companyName: raw.companyName || raw.customerName || customer.name || '',
+        customerType: raw.customerType || customer.type || 'Corporate',
+        gstNumber: raw.gstNumber || '',
+        billingAddress: raw.billingAddress || raw.address || '',
+        shippingAddress: raw.shippingAddress || '',
+        city: raw.city || '',
+        state: raw.state || '',
+        pincode: raw.pincode || '',
+        primaryContactNumber: raw.contactNumber || customer.phone || '',
+        alternateContactNumber: raw.alternateContactNumber || '',
+        email: raw.email || customer.email || '',
+        notes: raw.notes || '',
+        person1: { ...emptyAuthorizedPerson(), ...person1 },
+        person2: { ...emptyAuthorizedPerson(), ...person2 },
+        locations: locations.map((loc) => ({ ...emptyLocation(), ...loc })),
+        devices: devices.map((dev) => ({ ...emptyDevice(), ...dev })),
+        status: raw.status || customer.status || 'Active',
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const validateCustomerForm = () => {
+    const nextErrors = {};
+    if (!customerForm.companyName.trim()) nextErrors.companyName = 'Company / customer name is required.';
+    if (!customerForm.customerType.trim()) nextErrors.customerType = 'Customer type is required.';
+    if (!customerForm.billingAddress.trim()) nextErrors.billingAddress = 'Billing address is required.';
+    if (!customerForm.city.trim()) nextErrors.city = 'City is required.';
+    if (!customerForm.state.trim()) nextErrors.state = 'State is required.';
+    if (!customerForm.pincode.trim()) nextErrors.pincode = 'Pincode is required.';
+    if (!customerForm.primaryContactNumber.trim()) nextErrors.primaryContactNumber = 'Primary contact number is required.';
+    if (!customerForm.email.trim()) nextErrors.email = 'Email is required.';
+    if (!customerForm.person1.name.trim()) nextErrors.person1Name = 'Authorized Person 1 name is required.';
+    if (!customerForm.person1.phone.trim()) nextErrors.person1Phone = 'Authorized Person 1 phone is required.';
+
+    customerForm.locations.forEach((location, index) => {
+      if (!location.locationName.trim()) nextErrors[`locationName-${index}`] = 'Location name is required.';
+      if (!location.address.trim()) nextErrors[`locationAddress-${index}`] = 'Location address is required.';
+    });
+
+    customerForm.devices.forEach((device, index) => {
+      if (!device.deviceType.trim()) nextErrors[`deviceType-${index}`] = 'Device type is required.';
+      if (!device.model.trim()) nextErrors[`deviceModel-${index}`] = 'Device model is required.';
+      if (!device.serialNumber.trim()) nextErrors[`serialNumber-${index}`] = 'Serial number is required.';
+      if (!device.rentalStartDate) nextErrors[`rentalStartDate-${index}`] = 'Rental start date is required.';
+      if (!String(device.monthlyRent).trim()) nextErrors[`monthlyRent-${index}`] = 'Monthly rent is required.';
+      if (!device.locationId) nextErrors[`locationId-${index}`] = 'Assigned location is required.';
+    });
+
+    setCustomerFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const resetAfterSave = () => {
+    setCustomerForm({
+      companyName: '',
+      customerType: 'Corporate',
       gstNumber: '',
-      address: data.address || '',
-      contactNumber: data.phone || '',
-      email: data.email || '',
-      billingAddress: data.address || '',
-      locations: [],
+      billingAddress: '',
+      shippingAddress: '',
+      city: '',
+      state: '',
+      pincode: '',
+      primaryContactNumber: '',
+      alternateContactNumber: '',
+      email: '',
+      notes: '',
+      person1: emptyAuthorizedPerson(),
+      person2: emptyAuthorizedPerson(),
+      locations: [emptyLocation()],
+      devices: [emptyDevice()],
       status: 'Active',
+    });
+    setCustomerFormErrors({});
+    setActiveCustomerTab('profile');
+  };
+
+  const handleSaveCustomer = async (saveAndAddAnother = false) => {
+    if (!validateCustomerForm()) {
+      addToast('Please complete all required fields', 'info');
+      return;
+    }
+    const payload = {
+      customerType: customerForm.customerType,
+      companyName: customerForm.companyName,
+      customerName: customerForm.companyName,
+      authorizedPerson1: customerForm.person1.name,
+      authorizedPerson2: customerForm.person2.name,
+      gstNumber: customerForm.gstNumber,
+      address: customerForm.billingAddress,
+      billingAddress: customerForm.billingAddress,
+      shippingAddress: customerForm.shippingAddress,
+      city: customerForm.city,
+      state: customerForm.state,
+      pincode: customerForm.pincode,
+      contactNumber: customerForm.primaryContactNumber,
+      alternateContactNumber: customerForm.alternateContactNumber,
+      email: customerForm.email,
+      notes: customerForm.notes,
+      authorizedPersons: [customerForm.person1, customerForm.person2].filter((person) => person.name.trim() || person.phone.trim()),
+      locations: customerForm.locations,
+      devices: customerForm.devices,
+      status: customerForm.status || 'Active',
     };
     try {
       if (modalMode === 'Add') {
@@ -175,7 +351,12 @@ const RentalCustomersPage = () => {
         addToast('Customer updated');
       }
       await loadCustomers();
-      setIsModalOpen(false);
+      if (saveAndAddAnother) {
+        resetAfterSave();
+        addToast('Ready to add another customer');
+      } else {
+        setIsModalOpen(false);
+      }
     } catch (error) {
       addToast('Unable to save customer', 'info');
     }
@@ -280,7 +461,7 @@ const RentalCustomersPage = () => {
           <input type="text" className="filter-search" placeholder="Search customer, phone, GST..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
         </div>
-        <button className="primary-button" onClick={() => { setModalMode('Add'); setCurrentCustomer(null); setIsModalOpen(true); }}><Plus size={18} /> Add Customer</button>
+        <button className="primary-button" onClick={() => openCustomerModal('Add')}><Plus size={18} /> Add Customer</button>
         <select className="filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
           <option>All Types</option><option>Corporate</option><option>Individual</option>
         </select>
@@ -336,7 +517,7 @@ const RentalCustomersPage = () => {
                           <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> Open Process</button>
                           <button className="menu-item" onClick={() => initAgreement(c.type, c)}><ClipboardCheck size={14} /> Create Agreement</button>
                           <div className="h-px bg-slate-100 my-1"></div>
-                          <button className="menu-item" onClick={() => { setModalMode('Edit'); setCurrentCustomer(c); setIsModalOpen(true); setOpenMenuId(null); }}><Edit2 size={14} /> Edit</button>
+                          <button className="menu-item" onClick={() => { openCustomerModal('Edit', c); setOpenMenuId(null); }}><Edit2 size={14} /> Edit</button>
                           <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button>
                         </motion.div>
                       )}
@@ -442,15 +623,119 @@ const RentalCustomersPage = () => {
         {isModalOpen && (
           <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="modal-card" onClick={e => e.stopPropagation()}>
-              <h2>{modalMode} Customer</h2>
-              <form onSubmit={handleSaveCustomer}>
-                <div className="form-grid">
-                  <div className="form-field"><label>Type</label><select name="type" defaultValue={currentCustomer?.type}><option>Corporate</option><option>Individual</option></select></div>
-                  <div className="form-field"><label>Name</label><input name="name" required defaultValue={currentCustomer?.name} /></div>
-                  <div className="form-field"><label>Phone</label><input name="phone" required defaultValue={currentCustomer?.phone} /></div>
-                  <div className="form-field"><label>Email</label><input name="email" required defaultValue={currentCustomer?.email} /></div>
-                </div>
-                <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setIsModalOpen(false)}>Cancel</button><button type="submit" className="primary-button">Save</button></div>
+              <h2>{modalMode} Rental Customer</h2>
+              <p>Build a complete customer profile, add authorized persons, locations, and assign devices in one place.</p>
+              <div className="customer-form-tabs">
+                <button type="button" className={`customer-form-tab ${activeCustomerTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveCustomerTab('profile')}>Customer Profile</button>
+                <button type="button" className={`customer-form-tab ${activeCustomerTab === 'authorized' ? 'active' : ''}`} onClick={() => setActiveCustomerTab('authorized')}>Authorized Persons</button>
+                <button type="button" className={`customer-form-tab ${activeCustomerTab === 'locations' ? 'active' : ''}`} onClick={() => setActiveCustomerTab('locations')}>Locations</button>
+                <button type="button" className={`customer-form-tab ${activeCustomerTab === 'devices' ? 'active' : ''}`} onClick={() => setActiveCustomerTab('devices')}>Devices</button>
+              </div>
+
+              <form onSubmit={(event) => { event.preventDefault(); handleSaveCustomer(false); }}>
+                {activeCustomerTab === 'profile' && (
+                  <div className="section-card">
+                    <h3>Customer Profile</h3>
+                    <div className="form-grid">
+                      <div className="form-field">
+                        <label>Company / Customer Name <span className="field-required">*</span></label>
+                        <input value={customerForm.companyName} onChange={(e) => setCustomerForm((prev) => ({ ...prev, companyName: e.target.value }))} />
+                        {customerFormErrors.companyName && <small className="field-error">{customerFormErrors.companyName}</small>}
+                      </div>
+                      <div className="form-field">
+                        <label>Customer Type <span className="field-required">*</span></label>
+                        <select value={customerForm.customerType} onChange={(e) => setCustomerForm((prev) => ({ ...prev, customerType: e.target.value }))}><option>Corporate</option><option>Individual</option></select>
+                      </div>
+                      <div className="form-field"><label>GST Number <span className="field-optional">(Optional)</span></label><input value={customerForm.gstNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, gstNumber: e.target.value }))} /></div>
+                      <div className="form-field"><label>Email Address <span className="field-required">*</span></label><input type="email" value={customerForm.email} onChange={(e) => setCustomerForm((prev) => ({ ...prev, email: e.target.value }))} />{customerFormErrors.email && <small className="field-error">{customerFormErrors.email}</small>}</div>
+                      <div className="form-field full"><label>Billing Address <span className="field-required">*</span></label><textarea value={customerForm.billingAddress} onChange={(e) => setCustomerForm((prev) => ({ ...prev, billingAddress: e.target.value }))} />{customerFormErrors.billingAddress && <small className="field-error">{customerFormErrors.billingAddress}</small>}</div>
+                      <div className="form-field full"><label>Shipping Address <span className="field-optional">(Optional)</span></label><textarea value={customerForm.shippingAddress} onChange={(e) => setCustomerForm((prev) => ({ ...prev, shippingAddress: e.target.value }))} /></div>
+                      <div className="form-field"><label>City <span className="field-required">*</span></label><input value={customerForm.city} onChange={(e) => setCustomerForm((prev) => ({ ...prev, city: e.target.value }))} />{customerFormErrors.city && <small className="field-error">{customerFormErrors.city}</small>}</div>
+                      <div className="form-field"><label>State <span className="field-required">*</span></label><input value={customerForm.state} onChange={(e) => setCustomerForm((prev) => ({ ...prev, state: e.target.value }))} />{customerFormErrors.state && <small className="field-error">{customerFormErrors.state}</small>}</div>
+                      <div className="form-field"><label>Pincode <span className="field-required">*</span></label><input value={customerForm.pincode} onChange={(e) => setCustomerForm((prev) => ({ ...prev, pincode: e.target.value }))} />{customerFormErrors.pincode && <small className="field-error">{customerFormErrors.pincode}</small>}</div>
+                      <div className="form-field"><label>Primary Contact Number <span className="field-required">*</span></label><input value={customerForm.primaryContactNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, primaryContactNumber: e.target.value }))} />{customerFormErrors.primaryContactNumber && <small className="field-error">{customerFormErrors.primaryContactNumber}</small>}</div>
+                      <div className="form-field"><label>Alternate Contact Number <span className="field-optional">(Optional)</span></label><input value={customerForm.alternateContactNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, alternateContactNumber: e.target.value }))} /></div>
+                      <div className="form-field full"><label>Notes / Remarks <span className="field-optional">(Optional)</span></label><textarea value={customerForm.notes} onChange={(e) => setCustomerForm((prev) => ({ ...prev, notes: e.target.value }))} /></div>
+                    </div>
+                  </div>
+                )}
+                {activeCustomerTab === 'authorized' && (
+                  <div className="section-card section-stack">
+                    <h3>Authorized Persons</h3>
+                    <div className="mini-section-card">
+                      <h4>Authorized Person 1 <span className="field-required">*</span></h4>
+                      <div className="form-grid">
+                        <div className="form-field"><label>Name <span className="field-required">*</span></label><input value={customerForm.person1.name} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, name: e.target.value } }))} />{customerFormErrors.person1Name && <small className="field-error">{customerFormErrors.person1Name}</small>}</div>
+                        <div className="form-field"><label>Designation</label><input value={customerForm.person1.designation} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, designation: e.target.value } }))} /></div>
+                        <div className="form-field"><label>Phone Number <span className="field-required">*</span></label><input value={customerForm.person1.phone} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, phone: e.target.value } }))} />{customerFormErrors.person1Phone && <small className="field-error">{customerFormErrors.person1Phone}</small>}</div>
+                        <div className="form-field"><label>Email</label><input type="email" value={customerForm.person1.email} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, email: e.target.value } }))} /></div>
+                        <div className="form-field full"><label>ID Proof Upload</label><input type="file" onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, idProofName: e.target.files?.[0]?.name || '' } }))} /></div>
+                      </div>
+                    </div>
+                    <div className="mini-section-card">
+                      <h4>Authorized Person 2 <span className="field-optional">(Optional)</span></h4>
+                      <div className="form-grid">
+                        <div className="form-field"><label>Name <span className="field-optional">(Optional)</span></label><input value={customerForm.person2.name} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, name: e.target.value } }))} /></div>
+                        <div className="form-field"><label>Designation</label><input value={customerForm.person2.designation} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, designation: e.target.value } }))} /></div>
+                        <div className="form-field"><label>Phone Number</label><input value={customerForm.person2.phone} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, phone: e.target.value } }))} /></div>
+                        <div className="form-field"><label>Email</label><input type="email" value={customerForm.person2.email} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, email: e.target.value } }))} /></div>
+                        <div className="form-field full"><label>ID Proof Upload</label><input type="file" onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, idProofName: e.target.files?.[0]?.name || '' } }))} /></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {activeCustomerTab === 'locations' && (
+                  <div className="section-card section-stack">
+                    <div className="inline-section-header">
+                      <h3>Customer Locations</h3>
+                      <button type="button" className="secondary-button" onClick={() => setCustomerForm((prev) => ({ ...prev, locations: [...prev.locations, emptyLocation()] }))}><Plus size={16} /> Add Location</button>
+                    </div>
+                    {customerForm.locations.map((location, index) => (
+                      <div className="mini-section-card" key={location.id}>
+                        <div className="inline-section-header">
+                          <h4>Location {index + 1}</h4>
+                          {customerForm.locations.length > 1 && <button type="button" className="icon-button" onClick={() => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.filter((row) => row.id !== location.id), devices: prev.devices.map((device) => (device.locationId === location.id ? { ...device, locationId: '' } : device)) }))}><Trash2 size={14} /></button>}
+                        </div>
+                        <div className="form-grid">
+                          <div className="form-field"><label>Location Name <span className="field-required">*</span></label><input value={location.locationName} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, locationName: e.target.value } : row)) }))} />{customerFormErrors[`locationName-${index}`] && <small className="field-error">{customerFormErrors[`locationName-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Contact Person</label><input value={location.contactPerson} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, contactPerson: e.target.value } : row)) }))} /></div>
+                          <div className="form-field"><label>Phone Number</label><input value={location.phone} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, phone: e.target.value } : row)) }))} /></div>
+                          <div className="form-field"><label>Email</label><input type="email" value={location.email} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, email: e.target.value } : row)) }))} /></div>
+                          <div className="form-field full"><label>Address <span className="field-required">*</span></label><textarea value={location.address} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, address: e.target.value } : row)) }))} />{customerFormErrors[`locationAddress-${index}`] && <small className="field-error">{customerFormErrors[`locationAddress-${index}`]}</small>}</div>
+                          <div className="form-field full"><label>Remarks</label><textarea value={location.remarks} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, remarks: e.target.value } : row)) }))} /></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {activeCustomerTab === 'devices' && (
+                  <div className="section-card section-stack">
+                    <div className="inline-section-header">
+                      <h3>Customer Devices</h3>
+                      <button type="button" className="secondary-button" onClick={() => setCustomerForm((prev) => ({ ...prev, devices: [...prev.devices, emptyDevice()] }))}><Plus size={16} /> Add Device</button>
+                    </div>
+                    {customerForm.devices.map((device, index) => (
+                      <div className="mini-section-card" key={device.id}>
+                        <div className="inline-section-header">
+                          <h4>Device {index + 1}</h4>
+                          {customerForm.devices.length > 1 && <button type="button" className="icon-button" onClick={() => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.filter((row) => row.id !== device.id) }))}><Trash2 size={14} /></button>}
+                        </div>
+                        <div className="form-grid">
+                          <div className="form-field"><label>Device Type <span className="field-required">*</span></label><input value={device.deviceType} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, deviceType: e.target.value } : row)) }))} />{customerFormErrors[`deviceType-${index}`] && <small className="field-error">{customerFormErrors[`deviceType-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Brand</label><input value={device.brand} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, brand: e.target.value } : row)) }))} /></div>
+                          <div className="form-field"><label>Model <span className="field-required">*</span></label><input value={device.model} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, model: e.target.value } : row)) }))} />{customerFormErrors[`deviceModel-${index}`] && <small className="field-error">{customerFormErrors[`deviceModel-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Serial Number <span className="field-required">*</span></label><input value={device.serialNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, serialNumber: e.target.value } : row)) }))} />{customerFormErrors[`serialNumber-${index}`] && <small className="field-error">{customerFormErrors[`serialNumber-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Rental Start Date <span className="field-required">*</span></label><input type="date" value={device.rentalStartDate} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, rentalStartDate: e.target.value } : row)) }))} />{customerFormErrors[`rentalStartDate-${index}`] && <small className="field-error">{customerFormErrors[`rentalStartDate-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Monthly Rent <span className="field-required">*</span></label><input type="number" min="0" value={device.monthlyRent} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, monthlyRent: e.target.value } : row)) }))} />{customerFormErrors[`monthlyRent-${index}`] && <small className="field-error">{customerFormErrors[`monthlyRent-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Location Assigned <span className="field-required">*</span></label><select value={device.locationId} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, locationId: e.target.value } : row)) }))}><option value="">Select location</option>{customerForm.locations.map((location) => <option key={location.id} value={location.id}>{location.locationName || 'Unnamed Location'}</option>)}</select>{customerFormErrors[`locationId-${index}`] && <small className="field-error">{customerFormErrors[`locationId-${index}`]}</small>}</div>
+                          <div className="form-field"><label>Status</label><select value={device.status} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, status: e.target.value } : row)) }))}><option>Active</option><option>Inactive</option><option>Under Repair</option></select></div>
+                          <div className="form-field full"><label>Remarks</label><textarea value={device.remarks} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, remarks: e.target.value } : row)) }))} /></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setIsModalOpen(false)}>Cancel</button><button type="button" className="secondary-button" onClick={() => handleSaveCustomer(true)}>Save & Add Another</button><button type="submit" className="primary-button">Save</button></div>
               </form>
             </motion.div>
           </div>
