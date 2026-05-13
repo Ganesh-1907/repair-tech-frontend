@@ -24,6 +24,7 @@ import AMCAgreementsPage from './pages/admin/AMCAgreementsPage';
 import AMCQuotationPage from './pages/admin/AMCQuotationPage';
 import AMCInventoryPage from './pages/admin/AMCInventoryPage';
 import AMCNewContractPage from './pages/admin/AMCNewContractPage';
+import AMCViewPage from './pages/admin/AMCViewPage';
 
 // Admin Module Pages
 import ExpensesManagementPage from './pages/admin/ExpensesManagementPage';
@@ -65,6 +66,7 @@ import CMCDashboardPage from './pages/admin/CMCDashboardPage';
 import CMCPlansPage from './pages/admin/CMCPlansPage';
 import CMCInventoryPage from './pages/admin/CMCInventoryPage';
 import CMCNewContractPage from './pages/admin/CMCNewContractPage';
+import CMCViewPage from './pages/admin/CMCViewPage';
 import CMCReportsPage from './pages/admin/CMCReportsPage';
 
 import { adminRouteEntries } from './config/adminModules';
@@ -178,6 +180,7 @@ function App() {
               <Route path="/admin/amc/plans" element={<Layout><AMCPlansPage /></Layout>} />
               <Route path="/admin/amc/inventory" element={<Layout><AMCInventoryPage /></Layout>} />
               <Route path="/admin/amc/new" element={<Layout><AMCNewContractPage /></Layout>} />
+              <Route path="/admin/amc/view/:id" element={<Layout><AMCViewPage /></Layout>} />
               <Route path="/admin/amc/reports" element={<Layout><AMCReportsPage /></Layout>} />
 
               {/* CMC Module Redirects & Explicit Routes */}
@@ -186,6 +189,7 @@ function App() {
               <Route path="/admin/cmc/plans" element={<Layout><CMCPlansPage /></Layout>} />
               <Route path="/admin/cmc/inventory" element={<Layout><CMCInventoryPage /></Layout>} />
               <Route path="/admin/cmc/new" element={<Layout><CMCNewContractPage /></Layout>} />
+              <Route path="/admin/cmc/view/:id" element={<Layout><CMCViewPage /></Layout>} />
               <Route path="/admin/cmc/reports" element={<Layout><CMCReportsPage /></Layout>} />
 
               {/* Discounts Module Routes */}

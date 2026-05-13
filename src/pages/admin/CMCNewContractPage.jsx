@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Trash2, ChevronDown, ChevronUp, ArrowLeft, Save } from 'lucide-react';
 import { api } from '../../services/apiClient';
+import { normalizeContractDevices } from './contractDeviceFormUtils';
 import './PlansCustomers.css';
 
-const DEVICE_TYPES = ['Laptop', 'Desktop', 'Printer', 'CCTV', 'Server', 'Total Maintenance'];
+const DEVICE_TYPES = ['Laptop', 'Desktop', 'Printer', 'CCTV', 'Server', 'UPS', 'Scanner', 'Total Maintenance'];
 
 const createBlankDevice = (type = 'Laptop') => {
   switch (type) {
@@ -380,6 +381,10 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
 
 const CMCNewContractPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const editId = queryParams.get('id');
+
   const [cmcPlans, setCmcPlans] = useState([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
@@ -400,17 +405,60 @@ const CMCNewContractPage = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [plansRes, contractsRes] = await Promise.allSettled([
-        api.list('cmcPlans'),
-        api.list('cmcContracts'),
-      ]);
-      const plans = plansRes.status === 'fulfilled' ? plansRes.value : [];
-      const contracts = contractsRes.status === 'fulfilled' ? contractsRes.value : [];
-      setCmcPlans(Array.isArray(plans) ? plans : []);
-      setForm(f => ({ ...f, contractId: generateContractId(Array.isArray(contracts) ? contracts : []) }));
+      try {
+        if (editId?.startsWith('AMC-')) {
+          navigate(`/admin/amc/new?id=${editId}`, { replace: true });
+          return;
+        }
+
+        const [plansRes, contractsRes] = await Promise.allSettled([
+          api.list('cmcPlans'),
+          api.list('cmcContracts'),
+        ]);
+        const plans = plansRes.status === 'fulfilled' ? plansRes.value : [];
+        const contracts = contractsRes.status === 'fulfilled' ? contractsRes.value : [];
+        setCmcPlans(Array.isArray(plans) ? plans : []);
+
+        if (editId) {
+          const existing = await api.get('cmcContracts', editId);
+          if (existing) {
+            if (existing.contractType === 'AMC') {
+              navigate(`/admin/amc/new?id=${editId}`, { replace: true });
+              return;
+            }
+            const details = existing.cmcDetails || {};
+            const devices = normalizeContractDevices(details.devices || existing.devices, createBlankDevice, DEVICE_TYPES);
+            setForm({
+              companyName: existing.customerName || existing.name || '',
+              gstNumber: details.gstin || details.gst || existing.gstin || existing.gst || '',
+              primaryContact: {
+                name: details.authorizedPerson1 || details.contactPerson || existing.authorizedPerson1 || existing.contactPerson || '',
+                mobile: details.primaryContact?.mobile || details.contact || details.contactPhone || existing.contact || existing.contactPhone || '',
+                email: details.primaryContact?.email || details.email || existing.email || '',
+              },
+              secondaryContact: {
+                name: details.authorizedPerson2 || existing.authorizedPerson2 || '',
+                mobile: details.secondaryContact?.mobile || existing.secondaryContact?.mobile || '',
+                email: details.secondaryContact?.email || existing.secondaryContact?.email || '',
+              },
+              registeredAddress: details.address || existing.address || '',
+              contractId: existing.id || existing.contractId || '',
+              cmcPlan: details.planName || existing.plan || '',
+              expiryDate: (existing.endDate || existing.expiryDate || existing.expiry || '').split('T')[0],
+              status: existing.status || 'Active',
+              devices,
+            });
+            setOpenDevices(new Set(devices.map((_, i) => i)));
+          }
+        } else {
+          setForm(f => ({ ...f, contractId: generateContractId(Array.isArray(contracts) ? contracts : []) }));
+        }
+      } catch (err) {
+        console.error('Failed to load data:', err);
+      }
     };
     load();
-  }, []);
+  }, [editId, navigate]);
 
   const setContact = (type, field, value) => {
     setForm(f => ({ ...f, [type]: { ...f[type], [field]: value } }));
@@ -483,7 +531,11 @@ const CMCNewContractPage = () => {
           locations: [],
         },
       };
-      await api.create('cmcContracts', payload);
+      if (editId) {
+        await api.update('cmcContracts', editId, payload);
+      } else {
+        await api.create('cmcContracts', payload);
+      }
       navigate('/admin/cmc/inventory');
     } catch (err) {
       console.error('Failed to save CMC contract:', err);
@@ -500,13 +552,13 @@ const CMCNewContractPage = () => {
           <ArrowLeft size={18} /> Back to CMC Inventory
         </button>
         <div className="amc-new-page-title">
-          <h1>New CMC Enrollment</h1>
+          <h1>{editId ? 'Edit CMC Enrollment' : 'New CMC Enrollment'}</h1>
           <p>Register a new customer, contract details, and device registry.</p>
         </div>
         <div className="amc-new-page-actions">
           <button className="secondary-button" onClick={() => navigate('/admin/cmc/inventory')}>Cancel</button>
           <button className="primary-button" onClick={handleSave} disabled={saving}>
-            <Save size={16} /> {saving ? 'Saving…' : 'Save Enrollment'}
+            <Save size={16} /> {saving ? 'Saving…' : editId ? 'Update Enrollment' : 'Save Enrollment'}
           </button>
         </div>
       </div>
@@ -676,7 +728,7 @@ const CMCNewContractPage = () => {
         <div className="amc-form-footer">
           <button className="secondary-button" onClick={() => navigate('/admin/cmc/inventory')}>Cancel</button>
           <button className="primary-button" onClick={handleSave} disabled={saving}>
-            <Save size={16} /> {saving ? 'Saving…' : 'Save Enrollment'}
+            <Save size={16} /> {saving ? 'Saving…' : editId ? 'Update Enrollment' : 'Save Enrollment'}
           </button>
         </div>
       </div>

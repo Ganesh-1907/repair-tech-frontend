@@ -19,7 +19,7 @@
 }
 
 .sticky-head {
-  max-width: 1240px;
+  max-width: 1000px;
   margin: 0 auto 14px;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -99,7 +99,7 @@
 }
 
 .workflow-chain-card {
-  max-width: 1240px;
+  max-width: 1000px;
   margin: 0 auto 14px;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -208,7 +208,7 @@
 
 
 .quotation-form-card {
-  max-width: 1240px;
+  max-width: 1000px;
   margin: 0 auto;
   background: transparent !important;
   border: none !important;
@@ -217,26 +217,20 @@
 }
 
 .workflow-grid {
-  display: grid;
-  grid-template-columns: 1.15fr 1.2fr;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1000px;
+  margin: 0 auto;
 }
 
 .workflow-card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 16px;
+  border-radius: 20px;
+  padding: 24px;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
 }
-
-.workflow-card:hover {
-  transform: translateY(-1px);
-  transition: .2s ease;
-}
-
-.customer-card { grid-column: 1; }
-.activity-card { grid-column: span 2; }
 
 .section-head {
   display: flex;

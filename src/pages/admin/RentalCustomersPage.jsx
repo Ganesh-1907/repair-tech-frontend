@@ -1,16 +1,17 @@
-import React, { useMemo, useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Search, 
-  MoreVertical, 
-  Download, 
-  RefreshCcw, 
-  Eye, 
-  Edit2, 
-  Trash2, 
-  MapPin, 
-  Briefcase, 
-  Receipt, 
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  Plus,
+  Search,
+  MoreVertical,
+  Download,
+  RefreshCcw,
+  Eye,
+  Edit2,
+  Trash2,
+  MapPin,
+  Briefcase,
+  Receipt,
   X,
   CheckCircle2,
   AlertCircle,
@@ -21,12 +22,13 @@ import {
   Printer,
   Send,
   Copy,
-  ArrowRight,  Check,
+  ArrowRight, Check,
   Building2,
-  UserCheck,  Monitor,
+  UserCheck, Monitor,
   Zap,
   ShieldCheck,
-  Package
+  Package,
+  FileEdit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './RentalCustomerManagement.css';
@@ -71,25 +73,13 @@ const RentalCustomersPage = () => {
   // --- Local State ---
   const [customers, setCustomers] = useState([]);
 
-  const [documents, setDocuments] = useState({
-    quotations: [
-      { id: 'QTN-260401', customerId: 'RC-1001', customerName: 'Global Tech Solutions', date: '2026-04-20', status: 'Sent', total: 45000 },
-      { id: 'QTN-260402', customerId: 'RC-1002', customerName: 'Nikita Sharma', date: '2026-04-22', status: 'Draft', total: 12500 }
-    ],
-    corporateAgreements: [
-      { id: 'AGR-C-1001', customerId: 'RC-1001', customerName: 'Global Tech Solutions', date: '2026-04-21', status: 'Accepted' }
-    ],
-    individualAgreements: [
-      { id: 'AGR-I-1002', customerId: 'RC-1002', customerName: 'Nikita Sharma', date: '2026-04-23', status: 'Draft' }
-    ]
-  });
-
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All Types');
   const [statusFilter, setStatusFilter] = useState('All Status');
-  const [activeDocTab, setActiveDocTab] = useState('Quotations');
-  const [openMenuId, setOpenMenuId] = useState(null);
   
+  // Floating Menu State (CMC Style)
+  const [activeMenu, setActiveMenu] = useState({ id: null, open: false, x: 0, y: 0, width: 220 });
+
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('Add'); // Add, Edit, View
@@ -115,16 +105,12 @@ const RentalCustomersPage = () => {
     devices: [emptyDevice()],
     status: 'Active',
   });
-  
+
   // Doc Builder Modals
   const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
   const [agreementType, setAgreementType] = useState('Corporate'); // Corporate, Individual
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
   const [currentDoc, setCurrentDoc] = useState(null);
-
-  const [isLocationsModalOpen, setIsLocationsModalOpen] = useState(false);
-  const [isContractsModalOpen, setIsContractsModalOpen] = useState(false);
-  const [isInvoicesModalOpen, setIsInvoicesModalOpen] = useState(false);
 
   // Toasts
   const [toasts, setToasts] = useState([]);
@@ -154,6 +140,20 @@ const RentalCustomersPage = () => {
       addToast('Failed to load customers', 'info');
     });
   }, []);
+
+  // Click-out to close menu (CMC Style)
+  useEffect(() => {
+    const close = () => setActiveMenu((prev) => (prev.open ? { ...prev, open: false, id: null } : prev));
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    window.addEventListener('click', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('click', close);
+    };
+  }, []);
+
   const addToast = (message, type = 'success') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, message, type }]);
@@ -164,7 +164,7 @@ const RentalCustomersPage = () => {
 
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
-      const filterMatch = 
+      const filterMatch =
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.phone.includes(searchTerm) ||
         c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -184,15 +184,12 @@ const RentalCustomersPage = () => {
     addToast('Filters reset successfully', 'info');
   };
 
-  const handleExport = () => {
-    addToast('Exporting customer data...');
-  };
-
   const handleDelete = (id) => {
     if (window.confirm('Delete this customer?')) {
       api.remove('rentalCustomers', id)
         .then(() => {
           addToast('Customer deleted');
+          setActiveMenu({ id: null, open: false, x: 0, y: 0, width: 220 });
           return loadCustomers();
         })
         .catch(() => addToast('Failed to delete customer', 'info'));
@@ -390,6 +387,27 @@ const RentalCustomersPage = () => {
     window.location.href = `/admin/rental/customers/${customerId}`;
   };
 
+  // Smart Positioning Menu Trigger (CMC Style)
+  const handleOpenMenu = (event, customer) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = 220;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const menuHeight = 220; // Estimated height for Rental menu
+    
+    // Horizontal positioning: align to right of button, but keep on screen
+    const x = Math.max(8, Math.min(rect.right - width, viewportWidth - width - 8));
+    
+    // Vertical positioning: check if there is enough space below
+    const shouldOpenUp = rect.bottom + menuHeight > viewportHeight - 8;
+    const y = shouldOpenUp 
+      ? Math.max(8, rect.top - menuHeight - 6) 
+      : Math.min(viewportHeight - menuHeight - 8, rect.bottom + 6);
+
+    setActiveMenu({ id: customer.id, open: true, x, y, width });
+  };
+
   // --- Agreement Logic ---
   const initAgreement = (type, customer = null) => {
     setAgreementType(type);
@@ -447,17 +465,6 @@ const RentalCustomersPage = () => {
   };
 
   const saveAgreement = () => {
-    const category = agreementType === 'Corporate' ? 'corporateAgreements' : 'individualAgreements';
-    const docData = { 
-      id: currentDoc.agreement_no, 
-      customerName: currentDoc.company_name, 
-      date: currentDoc.agreement_date, 
-      status: 'Draft' 
-    };
-    setDocuments(prev => ({
-      ...prev,
-      [category]: [docData, ...prev[category].filter(a => a.id !== docData.id)]
-    }));
     addToast('Agreement saved');
     setIsAgreementModalOpen(false);
   };
@@ -511,14 +518,17 @@ const RentalCustomersPage = () => {
                       </button>
                     </div>
                   </td>
-                  <td className="text-slate-600">{c.person1}</td>
-                  <td className="font-mono text-xs text-slate-500">{c.gst}</td>
+                  <td className="text-slate-600 truncate-cell">{c.person1}</td>
+                  <td className="font-mono text-xs text-slate-500 truncate-cell">{c.gst}</td>
                   <td className="font-bold text-slate-700">{c.phone}</td>
                   <td><span className={`status-badge status-${c.status.toLowerCase()}`}>{c.status}</span></td>
                   <td className="text-center">
-                    <div className="actions-menu">
-                      <button className="icon-button mx-auto" onClick={e => { e.stopPropagation(); setOpenMenuId(openMenuId === c.id ? null : c.id); }}>
-                        <MoreVertical size={18} />
+                    <div className="actions-menu" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                      <button className="icon-button" onClick={() => openCustomerProcess(c.id)} title="View Process">
+                        <Eye size={14} />
+                      </button>
+                      <button className="icon-button" onClick={(e) => handleOpenMenu(e, c)}>
+                        <MoreVertical size={14} />
                       </button>
                       {openMenuId === c.id && (
                         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="menu-panel">
@@ -539,6 +549,30 @@ const RentalCustomersPage = () => {
         </div>
       </section>
 
+      {/* Floating Menu Panel (CMC Style) */}
+      {activeMenu.open && (
+        <div
+          className="menu-panel"
+          style={{ position: 'fixed', left: `${activeMenu.x}px`, top: `${activeMenu.y}px`, width: `${activeMenu.width}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(() => {
+            const c = filteredCustomers.find((row) => row.id === activeMenu.id);
+            if (!c) return null;
+            return (
+              <>
+                <button className="menu-item" onClick={() => goToQuotations(c)}><FileText size={14} /> Create Quotation</button>
+                <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> Open Process</button>
+                <button className="menu-item" onClick={() => initAgreement(c.type, c)}><ClipboardCheck size={14} /> Create Agreement</button>
+                <div className="h-px bg-slate-100 my-1"></div>
+                <button className="menu-item" onClick={() => { window.location.href = `/admin/rental/new?id=${c.id}`; }}><Edit2 size={14} /> Edit</button>
+                <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
       {/* --- Agreement Builder Modal --- */}
       <AnimatePresence>
         {isAgreementModalOpen && (
@@ -552,75 +586,18 @@ const RentalCustomersPage = () => {
                   <button className="primary-button !bg-emerald-600" onClick={saveAgreement}><Check size={18} /> Save & Close</button>
                 </div>
               </div>
-              <div className="document-form-layout">
-                <div className="document-form-panel no-print">
-                  <div className="document-section-card">
-                    <h3><Building2 size={18} /> Client Details</h3>
-                    <div className="document-form-grid">
-                      <div className="document-field full"><label>Company Name</label><input value={currentDoc.company_name} onChange={e => setCurrentDoc({...currentDoc, company_name: e.target.value})} /></div>
-                      <div className="document-field full"><label>Address</label><textarea value={currentDoc.company_address} onChange={e => setCurrentDoc({...currentDoc, company_address: e.target.value})} /></div>
-                    </div>
+              {/* Simplified Preview Content */}
+              <div className="p-8">
+                <div className="agreement-preview-paper">
+                  <h1>RENTAL AGREEMENT ({agreementType.toUpperCase()})</h1>
+                  <p>This agreement is made on <strong>{currentDoc.agreement_date}</strong></p>
+                  <div className="grid grid-cols-2 gap-8 my-8">
+                    <div><strong>Client:</strong><br />{currentDoc.company_name}<br />{currentDoc.company_address}</div>
+                    <div><strong>Provider:</strong><br />{currentDoc.provider_name}<br />{currentDoc.provider_address}</div>
                   </div>
-                  <div className="document-section-card">
-                    <h3><Monitor size={18} /> Equipment Details</h3>
-                    <button className="secondary-button !h-8 !px-3 !text-xs mb-4" onClick={() => setCurrentDoc({...currentDoc, devices: [...currentDoc.devices, {type:'Printer', model:'', specs:'', qty:1, rent:0}]})}><Plus size={14}/> Add Device</button>
-                    <table className="device-table-editor">
-                      <thead><tr><th>Model</th><th>Qty</th><th>Rent</th><th></th></tr></thead>
-                      <tbody>
-                        {currentDoc.devices.map((d, i) => (
-                          <tr key={i}>
-                            <td><input value={d.model} onChange={e => { const nd = [...currentDoc.devices]; nd[i].model = e.target.value; setCurrentDoc({...currentDoc, devices: nd}); }} /></td>
-                            <td><input type="number" value={d.qty} onChange={e => { const nd = [...currentDoc.devices]; nd[i].qty = e.target.value; setCurrentDoc({...currentDoc, devices: nd}); }} /></td>
-                            <td><input type="number" value={d.rent} onChange={e => { const nd = [...currentDoc.devices]; nd[i].rent = e.target.value; setCurrentDoc({...currentDoc, devices: nd}); }} /></td>
-                            <td><button onClick={() => setCurrentDoc({...currentDoc, devices: currentDoc.devices.filter((_, idx) => idx !== i)})}><Trash2 size={14}/></button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="document-section-card">
-                    <h3><ShieldCheck size={18} /> Editable Clauses</h3>
-                    <div className="agreement-field full"><label>Scope of Agreement</label><textarea value={currentDoc.scope_clause} onChange={e => setCurrentDoc({...currentDoc, scope_clause: e.target.value})} /></div>
-                    <div className="agreement-field full"><label>Termination Clause</label><textarea value={currentDoc.termination_clause} onChange={e => setCurrentDoc({...currentDoc, termination_clause: e.target.value})} /></div>
-                  </div>
+                  <h2>1. Scope</h2><p>{currentDoc.scope_clause}</p>
+                  <div className="signature-block"><div className="sig-line">For Client</div><div className="sig-line">For Provider</div></div>
                 </div>
-                <div className="document-preview-panel">
-                  <div className="agreement-preview-paper">
-                    <h1>RENTAL AGREEMENT ({agreementType.toUpperCase()})</h1>
-                    <p>This agreement is made on <strong>{currentDoc.agreement_date}</strong></p>
-                    <div className="grid grid-cols-2 gap-8 my-8">
-                      <div><strong>Client:</strong><br/>{currentDoc.company_name}<br/>{currentDoc.company_address}</div>
-                      <div><strong>Provider:</strong><br/>{currentDoc.provider_name}<br/>{currentDoc.provider_address}</div>
-                    </div>
-                    <h2>1. Scope</h2><p>{currentDoc.scope_clause}</p>
-                    <h2>2. Equipment</h2>
-                    <table>
-                      <thead><tr><th>Type</th><th>Model</th><th>Qty</th><th>Rent</th></tr></thead>
-                      <tbody>
-                        {currentDoc.devices.map((d, i) => (
-                          <tr key={i}><td>{d.type}</td><td>{d.model}</td><td>{d.qty}</td><td>₹{d.rent}</td></tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <h2>3. Termination</h2><p>{currentDoc.termination_clause}</p>
-                    <div className="signature-block"><div className="sig-line">For Client</div><div className="sig-line">For Provider</div></div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- Agreement Type Selector --- */}
-      <AnimatePresence>
-        {isTypeSelectorOpen && (
-          <div className="modal-overlay" onClick={() => setIsTypeSelectorOpen(false)}>
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="modal-card !w-[400px]" onClick={e => e.stopPropagation()}>
-              <h2 className="text-center mb-6">Select Agreement Type</h2>
-              <div className="flex flex-col gap-4">
-                <button className="primary-button !h-14 !justify-center" onClick={() => initAgreement('Corporate')}><Building2 size={20} /> Corporate Agreement</button>
-                <button className="secondary-button !h-14 !justify-center" onClick={() => initAgreement('Individual')}><User size={20} /> Individual Agreement</button>
               </div>
             </motion.div>
           </div>
@@ -765,4 +742,3 @@ const RentalCustomersPage = () => {
 };
 
 export default RentalCustomersPage;
-

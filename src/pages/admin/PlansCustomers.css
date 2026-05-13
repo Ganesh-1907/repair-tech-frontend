@@ -6,9 +6,11 @@
   --text-muted: #64748b;
   --white: #ffffff;
   --border-color: #e5e7eb;
-  --primary: #10b981; /* Green for AMC/CMC success */
+  --primary: #10b981;
+  /* Green for AMC/CMC success */
   --primary-hover: #059669;
-  --secondary: #6366f1; /* Indigo for badges/links */
+  --secondary: #6366f1;
+  /* Indigo for badges/links */
   --amber: #d97706;
   --red: #dc2626;
   --slate-50: #f8fafc;
@@ -187,7 +189,8 @@
   gap: 12px;
 }
 
-.toolbar-left, .toolbar-right {
+.toolbar-left,
+.toolbar-right {
   display: flex;
   gap: 12px;
 }
@@ -238,12 +241,35 @@
   display: inline-block;
 }
 
-.status-active { background: #dcfce7; color: #16a34a; }
-.status-draft { background: #f1f5f9; color: #64748b; }
-.status-inactive { background: #fee2e2; color: #dc2626; }
-.status-expiring { background: #fef3c7; color: #d97706; }
-.status-expired { background: #fee2e2; color: #dc2626; }
-.status-suspended { background: #f1f5f9; color: #64748b; }
+.status-active {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.status-draft {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.status-inactive {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-expiring {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.status-expired {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-suspended {
+  background: #f1f5f9;
+  color: #64748b;
+}
 
 .plan-badge {
   padding: 4px 10px;
@@ -422,8 +448,15 @@
 }
 
 @keyframes modalIn {
-  from { opacity: 0; transform: translateY(20px) scale(0.95); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modal-header {
@@ -519,7 +552,8 @@
   color: var(--text-muted);
 }
 
-.form-input, .form-select {
+.form-input,
+.form-select {
   height: 44px;
   border-radius: 10px;
   border: 1px solid var(--slate-200);
@@ -528,7 +562,8 @@
   outline: none;
 }
 
-.form-input:focus, .form-select:focus {
+.form-input:focus,
+.form-select:focus {
   border-color: var(--secondary);
 }
 
@@ -633,7 +668,7 @@
   background: var(--white);
   border: 1px solid var(--slate-200);
   border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   padding: 8px;
   min-width: 180px;
   z-index: 1000;
@@ -672,6 +707,7 @@
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
   .main-grid {
     grid-template-columns: 1fr;
   }
@@ -681,30 +717,38 @@
   .stats-grid {
     grid-template-columns: 1fr;
   }
+
   .plans-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
   }
+
   .plans-search input {
     width: 100%;
   }
+
   .card-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
-  .toolbar-left, .toolbar-right {
+
+  .toolbar-left,
+  .toolbar-right {
     flex-direction: column;
   }
+
   .modal-overlay {
     padding: 12px;
   }
+
   .amc-enrollment-modal {
     width: calc(100vw - 24px);
     max-width: calc(100vw - 24px);
     height: calc(100vh - 24px);
     max-height: calc(100vh - 24px);
   }
+
   .contract-details-grid {
     grid-template-columns: 1fr;
   }
@@ -725,7 +769,7 @@
   width: 100%;
   max-width: 800px;
   padding: 60px 80px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
   font-family: 'Times New Roman', Times, serif;
   line-height: 1.6;
   color: #1a1a1a;
@@ -784,7 +828,8 @@
   margin: 10px 0;
 }
 
-.agreement-table th, .agreement-table td {
+.agreement-table th,
+.agreement-table td {
   border: 1px solid #ddd;
   padding: 10px;
   text-align: left;
@@ -824,19 +869,24 @@
 }
 
 @media print {
-  .plans-page > *:not(.agreement-preview-container) {
+  .plans-page>*:not(.agreement-preview-container) {
     display: none;
   }
+
   .agreement-preview-container {
     padding: 0;
     background: white;
   }
+
   .agreement-document {
     box-shadow: none;
     padding: 0;
     max-width: none;
   }
-  .primary-button, .secondary-button, .icon-button {
+
+  .primary-button,
+  .secondary-button,
+  .icon-button {
     display: none;
   }
 }
@@ -875,7 +925,7 @@
 .back-button:hover {
   background: white;
   color: var(--secondary);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .document-paper {
@@ -883,7 +933,7 @@
   max-width: 900px;
   margin: 0 auto;
   padding: 80px 100px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   font-family: 'Inter', sans-serif;
   color: #1e293b;
@@ -1094,9 +1144,13 @@
     margin: 1.5cm;
     size: A4;
   }
-  
+
   /* Reset all containers */
-  html, body, #root, .app-container, .main-content {
+  html,
+  body,
+  #root,
+  .app-container,
+  .main-content {
     height: auto !important;
     overflow: visible !important;
     margin: 0 !important;
@@ -1110,7 +1164,7 @@
   }
 
   /* Show only the document and its children */
-  .document-view-container, 
+  .document-view-container,
   .document-view-container * {
     visibility: visible;
   }
@@ -1125,7 +1179,11 @@
   }
 
   /* Force hide UI elements even if they were set to visible */
-  .no-print, .document-header, button, nav, .sidebar {
+  .no-print,
+  .document-header,
+  button,
+  nav,
+  .sidebar {
     display: none !important;
     visibility: hidden !important;
   }
@@ -1241,10 +1299,12 @@
 .amc-form-card.card-customer {
   border-color: #bfdbfe;
 }
+
 .amc-form-card.card-customer .amc-form-card-header {
   background: linear-gradient(to right, #eff6ff, #dbeafe);
   border-bottom-color: #bfdbfe;
 }
+
 .amc-form-card.card-customer .amc-form-section-title {
   color: #1d4ed8;
 }
@@ -1253,10 +1313,12 @@
 .amc-form-card.card-contract {
   border-color: #a7f3d0;
 }
+
 .amc-form-card.card-contract .amc-form-card-header {
   background: linear-gradient(to right, #ecfdf5, #d1fae5);
   border-bottom-color: #a7f3d0;
 }
+
 .amc-form-card.card-contract .amc-form-section-title {
   color: #065f46;
 }
@@ -1265,11 +1327,13 @@
 .amc-form-card.card-devices {
   border-color: #c4b5fd;
 }
+
 .amc-form-card.card-devices .amc-form-card-header,
 .amc-form-card.card-devices .device-registry-header {
   background: linear-gradient(to right, #f5f3ff, #ede9fe);
   border-bottom-color: #c4b5fd;
 }
+
 .amc-form-card.card-devices .amc-form-section-title {
   color: #5b21b6;
 }
@@ -1296,6 +1360,7 @@
 }
 
 @media (max-width: 760px) {
+
   .form-row-2,
   .form-row-3 {
     grid-template-columns: 1fr;

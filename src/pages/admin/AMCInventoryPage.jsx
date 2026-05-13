@@ -21,7 +21,8 @@ const AMCInventoryPage = () => {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
-  const [activeMenu, setActiveMenu] = useState({ type: null, id: null });
+  // Floating Menu State (CMC Style)
+  const [activeMenu, setActiveMenu] = useState({ id: null, open: false, x: 0, y: 0, width: 220 });
   const [repairContract, setRepairContract] = useState(null);
   const [toast, setToast] = useState('');
 
@@ -73,6 +74,19 @@ const AMCInventoryPage = () => {
     return () => window.clearTimeout(timerId);
   }, [fetchContracts]);
 
+  // Click-out to close menu (CMC Style)
+  useEffect(() => {
+    const close = () => setActiveMenu((prev) => (prev.open ? { ...prev, open: false, id: null } : prev));
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    window.addEventListener('click', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('click', close);
+    };
+  }, []);
+
   useEffect(() => {
     if (!showModal && !showDetailModal) {
       return undefined;
@@ -95,7 +109,25 @@ const AMCInventoryPage = () => {
   const handleOpenDetail = (cust) => {
     setSelectedCustomer(cust);
     setShowDetailModal(true);
-    setActiveMenu({ type: null, id: null });
+    setActiveMenu({ id: null, open: false, x: 0, y: 0, width: 220 });
+  };
+
+  // Smart Positioning Menu Trigger (CMC Style)
+  const handleOpenMenu = (event, customer) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = 220;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const menuHeight = 220; 
+    
+    const x = Math.max(8, Math.min(rect.right - width, viewportWidth - width - 8));
+    const shouldOpenUp = rect.bottom + menuHeight > viewportHeight - 8;
+    const y = shouldOpenUp 
+      ? Math.max(8, rect.top - menuHeight - 6) 
+      : Math.min(viewportHeight - menuHeight - 8, rect.bottom + 6);
+
+    setActiveMenu({ id: customer.id, open: true, x, y, width });
   };
 
   const handleSave = async (data) => {
@@ -141,26 +173,12 @@ const AMCInventoryPage = () => {
       try {
         await api.remove('amcContracts', id);
         await fetchContracts();
-        setActiveMenu({type:null, id:null});
+        setActiveMenu({ id: null, open: false, x: 0, y: 0, width: 220 });
       } catch (error) {
         console.error('Failed to delete AMC:', error);
       }
     }
   };
-
-  const menuRef = useRef(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setActiveMenu({ type: null, id: null });
-      }
-    };
-    if (activeMenu.id) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [activeMenu]);
 
   const handleEditFromDoc = (cust) => {
     setEditingItem(cust);
@@ -246,20 +264,10 @@ const AMCInventoryPage = () => {
                       {c.status}
                     </span>
                   </td>
-                  <td style={{ position: 'relative' }}>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                       <button className="icon-button" onClick={() => handleOpenDetail(c)} title="View Details"><Eye size={14} /></button>
-                       <button className="icon-button" onClick={() => setActiveMenu({ type: 'cust', id: c.id })}><MoreVertical size={14} /></button>
+                  <td>
+                    <div className="actions-menu" style={{ display: 'flex', gap: '8px' }}>
+                       <button className="icon-button" onClick={(e) => handleOpenMenu(e, c)}><MoreVertical size={14} /></button>
                     </div>
-                    {activeMenu.type === 'cust' && activeMenu.id === c.id && (
-                      <div className="action-menu" ref={menuRef}>
-                        <button className="menu-item" onClick={() => { setEditingItem(c); setShowModal(true); setActiveMenu({type:null, id:null}); }}><Edit size={14} /> Edit</button>
-                        <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu({type:null, id:null}); }}><FileEdit size={14} /> AMC Quotation</button>
-                        <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu({type:null, id:null}); }}><FileText size={14} /> AMC Agreement</button>
-                        <button className="menu-item" onClick={() => { setRepairContract(c); setActiveMenu({type:null, id:null}); }}><Wrench size={14} /> Manage Repair</button>
-                        <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>
-                      </div>
-                    )}
                   </td>
                 </tr>
               ))}
@@ -267,6 +275,29 @@ const AMCInventoryPage = () => {
           </table>
         </div>
       </div>
+
+      {activeMenu.open && (
+        <div
+          className="action-menu"
+          style={{ position: 'fixed', left: `${activeMenu.x}px`, top: `${activeMenu.y}px`, width: `${activeMenu.width}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(() => {
+            const c = filteredCustomers.find((row) => row.id === activeMenu.id) || customers.find((row) => row.id === activeMenu.id);
+            if (!c) return null;
+            return (
+              <>
+                <button className="menu-item" onClick={() => navigate(`/admin/amc/view/${c.id}`)}><Eye size={14} /> View AMC</button>
+                <button className="menu-item" onClick={() => navigate(`/admin/amc/new?id=${c.id}`)}><Edit size={14} /> Edit AMC</button>
+                <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileEdit size={14} /> AMC Quotation</button>
+                <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileText size={14} /> AMC Agreement</button>
+                <button className="menu-item" onClick={() => { setRepairContract(c); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><Wrench size={14} /> Manage Repair</button>
+                <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       {showModal && (
         <CustomerModal
@@ -278,12 +309,6 @@ const AMCInventoryPage = () => {
         />
       )}
 
-      {showDetailModal && (
-        <CustomerDetailModal
-          customer={selectedCustomer}
-          onClose={() => setShowDetailModal(false)}
-        />
-      )}
 
       {repairContract && (
         <RepairModal
@@ -573,102 +598,8 @@ const CustomerModal = ({ onClose, onSubmit, editingItem, customers, amcPlans = [
   );
 };
 
-const CustomerDetailModal = ({ customer, onClose }) => {
-  if (!customer) return null;
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" style={{ width: '800px', maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-             <div className="customer-avatar" style={{ width: '56px', height: '56px', fontSize: '24px' }}>{customer.name[0]}</div>
-             <div>
-               <h3 style={{ margin: 0, fontSize: '20px' }}>{customer.name}</h3>
-               <span className="text-slate-500" style={{ fontSize: '14px' }}>{customer.contractId} | {customer.plan}</span>
-             </div>
-          </div>
-          <button className="icon-button" onClick={onClose} style={{ border: 'none' }}><X size={20} /></button>
-        </div>
-        <div className="modal-body" style={{ padding: '32px' }}>
-          <div className="main-grid" style={{ gridTemplateColumns: '1.4fr 1fr', gap: '32px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              {/* Profile Section */}
-              <section>
-                <h4 style={{ marginBottom: '16px', color: 'var(--secondary)', borderBottom: '2px solid var(--slate-100)', paddingBottom: '8px', fontSize: '15px' }}>Customer Profile</h4>
-                <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                  <div className="agreement-field"><strong>GSTIN</strong>{customer.gstin || 'Not Provided'}</div>
-                  <div className="agreement-field"><strong>Contact Info</strong>{customer.contact || 'N/A'}</div>
-                  <div className="agreement-field"><strong>Authorized Person 1</strong>{customer.authorizedPerson1 || 'Not Set'}</div>
-                  <div className="agreement-field"><strong>Authorized Person 2</strong>{customer.authorizedPerson2 || 'None'}</div>
-                </div>
-                <div className="agreement-field" style={{ marginTop: '16px' }}><strong>Registered Address</strong>{customer.address || 'Not Set'}</div>
-              </section>
-
-              {/* Devices Section */}
-              <section>
-                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h4 style={{ margin: 0, color: 'var(--secondary)', fontSize: '15px' }}>Asset Registry ({customer.devices?.length || 0} Devices)</h4>
-                 </div>
-                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    {(customer.devices || []).map((d, idx) => (
-                      <div key={idx} style={{ padding: '12px', background: 'var(--slate-50)', borderRadius: '12px', border: '1px solid var(--slate-100)' }}>
-                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <span className="plan-badge" style={{ fontSize: '10px' }}>{d.type}</span>
-                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.sn}</span>
-                         </div>
-                         <div style={{ fontWeight: '700', fontSize: '14px', marginTop: '8px' }}>{d.brand || 'Unnamed Device'}</div>
-                      </div>
-                    ))}
-                    {(!customer.devices || customer.devices.length === 0) && (
-                      <p className="text-slate-400" style={{ fontSize: '13px' }}>No devices registered under this AMC.</p>
-                    )}
-                 </div>
-              </section>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-              {/* Contract Status Card */}
-              <section className="plans-card" style={{ padding: '24px', border: '1px solid var(--slate-100)', boxShadow: '0 4px 20px rgba(0,0,0,0.04)', borderRadius: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                   <span className="text-slate-500" style={{ fontSize: '14px', fontWeight: '600' }}>Status</span>
-                   <span className={`status-badge status-${customer.status.toLowerCase().replace(' ', '-')}`}>{customer.status}</span>
-                </div>
-                <div className="space-y-4" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                       <span className="text-slate-500">Plan Value</span>
-                       <strong style={{ color: 'var(--primary)' }}>{customer.value || '₹0'}</strong>
-                   </div>
-                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                       <span className="text-slate-500">Expires On</span>
-                       <strong style={{ color: 'var(--red)' }}>{customer.expiry || 'N/A'}</strong>
-                   </div>
-                </div>
-              </section>
-
-              {/* Locations Section */}
-              <section>
-                 <h4 style={{ marginBottom: '16px', color: 'var(--secondary)', fontSize: '15px' }}>Service Locations</h4>
-                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {(customer.locations || ['Head Office']).map((loc, idx) => (
-                      <span key={idx} style={{ padding: '8px 16px', background: '#eef2ff', color: '#6366f1', borderRadius: '10px', fontSize: '13px', fontWeight: '600' }}>
-                        {loc}
-                      </span>
-                    ))}
-                 </div>
-              </section>
-            </div>
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="secondary-button" onClick={onClose}>Close Registry</button>
-          <button className="primary-button"><Download size={16} /> Export Profile</button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const AMCQuotationView = ({ customer, onBack }) => {
+const AMCQuotationView = ({ customer, onBack, onEdit }) => {
   const [mode, setMode] = useState('form'); // 'form' or 'preview'
   const [quoteData, setQuoteData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -710,6 +641,9 @@ const AMCQuotationView = ({ customer, onBack }) => {
             <ArrowLeft size={20} /> Back to Inventory
           </button>
           <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Quotation Settings</h2>
+          <button className="secondary-button" onClick={onEdit} style={{ marginLeft: 'auto', marginRight: '12px' }}>
+            <Edit size={16} /> Edit AMC Record
+          </button>
           <button className="primary-button" onClick={() => setMode('preview')}>
             Generate Preview <Eye size={16} style={{ marginLeft: '8px' }} />
           </button>
