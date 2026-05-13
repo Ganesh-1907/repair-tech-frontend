@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion'; // used only in modal/confirm
 import { discountService, getCouponTypeMeta } from '../../services/discountService';
+import { useToast } from '../../context/ToastContext';
 import './DiscountsModule.css';
 
 /* ─── helpers ─── */
@@ -365,10 +366,10 @@ function ConfirmDialog({ message, onConfirm, onCancel, loading }) {
 ═══════════════════════════════════ */
 export default function DiscountsListPage() {
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const [coupons,       setCoupons]       = useState([]);
   const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState('');
   const [search,        setSearch]        = useState('');
   const [typeFilter,    setTypeFilter]    = useState('all');
   const [statusFilter,  setStatusFilter]  = useState('all');
@@ -381,15 +382,14 @@ export default function DiscountsListPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError('');
     try {
       setCoupons(await discountService.list());
     } catch {
-      setError('Failed to load coupons. Is the backend running?');
+      addToast('Failed to load coupons. Is the backend running?', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -410,7 +410,7 @@ export default function DiscountsListPage() {
       setCoupons((prev) => prev.filter((c) => c.id !== confirmDelete.id));
       setConfirmDelete(null);
     } catch {
-      setError('Failed to delete coupon');
+      addToast('Failed to delete coupon', 'error');
     } finally {
       setDeleting(false);
     }
@@ -471,8 +471,6 @@ export default function DiscountsListPage() {
           </button>
         </div>
       </div>
-
-      {error && <div className="disc-error">{error}</div>}
 
       {/* List card */}
       <div className="disc-card">

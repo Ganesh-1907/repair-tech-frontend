@@ -226,7 +226,7 @@ const InstantMessagePage = () => {
   return (
     <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', minHeight: '100%' }}>
       {notice && (
-        <div className="success-banner mb-4" role="status" style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 1000, boxShadow: 'var(--shadow-md)' }}>
+        <div className="success-banner mb-4" role="status">
           <span>{notice}</span>
           <button className="icon-btn" onClick={() => setNotice('')} aria-label="Dismiss message notice">
             <X size={16} />

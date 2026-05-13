@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, Boxes, CheckCircle2, HardDrive, IndianRupee, Package, Plus, Printer, Wrench } from 'lucide-react';
 import { inventoryService } from '../../services/inventoryService';
 import { assetManagementService } from '../../services/assetManagementService';
+import { useToast } from '../../context/ToastContext';
 import '../InventoryPremiumStyles.css';
 
 const money = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
@@ -25,10 +26,10 @@ const statusTone = (status) => {
 
 const InventoryDashboardPage = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [items, setItems] = useState([]);
   const [assets, setAssets] = useState([]);
   const [inventoryStats, setInventoryStats] = useState({});
-  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -41,8 +42,8 @@ const InventoryDashboardPage = () => {
         setInventoryStats(nextInventoryStats);
         setAssets(nextAssets);
       })
-      .catch((error) => setNotice(error.response?.data?.message || error.message || 'Inventory dashboard failed to load.'));
-  }, []);
+      .catch((error) => addToast(error.response?.data?.message || error.message || 'Inventory dashboard failed to load.', 'error'));
+  }, [addToast]);
 
   const assetStatusCounts = useMemo(() => {
     const counts = { Active: 0, 'In repair': 0, Replaced: 0, Idle: 0 };
@@ -60,8 +61,6 @@ const InventoryDashboardPage = () => {
 
   return (
     <div className="inventory-page">
-      {notice && <div className="inventory-notice">{notice}</div>}
-
       <section className="inventory-hero">
         <div>
           <span className="inventory-eyebrow">Inventory Dashboard</span>

@@ -195,16 +195,7 @@
 
 .workflow-chain.mobile { display: none; }
 
-.success-banner {
-  max-width: 1240px;
-  margin: 0 auto 14px;
-  border-radius: 14px;
-  border: 1px solid #93c5fd;
-  background: linear-gradient(180deg, #eff6ff, #e0f2fe);
-  color: #0c4a6e;
-  font-weight: 700;
-  padding: 12px 14px;
-}
+/* success-banner is now a global fixed bottom-right toast — no local overrides */
 
 
 .quotation-form-card {

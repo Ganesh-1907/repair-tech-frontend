@@ -47,9 +47,6 @@ import DiscountsDashboardPage from './pages/admin/DiscountsDashboardPage';
 import DiscountsListPage from './pages/admin/DiscountsListPage';
 
 // Rental Module Pages
-import RentalQuotationPage from './pages/admin/RentalQuotationPage';
-import RentalCorporateAgreementPage from './pages/admin/RentalCorporateAgreementPage';
-import RentalIndividualAgreementPage from './pages/admin/RentalIndividualAgreementPage';
 import RentalCustomersPage from './pages/admin/RentalCustomersPage';
 import RentalPlansPage from './pages/admin/RentalPlansPage';
 import RentalAssetsInstallationsPage from './pages/admin/RentalAssetsInstallationsPage';
@@ -70,6 +67,7 @@ import CMCViewPage from './pages/admin/CMCViewPage';
 import CMCReportsPage from './pages/admin/CMCReportsPage';
 
 import { adminRouteEntries } from './config/adminModules';
+import { ToastProvider } from './context/ToastContext';
 import './App.css';
 
 const ExpenseLegacyViewRedirect = () => {
@@ -101,10 +99,6 @@ const existingAdminRouteComponents = {
   '/admin/rental/inventory': RentalCustomersPage,
   '/admin/rental/customers': RentalCustomersPage,
   '/admin/rental/customers-directory': RentalCustomersPage,
-  '/admin/rental/quotations': RentalQuotationPage,
-  '/admin/rental/agreements': RentalCustomersPage,
-  '/admin/rental/agreements/corporate': RentalCorporateAgreementPage,
-  '/admin/rental/agreements/individual': RentalIndividualAgreementPage,
   '/admin/rental/assets-installations': RentalAssetsInstallationsPage,
   '/admin/rental/billing-invoices': RentalBillingInvoicesPage,
   '/admin/rental/billing-generate': RentalBillingGeneratePage,
@@ -137,6 +131,7 @@ function App() {
   return (
     <Router>
       <ThemeProvider>
+        <ToastProvider>
         <AuthProvider>
           <PrivacyProvider>
             <Routes>
@@ -157,10 +152,6 @@ function App() {
               <Route path="/admin/rental/inventory" element={<Navigate to="/admin/rental/customers" replace />} />
               <Route path="/admin/rental/customers" element={<Layout><RentalCustomersPage /></Layout>} />
               <Route path="/admin/rental/customers-directory" element={<Layout><RentalCustomersPage /></Layout>} />
-              <Route path="/admin/rental/quotations" element={<Layout><RentalQuotationPage /></Layout>} />
-              <Route path="/admin/rental/agreements" element={<Navigate to="/admin/rental/customers" replace />} />
-              <Route path="/admin/rental/agreements/corporate" element={<Layout><RentalCorporateAgreementPage /></Layout>} />
-              <Route path="/admin/rental/agreements/individual" element={<Layout><RentalIndividualAgreementPage /></Layout>} />
               <Route path="/admin/rental/assets-installations" element={<Layout><RentalAssetsInstallationsPage /></Layout>} />
               <Route path="/admin/rental/billing-invoices" element={<Layout><RentalBillingInvoicesPage /></Layout>} />
               <Route path="/admin/rental/billing-generate" element={<Layout><RentalBillingGeneratePage /></Layout>} />
@@ -234,6 +225,7 @@ function App() {
             </Routes>
           </PrivacyProvider>
         </AuthProvider>
+        </ToastProvider>
       </ThemeProvider>
     </Router>
   );

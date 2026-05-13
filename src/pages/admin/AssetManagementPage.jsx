@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { assetManagementService } from '../../services/assetManagementService';
+import { useToast } from '../../context/ToastContext';
 import '../InventoryPremiumStyles.css';
 
 const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle'];
@@ -34,11 +35,11 @@ const statusTone = (status) => {
 };
 
 const AssetManagementPage = () => {
+  const { addToast } = useToast();
   const [assets, setAssets] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     loadData();
@@ -49,7 +50,7 @@ const AssetManagementPage = () => {
       const nextAssets = await assetManagementService.getAssets();
       setAssets(nextAssets);
     } catch (error) {
-      setNotice(error.response?.data?.message || error.message || 'Asset records failed to load.');
+      addToast(error.response?.data?.message || error.message || 'Asset records failed to load.', 'error');
     }
   }
 
@@ -85,8 +86,6 @@ const AssetManagementPage = () => {
 
   return (
     <div className="inventory-page">
-      {notice && <div className="inventory-notice">{notice}</div>}
-
       <section className="inventory-hero">
         <div>
           <span className="inventory-eyebrow">Asset Management</span>

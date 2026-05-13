@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { discountService, getCouponTypeMeta } from '../../services/discountService';
+import { useToast } from '../../context/ToastContext';
 
 const COUPON_TYPES = [
   { value: 'all_users',      label: 'All Users',      color: '#4f46e5', bg: '#eef2ff' },
@@ -38,22 +39,21 @@ const StatCard = ({ icon: Icon, label, value, sub, iconBg, iconColor, delay }) =
 
 export default function DiscountsDashboardPage() {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError('');
     try {
       const dash = await discountService.getDashboard();
       setData(dash);
     } catch {
-      setError('Failed to load dashboard. Is the backend running?');
+      addToast('Failed to load dashboard. Is the backend running?', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [addToast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -92,8 +92,6 @@ export default function DiscountsDashboardPage() {
           </button>
         </div>
       </div>
-
-      {error && <div className="disc-error">{error}</div>}
 
       {loading ? (
         <div className="disc-loader">

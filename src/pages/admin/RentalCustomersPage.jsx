@@ -1,121 +1,60 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Plus,
   Search,
   MoreVertical,
-  Download,
   RefreshCcw,
   Eye,
   Edit2,
   Trash2,
-  MapPin,
-  Briefcase,
-  Receipt,
-  X,
   CheckCircle2,
   AlertCircle,
-  ChevronRight,
-  User,
   FileText,
   ClipboardCheck,
+  ArrowLeft,
   Printer,
-  Send,
-  Copy,
-  ArrowRight, Check,
-  Building2,
-  UserCheck, Monitor,
-  Zap,
   ShieldCheck,
-  Package,
-  FileEdit
+  Mail,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './RentalCustomerManagement.css';
 import './RentalDocuments.css';
+import './PlansCustomers.css';
 import { api } from '../../services/apiClient';
 
-const DEVICE_OPTIONS = ['Desktop', 'Laptop', 'Printer', 'CCTV', 'Server'];
+/* ── Helpers ──────────────────────────────────────────────────── */
 
-const emptyAuthorizedPerson = () => ({
-  name: '',
-  designation: '',
-  phone: '',
-  email: '',
-  idProofName: '',
-});
+const DEVICE_OPTIONS = ['Desktop', 'Laptop', 'Printer', 'CCTV', 'Server', 'Network Equipment'];
 
-const emptyLocation = () => ({
-  id: `LOC-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-  locationName: '',
-  address: '',
-  contactPerson: '',
-  phone: '',
-  email: '',
-  remarks: '',
+const newQuoteDevice = () => ({
+  id: Date.now() + Math.random(),
+  device: 'Printer', model: '', qty: 1, monthlyRent: 0, deposit: 0,
 });
+const newAgreementDevice = () => ({
+  id: Date.now() + Math.random(),
+  type: 'Printer', brand: '', model: '', serial: '', qty: 1, monthlyRent: 0,
+});
+const fmt = (n) => Number(n || 0).toLocaleString('en-IN');
 
-const emptyDevice = () => ({
-  id: `DEV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-  device: '',
-  type: '',
-  brand: '',
-  model: '',
-  serialNumber: '',
-  rentalStartDate: '',
-  monthlyRent: '',
-  locationId: '',
-  status: 'Active',
-  remarks: '',
-});
+/* ── Main Page ────────────────────────────────────────────────── */
 
 const RentalCustomersPage = () => {
-  // --- Local State ---
   const [customers, setCustomers] = useState([]);
-
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All Types');
   const [statusFilter, setStatusFilter] = useState('All Status');
-  
-  // Floating Menu State (CMC Style)
   const [activeMenu, setActiveMenu] = useState({ id: null, open: false, x: 0, y: 0, width: 220 });
-
-  // Modals
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('Add'); // Add, Edit, View
-  const [currentCustomer, setCurrentCustomer] = useState(null);
-  const [activeCustomerTab, setActiveCustomerTab] = useState('profile');
-  const [customerFormErrors, setCustomerFormErrors] = useState({});
-  const [customerForm, setCustomerForm] = useState({
-    companyName: '',
-    customerType: 'Corporate',
-    gstNumber: '',
-    billingAddress: '',
-    shippingAddress: '',
-    city: '',
-    state: '',
-    pincode: '',
-    primaryContactNumber: '',
-    alternateContactNumber: '',
-    email: '',
-    notes: '',
-    person1: emptyAuthorizedPerson(),
-    person2: emptyAuthorizedPerson(),
-    locations: [emptyLocation()],
-    devices: [emptyDevice()],
-    status: 'Active',
-  });
-
-  // Doc Builder Modals
-  const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
-  const [agreementType, setAgreementType] = useState('Corporate'); // Corporate, Individual
-  const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false);
-  const [currentDoc, setCurrentDoc] = useState(null);
-
-  // Toasts
   const [toasts, setToasts] = useState([]);
 
-  // --- Helpers ---
+  // Sub-view state
+  const [view, setView] = useState('list'); // 'list' | 'quotation' | 'agreement'
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+
+  const addToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  };
 
   const loadCustomers = async () => {
     const rows = await api.list('rentalCustomers');
@@ -128,7 +67,7 @@ const RentalCustomersPage = () => {
       gst: row.gstNumber || '-',
       phone: row.contactNumber || '',
       email: row.email || '',
-      address: row.address || '',
+      address: row.address || row.billingAddress || '',
       locations: Array.isArray(row.locations) ? row.locations.length : Number(row.locations || 0),
       status: row.status || 'Active',
       raw: row,
@@ -136,12 +75,9 @@ const RentalCustomersPage = () => {
   };
 
   useEffect(() => {
-    loadCustomers().catch(() => {
-      addToast('Failed to load customers', 'info');
-    });
+    loadCustomers().catch(() => addToast('Failed to load customers', 'info'));
   }, []);
 
-  // Click-out to close menu (CMC Style)
   useEffect(() => {
     const close = () => setActiveMenu((prev) => (prev.open ? { ...prev, open: false, id: null } : prev));
     window.addEventListener('scroll', close, true);
@@ -154,34 +90,20 @@ const RentalCustomersPage = () => {
     };
   }, []);
 
-  const addToast = (message, type = 'success') => {
-    const id = Date.now();
-    setToasts(prev => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
-  };
-
-  const filteredCustomers = useMemo(() => {
-    return customers.filter(c => {
-      const filterMatch =
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.phone.includes(searchTerm) ||
-        c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.gst.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const typeMatch = typeFilter === 'All Types' || c.type === typeFilter;
-      const statusMatch = statusFilter === 'All Status' || c.status === statusFilter;
-
-      return filterMatch && typeMatch && statusMatch;
-    });
-  }, [customers, searchTerm, typeFilter, statusFilter]);
+  const filteredCustomers = useMemo(() => customers.filter(c => {
+    const filterMatch =
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.phone.includes(searchTerm) ||
+      c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.gst.toLowerCase().includes(searchTerm.toLowerCase());
+    const typeMatch = typeFilter === 'All Types' || c.type === typeFilter;
+    const statusMatch = statusFilter === 'All Status' || c.status === statusFilter;
+    return filterMatch && typeMatch && statusMatch;
+  }), [customers, searchTerm, typeFilter, statusFilter]);
 
   const resetFilters = () => {
-    setSearchTerm('');
-    setTypeFilter('All Types');
-    setStatusFilter('All Status');
-    addToast('Filters reset successfully', 'info');
+    setSearchTerm(''); setTypeFilter('All Types'); setStatusFilter('All Status');
+    addToast('Filters reset', 'info');
   };
 
   const handleDelete = (id) => {
@@ -196,279 +118,42 @@ const RentalCustomersPage = () => {
     }
   };
 
-  const openCustomerModal = (mode, customer = null) => {
-    setModalMode(mode);
-    setCurrentCustomer(customer);
-    setActiveCustomerTab('profile');
-    setCustomerFormErrors({});
-    if (!customer) {
-      setCustomerForm({
-        companyName: '',
-        customerType: 'Corporate',
-        gstNumber: '',
-        billingAddress: '',
-        shippingAddress: '',
-        city: '',
-        state: '',
-        pincode: '',
-        primaryContactNumber: '',
-        alternateContactNumber: '',
-        email: '',
-        notes: '',
-        person1: emptyAuthorizedPerson(),
-        person2: emptyAuthorizedPerson(),
-        locations: [emptyLocation()],
-        devices: [emptyDevice()],
-        status: 'Active',
-      });
-    } else {
-      const raw = customer.raw || {};
-      const locations = Array.isArray(raw.locations) && raw.locations.length ? raw.locations : [emptyLocation()];
-      const devices = Array.isArray(raw.devices) && raw.devices.length ? raw.devices : [emptyDevice()];
-      const person1 = raw.authorizedPersons?.[0] || {
-        ...emptyAuthorizedPerson(),
-        name: raw.authorizedPerson1 || '',
-      };
-      const person2 = raw.authorizedPersons?.[1] || {
-        ...emptyAuthorizedPerson(),
-        name: raw.authorizedPerson2 || '',
-      };
-      setCustomerForm({
-        companyName: raw.companyName || raw.customerName || customer.name || '',
-        customerType: raw.customerType || customer.type || 'Corporate',
-        gstNumber: raw.gstNumber || '',
-        billingAddress: raw.billingAddress || raw.address || '',
-        shippingAddress: raw.shippingAddress || '',
-        city: raw.city || '',
-        state: raw.state || '',
-        pincode: raw.pincode || '',
-        primaryContactNumber: raw.contactNumber || customer.phone || '',
-        alternateContactNumber: raw.alternateContactNumber || '',
-        email: raw.email || customer.email || '',
-        notes: raw.notes || '',
-        person1: { ...emptyAuthorizedPerson(), ...person1 },
-        person2: { ...emptyAuthorizedPerson(), ...person2 },
-        locations: locations.map((loc) => ({ ...emptyLocation(), ...loc })),
-        devices: devices.map((dev) => ({
-          ...emptyDevice(),
-          ...dev,
-          device: dev.device || dev.deviceType || '',
-          type: dev.type || '',
-        })),
-        status: raw.status || customer.status || 'Active',
-      });
-    }
-    setIsModalOpen(true);
-  };
+  const openCustomerProcess = (customerId) => { window.location.href = `/admin/rental/customers/${customerId}`; };
 
-  const validateCustomerForm = () => {
-    const nextErrors = {};
-    if (!customerForm.companyName.trim()) nextErrors.companyName = 'Company / customer name is required.';
-    if (!customerForm.customerType.trim()) nextErrors.customerType = 'Customer type is required.';
-    if (!customerForm.billingAddress.trim()) nextErrors.billingAddress = 'Billing address is required.';
-    if (!customerForm.city.trim()) nextErrors.city = 'City is required.';
-    if (!customerForm.state.trim()) nextErrors.state = 'State is required.';
-    if (!customerForm.pincode.trim()) nextErrors.pincode = 'Pincode is required.';
-    if (!customerForm.primaryContactNumber.trim()) nextErrors.primaryContactNumber = 'Primary contact number is required.';
-    if (!customerForm.email.trim()) nextErrors.email = 'Email is required.';
-    if (!customerForm.person1.name.trim()) nextErrors.person1Name = 'Authorized Person 1 name is required.';
-    if (!customerForm.person1.phone.trim()) nextErrors.person1Phone = 'Authorized Person 1 phone is required.';
-
-    customerForm.locations.forEach((location, index) => {
-      if (!location.locationName.trim()) nextErrors[`locationName-${index}`] = 'Location name is required.';
-      if (!location.address.trim()) nextErrors[`locationAddress-${index}`] = 'Location address is required.';
-    });
-
-    setCustomerFormErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  };
-
-  const resetAfterSave = () => {
-    setCustomerForm({
-      companyName: '',
-      customerType: 'Corporate',
-      gstNumber: '',
-      billingAddress: '',
-      shippingAddress: '',
-      city: '',
-      state: '',
-      pincode: '',
-      primaryContactNumber: '',
-      alternateContactNumber: '',
-      email: '',
-      notes: '',
-      person1: emptyAuthorizedPerson(),
-      person2: emptyAuthorizedPerson(),
-      locations: [emptyLocation()],
-      devices: [emptyDevice()],
-      status: 'Active',
-    });
-    setCustomerFormErrors({});
-    setActiveCustomerTab('profile');
-  };
-
-  const handleSaveCustomer = async (saveAndAddAnother = false) => {
-    if (!validateCustomerForm()) {
-      addToast('Please complete all required fields', 'info');
-      return;
-    }
-    const payload = {
-      customerType: customerForm.customerType,
-      companyName: customerForm.companyName,
-      customerName: customerForm.companyName,
-      authorizedPerson1: customerForm.person1.name,
-      authorizedPerson2: customerForm.person2.name,
-      gstNumber: customerForm.gstNumber,
-      address: customerForm.billingAddress,
-      billingAddress: customerForm.billingAddress,
-      shippingAddress: customerForm.shippingAddress,
-      city: customerForm.city,
-      state: customerForm.state,
-      pincode: customerForm.pincode,
-      contactNumber: customerForm.primaryContactNumber,
-      alternateContactNumber: customerForm.alternateContactNumber,
-      email: customerForm.email,
-      notes: customerForm.notes,
-      authorizedPersons: [customerForm.person1, customerForm.person2].filter((person) => person.name.trim() || person.phone.trim()),
-      locations: customerForm.locations,
-      devices: customerForm.devices.filter((device) => (
-        String(device.device || '').trim()
-        || String(device.type || '').trim()
-        || String(device.brand || '').trim()
-        || String(device.model || '').trim()
-        || String(device.serialNumber || '').trim()
-        || String(device.rentalStartDate || '').trim()
-        || String(device.monthlyRent || '').trim()
-        || String(device.locationId || '').trim()
-        || String(device.remarks || '').trim()
-      )),
-      status: customerForm.status || 'Active',
-    };
-    try {
-      if (modalMode === 'Add') {
-        await api.create('rentalCustomers', payload);
-        addToast('Customer added');
-      } else if (currentCustomer?.id) {
-        await api.update('rentalCustomers', currentCustomer.id, {
-          ...(currentCustomer.raw || {}),
-          ...payload,
-          id: currentCustomer.id,
-        });
-        addToast('Customer updated');
-      }
-      await loadCustomers();
-      if (saveAndAddAnother) {
-        resetAfterSave();
-        addToast('Ready to add another customer');
-      } else {
-        setIsModalOpen(false);
-      }
-    } catch (error) {
-      addToast('Unable to save customer', 'info');
-    }
-  };
-
-  const goToQuotations = (customer = null) => {
-    if (!customer) {
-      window.location.href = '/admin/rental/quotations';
-      return;
-    }
-    const params = new URLSearchParams({
-      customerId: customer.id || '',
-      customerName: customer.name || '',
-      contactPerson: customer.person1 || '',
-      customerAddress: customer.address || '',
-      gstin: customer.gst || '',
-    });
-    window.location.href = `/admin/rental/quotations?${params.toString()}`;
-  };
-
-  const openCustomerProcess = (customerId) => {
-    window.location.href = `/admin/rental/customers/${customerId}`;
-  };
-
-  // Smart Positioning Menu Trigger (CMC Style)
   const handleOpenMenu = (event, customer) => {
     event.stopPropagation();
     const rect = event.currentTarget.getBoundingClientRect();
     const width = 220;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const menuHeight = 220; // Estimated height for Rental menu
-    
-    // Horizontal positioning: align to right of button, but keep on screen
-    const x = Math.max(8, Math.min(rect.right - width, viewportWidth - width - 8));
-    
-    // Vertical positioning: check if there is enough space below
-    const shouldOpenUp = rect.bottom + menuHeight > viewportHeight - 8;
-    const y = shouldOpenUp 
-      ? Math.max(8, rect.top - menuHeight - 6) 
-      : Math.min(viewportHeight - menuHeight - 8, rect.bottom + 6);
-
+    const menuHeight = 230;
+    const x = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+    const shouldOpenUp = rect.bottom + menuHeight > window.innerHeight - 8;
+    const y = shouldOpenUp
+      ? Math.max(8, rect.top - menuHeight - 6)
+      : Math.min(window.innerHeight - menuHeight - 8, rect.bottom + 6);
     setActiveMenu({ id: customer.id, open: true, x, y, width });
   };
 
-  // --- Agreement Logic ---
-  const initAgreement = (type, customer = null) => {
-    setAgreementType(type);
-    const agr = {
-      agreement_no: `${type === 'Corporate' ? 'AGR-C' : 'AGR-I'}-${Math.floor(100000 + Math.random() * 900000)}`,
-      agreement_date: new Date().toISOString().split('T')[0],
-      start_date: new Date().toISOString().split('T')[0],
-      end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-      jurisdiction_city: 'Indore',
-      company_name: customer?.name || '',
-      company_address: 'Main Industrial Area, Plot 12, City',
-      gst: customer?.gst || '',
-      auth_person: customer?.person1 || '',
-      phone: customer?.phone || '',
-      email: customer?.email || '',
-      provider_name: 'REPAIRBOY SERVICES PVT LTD',
-      provider_address: 'Plot 42, Tech Hub, City',
-      provider_auth: 'System Admin',
-      provider_phone: '+91 9876543210',
-      provider_email: 'billing@repairboy.com',
-      devices: [{ type: 'Printer', model: 'HP M126nw', specs: 'B/W, WiFi', serial: 'SN-XJ202', qty: 1, rent: 2500, deposit: 5000 }],
-      billing_cycle: 'Monthly',
-      payment_due_days: 7,
-      min_commitment: 5000,
-      installation: 1500,
-      delivery: 500,
-      gst_percent: 18,
-      late_fee: 2,
-      a4_bw: 0.50,
-      a4_color: 4.50,
-      a3_bw: 1.20,
-      a3_color: 8.00,
-      sla_time: 4,
-      downtime_limit: 24,
-      replacement_policy: 'Replacement provided if repair takes > 48 hrs.',
-      maintenance_coverage: 'All parts and toner included.',
-      client_sig_name: customer?.person1 || '',
-      client_designation: 'Director',
-      provider_sig_name: 'Regional Manager',
-      provider_designation: 'Provider Manager',
-      witness1: '—',
-      witness2: '—',
-      status: 'Draft',
-      // Clauses
-      scope_clause: 'The Service Provider agrees to supply and maintain the equipment.',
-      rental_clause: 'Monthly rental shall be paid in advance.',
-      usage_clause: 'Usage charges based on meter reading.',
-      termination_clause: '30 days notice required.',
-      liability_clause: 'Client is responsible for physical damages.',
-      jurisdiction_clause: 'Subject to jurisdiction of city courts.'
-    };
-    setCurrentDoc(agr);
-    setIsAgreementModalOpen(true);
-    setIsTypeSelectorOpen(false);
+  const openQuotation = (c) => {
+    setSelectedCustomer(c);
+    setView('quotation');
+    setActiveMenu(prev => ({ ...prev, open: false, id: null }));
   };
 
-  const saveAgreement = () => {
-    addToast('Agreement saved');
-    setIsAgreementModalOpen(false);
+  const openAgreement = (c) => {
+    setSelectedCustomer(c);
+    setView('agreement');
+    setActiveMenu(prev => ({ ...prev, open: false, id: null }));
   };
 
+  /* ── Sub-view renders ── */
+  if (view === 'quotation' && selectedCustomer) {
+    return <RentalQuotationView customer={selectedCustomer} onBack={() => setView('list')} />;
+  }
+  if (view === 'agreement' && selectedCustomer) {
+    return <RentalAgreementView customer={selectedCustomer} onBack={() => setView('list')} />;
+  }
+
+  /* ── List View ─────────────────────────────────────────────── */
   return (
     <div className="customer-page">
       {/* --- Filters --- */}
@@ -477,7 +162,7 @@ const RentalCustomersPage = () => {
           <input type="text" className="filter-search" placeholder="Search customer, phone, GST..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
         </div>
-        <button className="primary-button" onClick={() => openCustomerModal('Add')}><Plus size={18} /> Add Customer</button>
+        <button className="primary-button" onClick={() => { window.location.href = '/admin/rental/new'; }}><Plus size={18} /> Add Customer</button>
         <select className="filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
           <option>All Types</option><option>Corporate</option><option>Individual</option>
         </select>
@@ -508,12 +193,7 @@ const RentalCustomersPage = () => {
                   <td>
                     <div className="customer-cell">
                       <div className="customer-avatar">{c.name.charAt(0)}</div>
-                      <button
-                        type="button"
-                        className="font-bold text-slate-800 hover:text-indigo-600"
-                        onClick={() => openCustomerProcess(c.id)}
-                        style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
-                      >
+                      <button type="button" className="font-bold text-slate-800 hover:text-indigo-600" onClick={() => openCustomerProcess(c.id)} style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}>
                         {c.name}
                       </button>
                     </div>
@@ -524,22 +204,8 @@ const RentalCustomersPage = () => {
                   <td><span className={`status-badge status-${c.status.toLowerCase()}`}>{c.status}</span></td>
                   <td className="text-center">
                     <div className="actions-menu" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                      <button className="icon-button" onClick={() => openCustomerProcess(c.id)} title="View Process">
-                        <Eye size={14} />
-                      </button>
-                      <button className="icon-button" onClick={(e) => handleOpenMenu(e, c)}>
-                        <MoreVertical size={14} />
-                      </button>
-                      {openMenuId === c.id && (
-                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="menu-panel">
-                          <button className="menu-item" onClick={() => goToQuotations(c)}><FileText size={14} /> Create Quotation</button>
-                          <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> Open Process</button>
-                          <button className="menu-item" onClick={() => initAgreement(c.type, c)}><ClipboardCheck size={14} /> Create Agreement</button>
-                          <div className="h-px bg-slate-100 my-1"></div>
-                          <button className="menu-item" onClick={() => { openCustomerModal('Edit', c); setOpenMenuId(null); }}><Edit2 size={14} /> Edit</button>
-                          <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button>
-                        </motion.div>
-                      )}
+                      <button className="icon-button" onClick={() => openCustomerProcess(c.id)} title="View Process"><Eye size={14} /></button>
+                      <button className="icon-button" onClick={(e) => handleOpenMenu(e, c)}><MoreVertical size={14} /></button>
                     </div>
                   </td>
                 </tr>
@@ -549,7 +215,7 @@ const RentalCustomersPage = () => {
         </div>
       </section>
 
-      {/* Floating Menu Panel (CMC Style) */}
+      {/* Floating Action Menu */}
       {activeMenu.open && (
         <div
           className="menu-panel"
@@ -561,11 +227,11 @@ const RentalCustomersPage = () => {
             if (!c) return null;
             return (
               <>
-                <button className="menu-item" onClick={() => goToQuotations(c)}><FileText size={14} /> Create Quotation</button>
+                <button className="menu-item" onClick={() => openQuotation(c)}><FileText size={14} /> Create Quotation</button>
+                <button className="menu-item" onClick={() => openAgreement(c)}><ClipboardCheck size={14} /> Create Agreement</button>
                 <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> Open Process</button>
-                <button className="menu-item" onClick={() => initAgreement(c.type, c)}><ClipboardCheck size={14} /> Create Agreement</button>
                 <div className="h-px bg-slate-100 my-1"></div>
-                <button className="menu-item" onClick={() => { window.location.href = `/admin/rental/new?id=${c.id}`; }}><Edit2 size={14} /> Edit</button>
+                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); window.location.href = `/admin/rental/new?id=${c.id}`; }}><Edit2 size={14} /> Edit Customer</button>
                 <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button>
               </>
             );
@@ -573,164 +239,8 @@ const RentalCustomersPage = () => {
         </div>
       )}
 
-      {/* --- Agreement Builder Modal --- */}
-      <AnimatePresence>
-        {isAgreementModalOpen && (
-          <div className="modal-overlay" onClick={() => setIsAgreementModalOpen(false)}>
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="document-modal" onClick={e => e.stopPropagation()}>
-              <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50 no-print">
-                <h2 className="!m-0">Create Rental Agreement ({agreementType})</h2>
-                <div className="flex gap-3">
-                  <button className="secondary-button" onClick={() => setIsAgreementModalOpen(false)}>Cancel</button>
-                  <button className="primary-button" onClick={() => window.print()}><Printer size={18} /> Print</button>
-                  <button className="primary-button !bg-emerald-600" onClick={saveAgreement}><Check size={18} /> Save & Close</button>
-                </div>
-              </div>
-              {/* Simplified Preview Content */}
-              <div className="p-8">
-                <div className="agreement-preview-paper">
-                  <h1>RENTAL AGREEMENT ({agreementType.toUpperCase()})</h1>
-                  <p>This agreement is made on <strong>{currentDoc.agreement_date}</strong></p>
-                  <div className="grid grid-cols-2 gap-8 my-8">
-                    <div><strong>Client:</strong><br />{currentDoc.company_name}<br />{currentDoc.company_address}</div>
-                    <div><strong>Provider:</strong><br />{currentDoc.provider_name}<br />{currentDoc.provider_address}</div>
-                  </div>
-                  <h2>1. Scope</h2><p>{currentDoc.scope_clause}</p>
-                  <div className="signature-block"><div className="sig-line">For Client</div><div className="sig-line">For Provider</div></div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- Existing Customer Modal --- */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="modal-card" onClick={e => e.stopPropagation()}>
-              <h2>{modalMode} Rental Customer</h2>
-              <p>Build a complete customer profile, add authorized persons, locations, and assign devices in one place.</p>
-              <div className="customer-form-tabs">
-                <button type="button" className={`customer-form-tab ${activeCustomerTab === 'profile' ? 'active' : ''}`} onClick={() => setActiveCustomerTab('profile')}>Customer Profile</button>
-                <button type="button" className={`customer-form-tab ${activeCustomerTab === 'authorized' ? 'active' : ''}`} onClick={() => setActiveCustomerTab('authorized')}>Authorized Persons</button>
-                <button type="button" className={`customer-form-tab ${activeCustomerTab === 'locations' ? 'active' : ''}`} onClick={() => setActiveCustomerTab('locations')}>Locations</button>
-                <button type="button" className={`customer-form-tab ${activeCustomerTab === 'devices' ? 'active' : ''}`} onClick={() => setActiveCustomerTab('devices')}>Devices</button>
-              </div>
-
-              <form onSubmit={(event) => { event.preventDefault(); handleSaveCustomer(false); }}>
-                {activeCustomerTab === 'profile' && (
-                  <div className="section-card">
-                    <h3>Customer Profile</h3>
-                    <div className="form-grid">
-                      <div className="form-field">
-                        <label>Company / Customer Name <span className="field-required">*</span></label>
-                        <input value={customerForm.companyName} onChange={(e) => setCustomerForm((prev) => ({ ...prev, companyName: e.target.value }))} />
-                        {customerFormErrors.companyName && <small className="field-error">{customerFormErrors.companyName}</small>}
-                      </div>
-                      <div className="form-field">
-                        <label>Customer Type <span className="field-required">*</span></label>
-                        <select value={customerForm.customerType} onChange={(e) => setCustomerForm((prev) => ({ ...prev, customerType: e.target.value }))}><option>Corporate</option><option>Individual</option></select>
-                      </div>
-                      <div className="form-field"><label>GST Number <span className="field-optional">(Optional)</span></label><input value={customerForm.gstNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, gstNumber: e.target.value }))} /></div>
-                      <div className="form-field"><label>Email Address <span className="field-required">*</span></label><input type="email" value={customerForm.email} onChange={(e) => setCustomerForm((prev) => ({ ...prev, email: e.target.value }))} />{customerFormErrors.email && <small className="field-error">{customerFormErrors.email}</small>}</div>
-                      <div className="form-field full"><label>Billing Address <span className="field-required">*</span></label><textarea value={customerForm.billingAddress} onChange={(e) => setCustomerForm((prev) => ({ ...prev, billingAddress: e.target.value }))} />{customerFormErrors.billingAddress && <small className="field-error">{customerFormErrors.billingAddress}</small>}</div>
-                      <div className="form-field full"><label>Shipping Address <span className="field-optional">(Optional)</span></label><textarea value={customerForm.shippingAddress} onChange={(e) => setCustomerForm((prev) => ({ ...prev, shippingAddress: e.target.value }))} /></div>
-                      <div className="form-field"><label>City <span className="field-required">*</span></label><input value={customerForm.city} onChange={(e) => setCustomerForm((prev) => ({ ...prev, city: e.target.value }))} />{customerFormErrors.city && <small className="field-error">{customerFormErrors.city}</small>}</div>
-                      <div className="form-field"><label>State <span className="field-required">*</span></label><input value={customerForm.state} onChange={(e) => setCustomerForm((prev) => ({ ...prev, state: e.target.value }))} />{customerFormErrors.state && <small className="field-error">{customerFormErrors.state}</small>}</div>
-                      <div className="form-field"><label>Pincode <span className="field-required">*</span></label><input value={customerForm.pincode} onChange={(e) => setCustomerForm((prev) => ({ ...prev, pincode: e.target.value }))} />{customerFormErrors.pincode && <small className="field-error">{customerFormErrors.pincode}</small>}</div>
-                      <div className="form-field"><label>Primary Contact Number <span className="field-required">*</span></label><input value={customerForm.primaryContactNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, primaryContactNumber: e.target.value }))} />{customerFormErrors.primaryContactNumber && <small className="field-error">{customerFormErrors.primaryContactNumber}</small>}</div>
-                      <div className="form-field"><label>Alternate Contact Number <span className="field-optional">(Optional)</span></label><input value={customerForm.alternateContactNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, alternateContactNumber: e.target.value }))} /></div>
-                      <div className="form-field full"><label>Notes / Remarks <span className="field-optional">(Optional)</span></label><textarea value={customerForm.notes} onChange={(e) => setCustomerForm((prev) => ({ ...prev, notes: e.target.value }))} /></div>
-                    </div>
-                  </div>
-                )}
-                {activeCustomerTab === 'authorized' && (
-                  <div className="section-card section-stack">
-                    <h3>Authorized Persons</h3>
-                    <div className="mini-section-card">
-                      <h4>Authorized Person 1 <span className="field-required">*</span></h4>
-                      <div className="form-grid">
-                        <div className="form-field"><label>Name <span className="field-required">*</span></label><input value={customerForm.person1.name} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, name: e.target.value } }))} />{customerFormErrors.person1Name && <small className="field-error">{customerFormErrors.person1Name}</small>}</div>
-                        <div className="form-field"><label>Designation</label><input value={customerForm.person1.designation} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, designation: e.target.value } }))} /></div>
-                        <div className="form-field"><label>Phone Number <span className="field-required">*</span></label><input value={customerForm.person1.phone} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, phone: e.target.value } }))} />{customerFormErrors.person1Phone && <small className="field-error">{customerFormErrors.person1Phone}</small>}</div>
-                        <div className="form-field"><label>Email</label><input type="email" value={customerForm.person1.email} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, email: e.target.value } }))} /></div>
-                        <div className="form-field full"><label>ID Proof Upload</label><input type="file" onChange={(e) => setCustomerForm((prev) => ({ ...prev, person1: { ...prev.person1, idProofName: e.target.files?.[0]?.name || '' } }))} /></div>
-                      </div>
-                    </div>
-                    <div className="mini-section-card">
-                      <h4>Authorized Person 2 <span className="field-optional">(Optional)</span></h4>
-                      <div className="form-grid">
-                        <div className="form-field"><label>Name <span className="field-optional">(Optional)</span></label><input value={customerForm.person2.name} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, name: e.target.value } }))} /></div>
-                        <div className="form-field"><label>Designation</label><input value={customerForm.person2.designation} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, designation: e.target.value } }))} /></div>
-                        <div className="form-field"><label>Phone Number</label><input value={customerForm.person2.phone} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, phone: e.target.value } }))} /></div>
-                        <div className="form-field"><label>Email</label><input type="email" value={customerForm.person2.email} onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, email: e.target.value } }))} /></div>
-                        <div className="form-field full"><label>ID Proof Upload</label><input type="file" onChange={(e) => setCustomerForm((prev) => ({ ...prev, person2: { ...prev.person2, idProofName: e.target.files?.[0]?.name || '' } }))} /></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {activeCustomerTab === 'locations' && (
-                  <div className="section-card section-stack">
-                    <div className="inline-section-header">
-                      <h3>Customer Locations</h3>
-                      <button type="button" className="secondary-button" onClick={() => setCustomerForm((prev) => ({ ...prev, locations: [...prev.locations, emptyLocation()] }))}><Plus size={16} /> Add Location</button>
-                    </div>
-                    {customerForm.locations.map((location, index) => (
-                      <div className="mini-section-card" key={location.id}>
-                        <div className="inline-section-header">
-                          <h4>Location {index + 1}</h4>
-                          {customerForm.locations.length > 1 && <button type="button" className="icon-button" onClick={() => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.filter((row) => row.id !== location.id), devices: prev.devices.map((device) => (device.locationId === location.id ? { ...device, locationId: '' } : device)) }))}><Trash2 size={14} /></button>}
-                        </div>
-                        <div className="form-grid">
-                          <div className="form-field"><label>Location Name <span className="field-required">*</span></label><input value={location.locationName} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, locationName: e.target.value } : row)) }))} />{customerFormErrors[`locationName-${index}`] && <small className="field-error">{customerFormErrors[`locationName-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Contact Person</label><input value={location.contactPerson} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, contactPerson: e.target.value } : row)) }))} /></div>
-                          <div className="form-field"><label>Phone Number</label><input value={location.phone} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, phone: e.target.value } : row)) }))} /></div>
-                          <div className="form-field"><label>Email</label><input type="email" value={location.email} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, email: e.target.value } : row)) }))} /></div>
-                          <div className="form-field full"><label>Address <span className="field-required">*</span></label><textarea value={location.address} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, address: e.target.value } : row)) }))} />{customerFormErrors[`locationAddress-${index}`] && <small className="field-error">{customerFormErrors[`locationAddress-${index}`]}</small>}</div>
-                          <div className="form-field full"><label>Remarks</label><textarea value={location.remarks} onChange={(e) => setCustomerForm((prev) => ({ ...prev, locations: prev.locations.map((row) => (row.id === location.id ? { ...row, remarks: e.target.value } : row)) }))} /></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {activeCustomerTab === 'devices' && (
-                  <div className="section-card section-stack">
-                    <div className="inline-section-header">
-                      <h3>Customer Devices</h3>
-                      <button type="button" className="secondary-button" onClick={() => setCustomerForm((prev) => ({ ...prev, devices: [...prev.devices, emptyDevice()] }))}><Plus size={16} /> Add Device</button>
-                    </div>
-                    {customerForm.devices.map((device, index) => (
-                      <div className="mini-section-card" key={device.id}>
-                        <div className="inline-section-header">
-                          <h4>Device {index + 1}</h4>
-                          {customerForm.devices.length > 1 && <button type="button" className="icon-button" onClick={() => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.filter((row) => row.id !== device.id) }))}><Trash2 size={14} /></button>}
-                        </div>
-                        <div className="form-grid">
-                          <div className="form-field"><label>Device <span className="field-optional">(Optional)</span></label><select value={device.device} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, device: e.target.value } : row)) }))}><option value="">Select device</option>{DEVICE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select>{customerFormErrors[`deviceType-${index}`] && <small className="field-error">{customerFormErrors[`deviceType-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Type <span className="field-optional">(Optional)</span></label><input value={device.type} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, type: e.target.value } : row)) }))} /></div>
-                          <div className="form-field"><label>Brand</label><input value={device.brand} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, brand: e.target.value } : row)) }))} /></div>
-                          <div className="form-field"><label>Model <span className="field-optional">(Optional)</span></label><input value={device.model} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, model: e.target.value } : row)) }))} />{customerFormErrors[`deviceModel-${index}`] && <small className="field-error">{customerFormErrors[`deviceModel-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Serial Number <span className="field-optional">(Optional)</span></label><input value={device.serialNumber} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, serialNumber: e.target.value } : row)) }))} />{customerFormErrors[`serialNumber-${index}`] && <small className="field-error">{customerFormErrors[`serialNumber-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Rental Start Date <span className="field-optional">(Optional)</span></label><input type="date" value={device.rentalStartDate} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, rentalStartDate: e.target.value } : row)) }))} />{customerFormErrors[`rentalStartDate-${index}`] && <small className="field-error">{customerFormErrors[`rentalStartDate-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Monthly Rent <span className="field-optional">(Optional)</span></label><input type="number" min="0" value={device.monthlyRent} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, monthlyRent: e.target.value } : row)) }))} />{customerFormErrors[`monthlyRent-${index}`] && <small className="field-error">{customerFormErrors[`monthlyRent-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Location Assigned <span className="field-optional">(Optional)</span></label><select value={device.locationId} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, locationId: e.target.value } : row)) }))}><option value="">Select location</option>{customerForm.locations.map((location) => <option key={location.id} value={location.id}>{location.locationName || 'Unnamed Location'}</option>)}</select>{customerFormErrors[`locationId-${index}`] && <small className="field-error">{customerFormErrors[`locationId-${index}`]}</small>}</div>
-                          <div className="form-field"><label>Status</label><select value={device.status} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, status: e.target.value } : row)) }))}><option>Active</option><option>Inactive</option><option>Under Repair</option></select></div>
-                          <div className="form-field full"><label>Remarks</label><textarea value={device.remarks} onChange={(e) => setCustomerForm((prev) => ({ ...prev, devices: prev.devices.map((row) => (row.id === device.id ? { ...row, remarks: e.target.value } : row)) }))} /></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="modal-actions"><button type="button" className="secondary-button" onClick={() => setIsModalOpen(false)}>Cancel</button><button type="button" className="secondary-button" onClick={() => handleSaveCustomer(true)}>Save & Add Another</button><button type="submit" className="primary-button">Save</button></div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* --- Toasts --- */}
-      <div className="fixed top-6 right-6 z-[2000] flex flex-col gap-3">
+      <div className="fixed bottom-6 right-6 z-[2000] flex flex-col gap-3">
         <AnimatePresence>{toasts.map(t => (
           <motion.div key={t.id} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }} className="toast">
             {t.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-400" /> : <AlertCircle size={18} className="text-sky-400" />} {t.message}
@@ -742,3 +252,585 @@ const RentalCustomersPage = () => {
 };
 
 export default RentalCustomersPage;
+
+/* ── Rental Quotation View ────────────────────────────────────── */
+
+const RentalQuotationView = ({ customer, onBack }) => {
+  const buildQuote = () => ({
+    quoteNo: `RQT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+    date: new Date().toISOString().split('T')[0],
+    validity: '30 Days',
+    customerName: customer.name || '',
+    contactPerson: customer.person1 || '',
+    customerAddress: customer.address || '',
+    gstin: customer.gst || '',
+    phone: customer.phone || '',
+    email: customer.email || '',
+    minimumPeriod: '3 Months',
+    installationCharges: 0,
+    deliveryCharges: 0,
+    securityDeposit: 0,
+    gstPercent: 18,
+    paymentTerms: 'Advance',
+    slaResponse: '4-8 Working Hours',
+    scope: 'Device installation, preventive maintenance, breakdown support, remote support, on-site visits',
+    exclusions: 'Physical damage, consumables, accessories',
+  });
+
+  const buildDevices = () => {
+    const raw = customer.raw?.devices;
+    if (Array.isArray(raw) && raw.length) {
+      return raw.map((d) => ({
+        id: Date.now() + Math.random(),
+        device: d.device || d.deviceType || 'Printer',
+        model: d.model || d.brand || '',
+        qty: 1,
+        monthlyRent: Number(d.monthlyRent || 0),
+        deposit: 0,
+      }));
+    }
+    return [newQuoteDevice()];
+  };
+
+  const [quote, setQuote] = useState(buildQuote);
+  const [devices, setDevices] = useState(buildDevices);
+
+  const set = (field, val) => setQuote((q) => ({ ...q, [field]: val }));
+  const updateDevice = (id, field, val) =>
+    setDevices((prev) => prev.map((d) => (d.id === id ? { ...d, [field]: val } : d)));
+
+  const deviceTotal = () => devices.reduce((s, d) => s + Number(d.qty || 0) * Number(d.monthlyRent || 0), 0);
+  const gstAmount = () => Math.round(deviceTotal() * (Number(quote.gstPercent) / 100));
+  const grandTotal = () => deviceTotal() + gstAmount() + Number(quote.installationCharges || 0) + Number(quote.deliveryCharges || 0);
+
+  const handleEmail = () => {
+    const subject = encodeURIComponent(`Rental Quotation ${quote.quoteNo} - RepairTech Enterprise`);
+    const body = encodeURIComponent(`Dear ${quote.contactPerson || quote.customerName},\n\nPlease find attached the rental quotation ${quote.quoteNo} for your reference.\n\nTotal: ₹${fmt(grandTotal())}/month\n\nRegards,\nRepairTech Enterprise`);
+    window.open(`mailto:${quote.email}?subject=${subject}&body=${body}`);
+  };
+
+  return (
+    <div className="plans-page">
+      <header className="plans-header">
+        <div className="plans-header-left">
+          <button className="secondary-button" onClick={onBack} style={{ marginBottom: 12 }}>
+            <ArrowLeft size={16} /> Back to Customers
+          </button>
+          <h1>Rental Quotation</h1>
+          <p>For: <strong>{customer.name}</strong></p>
+        </div>
+        <div className="plans-header-actions">
+          {quote.email && (
+            <button className="secondary-button" onClick={handleEmail}>
+              <Mail size={18} /> Send to Email
+            </button>
+          )}
+          <button className="secondary-button" onClick={() => window.print()}>
+            <Printer size={18} /> Print Quote
+          </button>
+          <button className="primary-button" onClick={onBack}>
+            <CheckCircle2 size={18} /> Save Quotation
+          </button>
+        </div>
+      </header>
+
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        {/* ── LEFT: EDITOR ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Customer Details */}
+          <div className="table-card">
+            <div className="card-header"><div className="card-title-area"><h2>Customer Details</h2></div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
+                <div className="form-group"><label>Customer Name</label><input className="form-input" value={quote.customerName} onChange={(e) => set('customerName', e.target.value)} /></div>
+                <div className="form-group"><label>Contact Person</label><input className="form-input" value={quote.contactPerson} onChange={(e) => set('contactPerson', e.target.value)} /></div>
+                <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Address</label><input className="form-input" value={quote.customerAddress} onChange={(e) => set('customerAddress', e.target.value)} /></div>
+                <div className="form-group"><label>Phone</label><input className="form-input" value={quote.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+                <div className="form-group"><label>Email</label><input className="form-input" type="email" value={quote.email} onChange={(e) => set('email', e.target.value)} /></div>
+                <div className="form-group"><label>GSTIN</label><input className="form-input" value={quote.gstin} onChange={(e) => set('gstin', e.target.value)} /></div>
+                <div className="form-group"><label>Quote Number</label><input className="form-input" value={quote.quoteNo} readOnly style={{ background: '#f8fafc' }} /></div>
+                <div className="form-group"><label>Validity</label>
+                  <select className="form-select" value={quote.validity} onChange={(e) => set('validity', e.target.value)}>
+                    <option>15 Days</option><option>30 Days</option><option>60 Days</option>
+                  </select>
+                </div>
+                <div className="form-group"><label>Min. Rental Period</label>
+                  <select className="form-select" value={quote.minimumPeriod} onChange={(e) => set('minimumPeriod', e.target.value)}>
+                    <option>1 Month</option><option>3 Months</option><option>6 Months</option><option>12 Months</option>
+                  </select>
+                </div>
+                <div className="form-group"><label>Payment Terms</label>
+                  <select className="form-select" value={quote.paymentTerms} onChange={(e) => set('paymentTerms', e.target.value)}>
+                    <option>Advance</option><option>Net 7</option><option>Net 15</option><option>Net 30</option>
+                  </select>
+                </div>
+            </div>
+          </div>
+
+          {/* Devices & Pricing */}
+          <div className="table-card">
+            <div className="card-header">
+              <div className="card-title-area">
+                <h2>Devices & Pricing</h2>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>Add all devices to be covered under this quotation</p>
+              </div>
+              <button className="secondary-button" onClick={() => setDevices((prev) => [...prev, newQuoteDevice()])}>
+                <Plus size={16} /> Add Device
+              </button>
+            </div>
+            <div style={{ padding: '0 20px 24px' }}>
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Device Type</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Model / Specs</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0', width: 70 }}>Qty</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Monthly Rent (₹)</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Deposit (₹)</th>
+                      <th style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', width: 44 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {devices.map((d, idx) => (
+                      <tr key={d.id} style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                          <select className="form-select" style={{ height: 38, fontSize: 13, minWidth: 130 }} value={d.device} onChange={(e) => updateDevice(d.id, 'device', e.target.value)}>
+                            {DEVICE_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                          </select>
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                          <input className="form-input" style={{ height: 38, fontSize: 13 }} value={d.model} onChange={(e) => updateDevice(d.id, 'model', e.target.value)} placeholder="e.g. HP LaserJet Pro" />
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
+                          <input type="number" className="form-input" style={{ height: 38, width: 60, fontSize: 13, textAlign: 'center' }} min={1} value={d.qty} onChange={(e) => updateDevice(d.id, 'qty', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
+                          <input type="number" className="form-input" style={{ height: 38, width: 110, fontSize: 13, textAlign: 'right' }} min={0} value={d.monthlyRent} onChange={(e) => updateDevice(d.id, 'monthlyRent', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
+                          <input type="number" className="form-input" style={{ height: 38, width: 110, fontSize: 13, textAlign: 'right' }} min={0} value={d.deposit} onChange={(e) => updateDevice(d.id, 'deposit', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
+                          <button className="icon-button" style={{ color: '#ef4444', width: 32, height: 32 }} onClick={() => setDevices((prev) => prev.filter((x) => x.id !== d.id))}>
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#f0fdf4', borderTop: '2px solid #bbf7d0' }}>
+                      <td colSpan={3} style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: '#15803d' }}>Monthly Total ({devices.length} device{devices.length !== 1 ? 's' : ''})</td>
+                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: 15, fontWeight: 800, color: '#15803d' }}>₹{fmt(deviceTotal())}</td>
+                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: 13, color: '#64748b' }}>₹{fmt(devices.reduce((s, d) => s + Number(d.deposit || 0), 0))}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Charges & Terms */}
+          <div className="table-card">
+            <div className="card-header"><div className="card-title-area"><h2>Charges & Terms</h2></div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
+              <div className="form-group"><label>Installation Charges (₹)</label><input type="number" className="form-input" min={0} value={quote.installationCharges} onChange={(e) => set('installationCharges', e.target.value)} /></div>
+              <div className="form-group"><label>Delivery Charges (₹)</label><input type="number" className="form-input" min={0} value={quote.deliveryCharges} onChange={(e) => set('deliveryCharges', e.target.value)} /></div>
+              <div className="form-group"><label>Security Deposit (₹)</label><input type="number" className="form-input" min={0} value={quote.securityDeposit} onChange={(e) => set('securityDeposit', e.target.value)} /></div>
+              <div className="form-group"><label>GST (%)</label>
+                <select className="form-select" value={quote.gstPercent} onChange={(e) => set('gstPercent', e.target.value)}>
+                  <option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option>
+                </select>
+              </div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>SLA Response Time</label><input className="form-input" value={quote.slaResponse} onChange={(e) => set('slaResponse', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Scope of Services</label><textarea className="form-input" style={{ height: 80 }} value={quote.scope} onChange={(e) => set('scope', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Exclusions</label><textarea className="form-input" style={{ height: 64 }} value={quote.exclusions} onChange={(e) => set('exclusions', e.target.value)} /></div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── RIGHT: LIVE PREVIEW ── */}
+        <div className="agreement-preview-container no-print-hide">
+          <div className="agreement-document">
+            <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h1 style={{ fontSize: 22, margin: '0 0 4px' }}>QUOTATION</h1>
+                <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo}</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Date: {quote.date} &nbsp;|&nbsp; Valid: {quote.validity}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <h2 style={{ fontSize: 16, margin: '0 0 2px' }}>RepairTech Enterprise</h2>
+                <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>Authorized Service Center</p>
+              </div>
+            </div>
+
+            <div className="agreement-grid" style={{ marginBottom: 16 }}>
+              <div className="agreement-section">
+                <h2>Quote For</h2>
+                <div className="agreement-field"><strong>Customer</strong>{quote.customerName || '—'}</div>
+                <div className="agreement-field"><strong>Contact</strong>{quote.contactPerson || '—'}</div>
+                <div className="agreement-field"><strong>Address</strong>{quote.customerAddress || '—'}</div>
+                <div className="agreement-field"><strong>GSTIN</strong>{quote.gstin || '—'}</div>
+                <div className="agreement-field"><strong>Phone</strong>{quote.phone || '—'}</div>
+              </div>
+              <div className="agreement-section">
+                <h2>Terms</h2>
+                <div className="agreement-field"><strong>Min. Period</strong>{quote.minimumPeriod}</div>
+                <div className="agreement-field"><strong>Payment</strong>{quote.paymentTerms}</div>
+                <div className="agreement-field"><strong>SLA Response</strong>{quote.slaResponse}</div>
+              </div>
+            </div>
+
+            <div className="agreement-section">
+              <h2>Device & Pricing Details</h2>
+              <table className="agreement-table">
+                <thead><tr><th>Device</th><th>Model</th><th>Qty</th><th>Monthly Rent</th><th>Total/Month</th></tr></thead>
+                <tbody>
+                  {devices.map((d) => (
+                    <tr key={d.id}>
+                      <td>{d.device}</td><td>{d.model || '—'}</td><td>{d.qty}</td>
+                      <td>₹{fmt(d.monthlyRent)}</td>
+                      <td>₹{fmt(Number(d.qty) * Number(d.monthlyRent))}</td>
+                    </tr>
+                  ))}
+                  <tr><td colSpan={4} style={{ textAlign: 'right' }}><strong>Device Subtotal</strong></td><td><strong>₹{fmt(deviceTotal())}</strong></td></tr>
+                  {Number(quote.installationCharges) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Installation</td><td>₹{fmt(quote.installationCharges)}</td></tr>}
+                  {Number(quote.deliveryCharges) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Delivery</td><td>₹{fmt(quote.deliveryCharges)}</td></tr>}
+                  <tr><td colSpan={4} style={{ textAlign: 'right' }}>GST ({quote.gstPercent}%)</td><td>₹{fmt(gstAmount())}</td></tr>
+                  <tr style={{ background: '#f0fdf4' }}><td colSpan={4} style={{ textAlign: 'right' }}><strong>Grand Total / Month</strong></td><td><strong>₹{fmt(grandTotal())}</strong></td></tr>
+                  {Number(quote.securityDeposit) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Security Deposit (one-time)</td><td>₹{fmt(quote.securityDeposit)}</td></tr>}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="agreement-section">
+              <h2>Scope of Services</h2>
+              <p style={{ fontSize: 12, lineHeight: 1.6 }}>{quote.scope}</p>
+            </div>
+            {quote.exclusions && (
+              <div className="agreement-section">
+                <h2>Exclusions</h2>
+                <p style={{ fontSize: 12, lineHeight: 1.6 }}>{quote.exclusions}</p>
+              </div>
+            )}
+
+            <div className="agreement-signatures" style={{ marginTop: 32 }}>
+              <div className="signature-block"><div className="signature-line">Authorized Signatory (Provider)</div></div>
+              <div className="signature-block"><div className="signature-line">Authorized Signatory (Client)</div></div>
+            </div>
+            <div className="agreement-footer"><p>Generated by RepairTech Enterprise — Rental Management System</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ── Rental Agreement View ────────────────────────────────────── */
+
+const RentalAgreementView = ({ customer, onBack }) => {
+  const buildForm = () => ({
+    agreementNo: `AGR-${customer.type === 'Individual' ? 'I' : 'C'}-${Math.floor(100000 + Math.random() * 900000)}`,
+    agreementDate: new Date().toISOString().split('T')[0],
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+    customerType: customer.type || 'Corporate',
+    customerName: customer.name || '',
+    contactPerson: customer.person1 || '',
+    customerAddress: customer.address || '',
+    gstin: customer.gst || '',
+    phone: customer.phone || '',
+    email: customer.email || '',
+    providerName: 'RepairTech Enterprise',
+    providerAddress: 'Plot 42, Tech Hub, City',
+    providerGstin: '22AAAAA0000A1Z5',
+    billingCycle: 'Monthly',
+    paymentDueDays: '7',
+    gstPercent: '18',
+    slaResponse: '4',
+    resolutionTime: '24 Hours',
+    minimumPeriod: '12 Months',
+    securityDeposit: '',
+    installationCharges: '',
+    lateFee: '2',
+    terminationNotice: '30',
+    replacementPolicy: 'Replacement provided if repair exceeds 48 hours.',
+    maintenanceCoverage: 'All parts and toner included in comprehensive plan.',
+    liabilityClause: 'The Client is responsible for all physical damage to the equipment.',
+    jurisdiction: 'Indore',
+  });
+
+  const buildDevices = () => {
+    const raw = customer.raw?.devices;
+    if (Array.isArray(raw) && raw.length) {
+      return raw.map((d) => ({
+        id: Date.now() + Math.random(),
+        type: d.device || d.deviceType || 'Printer',
+        brand: d.brand || '',
+        model: d.model || '',
+        serial: d.serialNumber || '',
+        qty: 1,
+        monthlyRent: Number(d.monthlyRent || 0),
+      }));
+    }
+    return [newAgreementDevice()];
+  };
+
+  const [form, setForm] = useState(buildForm);
+  const [devices, setDevices] = useState(buildDevices);
+
+  const set = (field, val) => setForm((f) => ({ ...f, [field]: val }));
+  const updateDevice = (id, field, val) =>
+    setDevices((prev) => prev.map((d) => (d.id === id ? { ...d, [field]: val } : d)));
+
+  const monthlyTotal = () => devices.reduce((s, d) => s + Number(d.qty || 0) * Number(d.monthlyRent || 0), 0);
+
+  const handleEmail = () => {
+    const subject = encodeURIComponent(`Rental Agreement ${form.agreementNo} - RepairTech Enterprise`);
+    const body = encodeURIComponent(`Dear ${form.contactPerson || form.customerName},\n\nPlease find the rental agreement ${form.agreementNo} for your review and signature.\n\nAgreement Period: ${form.startDate} to ${form.endDate}\nMonthly Total: ₹${fmt(monthlyTotal())}\n\nRegards,\nRepairTech Enterprise`);
+    window.open(`mailto:${form.email}?subject=${subject}&body=${body}`);
+  };
+
+  return (
+    <div className="plans-page">
+      <header className="plans-header">
+        <div className="plans-header-left">
+          <button className="secondary-button" onClick={onBack} style={{ marginBottom: 12 }}>
+            <ArrowLeft size={16} /> Back to Customers
+          </button>
+          <h1>Rental Agreement</h1>
+          <p>For: <strong>{customer.name}</strong></p>
+        </div>
+        <div className="plans-header-actions">
+          {form.email && (
+            <button className="secondary-button" onClick={handleEmail}>
+              <Mail size={18} /> Send to Email
+            </button>
+          )}
+          <button className="secondary-button" onClick={() => window.print()}>
+            <Printer size={18} /> Print Agreement
+          </button>
+          <button className="primary-button" onClick={onBack}>
+            <ShieldCheck size={18} /> Finalize & Save
+          </button>
+        </div>
+      </header>
+
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1.2fr', gap: 24 }}>
+        {/* ── LEFT: FORM ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="table-card">
+            <div className="card-header"><div className="card-title-area"><h2>Customer Info</h2><p>{form.customerName}</p></div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
+              <div className="form-group"><label>Customer Name</label><input className="form-input" value={form.customerName} onChange={(e) => set('customerName', e.target.value)} /></div>
+              <div className="form-group"><label>Contact Person</label><input className="form-input" value={form.contactPerson} onChange={(e) => set('contactPerson', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Address</label><input className="form-input" value={form.customerAddress} onChange={(e) => set('customerAddress', e.target.value)} /></div>
+              <div className="form-group"><label>Phone</label><input className="form-input" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+              <div className="form-group"><label>Email</label><input className="form-input" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
+              <div className="form-group"><label>GSTIN</label><input className="form-input" value={form.gstin} onChange={(e) => set('gstin', e.target.value)} /></div>
+              <div className="form-group"><label>Customer Type</label>
+                <select className="form-select" value={form.customerType} onChange={(e) => set('customerType', e.target.value)}>
+                  <option>Corporate</option><option>Individual</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="table-card">
+            <div className="card-header"><div className="card-title-area"><h2>Agreement Details</h2></div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
+              <div className="form-group"><label>Agreement Date</label><input type="date" className="form-input" value={form.agreementDate} onChange={(e) => set('agreementDate', e.target.value)} /></div>
+              <div className="form-group"><label>Min. Rental Period</label>
+                <select className="form-select" value={form.minimumPeriod} onChange={(e) => set('minimumPeriod', e.target.value)}>
+                  <option>3 Months</option><option>6 Months</option><option>12 Months</option><option>24 Months</option>
+                </select>
+              </div>
+              <div className="form-group"><label>Start Date</label><input type="date" className="form-input" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} /></div>
+              <div className="form-group"><label>End Date</label><input type="date" className="form-input" value={form.endDate} onChange={(e) => set('endDate', e.target.value)} /></div>
+              <div className="form-group"><label>Billing Cycle</label>
+                <select className="form-select" value={form.billingCycle} onChange={(e) => set('billingCycle', e.target.value)}>
+                  <option>Monthly</option><option>Quarterly</option><option>Bi-Annual</option><option>Annual</option>
+                </select>
+              </div>
+              <div className="form-group"><label>Payment Due (Days)</label><input type="number" className="form-input" value={form.paymentDueDays} onChange={(e) => set('paymentDueDays', e.target.value)} /></div>
+              <div className="form-group"><label>SLA Response (Hours)</label><input type="number" className="form-input" value={form.slaResponse} onChange={(e) => set('slaResponse', e.target.value)} /></div>
+              <div className="form-group"><label>GST (%)</label>
+                <select className="form-select" value={form.gstPercent} onChange={(e) => set('gstPercent', e.target.value)}>
+                  <option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option>
+                </select>
+              </div>
+              <div className="form-group"><label>Security Deposit (₹)</label><input type="number" className="form-input" min={0} value={form.securityDeposit} onChange={(e) => set('securityDeposit', e.target.value)} /></div>
+              <div className="form-group"><label>Installation Charges (₹)</label><input type="number" className="form-input" min={0} value={form.installationCharges} onChange={(e) => set('installationCharges', e.target.value)} /></div>
+              <div className="form-group"><label>Termination Notice (Days)</label><input type="number" className="form-input" value={form.terminationNotice} onChange={(e) => set('terminationNotice', e.target.value)} /></div>
+              <div className="form-group"><label>Jurisdiction</label><input className="form-input" value={form.jurisdiction} onChange={(e) => set('jurisdiction', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Maintenance Coverage</label><textarea className="form-input" style={{ height: 72 }} value={form.maintenanceCoverage} onChange={(e) => set('maintenanceCoverage', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Replacement Policy</label><textarea className="form-input" style={{ height: 60 }} value={form.replacementPolicy} onChange={(e) => set('replacementPolicy', e.target.value)} /></div>
+            </div>
+          </div>
+
+          {/* Devices */}
+          <div className="table-card">
+            <div className="card-header">
+              <div className="card-title-area">
+                <h2>Devices Covered</h2>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>List all devices included in this agreement</p>
+              </div>
+              <button className="secondary-button" onClick={() => setDevices((p) => [...p, newAgreementDevice()])}>
+                <Plus size={16} /> Add Device
+              </button>
+            </div>
+            <div style={{ padding: '0 20px 24px' }}>
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Device Type</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Brand / Model</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Serial No.</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0', width: 70 }}>Qty</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Rent / Unit (₹)</th>
+                      <th style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', width: 44 }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {devices.map((d, idx) => (
+                      <tr key={d.id} style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                          <select className="form-select" style={{ height: 38, fontSize: 13, minWidth: 130 }} value={d.type} onChange={(e) => updateDevice(d.id, 'type', e.target.value)}>
+                            {DEVICE_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+                          </select>
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                          <input className="form-input" style={{ height: 38, fontSize: 13 }} value={d.model} onChange={(e) => updateDevice(d.id, 'model', e.target.value)} placeholder="e.g. HP LaserJet Pro" />
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
+                          <input className="form-input" style={{ height: 38, fontSize: 13 }} value={d.serial} onChange={(e) => updateDevice(d.id, 'serial', e.target.value)} placeholder="Serial No." />
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
+                          <input type="number" className="form-input" style={{ height: 38, width: 60, fontSize: 13, textAlign: 'center' }} min={1} value={d.qty} onChange={(e) => updateDevice(d.id, 'qty', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
+                          <input type="number" className="form-input" style={{ height: 38, width: 110, fontSize: 13, textAlign: 'right' }} min={0} value={d.monthlyRent} onChange={(e) => updateDevice(d.id, 'monthlyRent', e.target.value)} />
+                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
+                          <button className="icon-button" style={{ color: '#ef4444', width: 32, height: 32 }} onClick={() => setDevices((p) => p.filter((x) => x.id !== d.id))}>
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#f0fdf4', borderTop: '2px solid #bbf7d0' }}>
+                      <td colSpan={4} style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: '#15803d' }}>Monthly Total ({devices.length} device{devices.length !== 1 ? 's' : ''})</td>
+                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: 15, fontWeight: 800, color: '#15803d' }}>₹{fmt(monthlyTotal())}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── RIGHT: LIVE PREVIEW ── */}
+        <div className="agreement-preview-container">
+          <div className="agreement-document">
+            <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <h1 style={{ fontSize: 20 }}>{form.customerType.toUpperCase()} RENTAL AGREEMENT</h1>
+                <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>No: {form.agreementNo} &nbsp;|&nbsp; Date: {form.agreementDate}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <h2 style={{ fontSize: 15, margin: 0 }}>RepairTech Enterprise</h2>
+                <p style={{ fontSize: 11, margin: 0, color: '#64748b' }}>Authorized Service Center</p>
+              </div>
+            </div>
+
+            <div className="agreement-grid">
+              <div className="agreement-section">
+                <h2>Service Provider</h2>
+                <div className="agreement-field"><strong>Name</strong>{form.providerName}</div>
+                <div className="agreement-field"><strong>GSTIN</strong>{form.providerGstin}</div>
+                <div className="agreement-field"><strong>Address</strong>{form.providerAddress}</div>
+              </div>
+              <div className="agreement-section">
+                <h2>Client</h2>
+                <div className="agreement-field"><strong>Name</strong>{form.customerName || '—'}</div>
+                <div className="agreement-field"><strong>GSTIN</strong>{form.gstin || '—'}</div>
+                <div className="agreement-field"><strong>Address</strong>{form.customerAddress || '—'}</div>
+                <div className="agreement-field"><strong>Contact</strong>{form.contactPerson || '—'}</div>
+                <div className="agreement-field"><strong>Phone</strong>{form.phone || '—'}</div>
+              </div>
+            </div>
+
+            <div className="agreement-section">
+              <h2>1. Contract Period</h2>
+              <p>Valid from <strong>{form.startDate || '___'}</strong> to <strong>{form.endDate || '___'}</strong> (min. {form.minimumPeriod}).</p>
+            </div>
+
+            <div className="agreement-section">
+              <h2>2. Devices Covered</h2>
+              <table className="agreement-table">
+                <thead><tr><th>Type</th><th>Brand/Model</th><th>Serial</th><th>Qty</th><th>Monthly Rent</th></tr></thead>
+                <tbody>
+                  {devices.map((d) => (
+                    <tr key={d.id}>
+                      <td>{d.type}</td><td>{d.model || '—'}</td><td>{d.serial || '—'}</td><td>{d.qty}</td>
+                      <td>₹{fmt(Number(d.qty) * Number(d.monthlyRent))}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: '#f0fdf4' }}>
+                    <td colSpan={4} style={{ textAlign: 'right' }}><strong>Total / Month</strong></td>
+                    <td><strong>₹{fmt(monthlyTotal())}</strong></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="agreement-section">
+              <h2>3. Payment Terms</h2>
+              <p>Billing: <strong>{form.billingCycle}</strong>. Due within <strong>{form.paymentDueDays} days</strong>. Late fee: <strong>{form.lateFee}%/month</strong>. GST: <strong>{form.gstPercent}%</strong>.</p>
+              {form.securityDeposit && <p>Security Deposit: <strong>₹{fmt(form.securityDeposit)}</strong> (refundable).</p>}
+              {form.installationCharges && <p>Installation: <strong>₹{fmt(form.installationCharges)}</strong> (one-time).</p>}
+            </div>
+
+            <div className="agreement-section">
+              <h2>4. SLA</h2>
+              <p>Response: <strong>{form.slaResponse} working hours</strong>. Resolution: <strong>{form.resolutionTime}</strong>.</p>
+            </div>
+
+            <div className="agreement-section">
+              <h2>5. Maintenance</h2>
+              <p>{form.maintenanceCoverage}</p>
+            </div>
+
+            <div className="agreement-section">
+              <h2>6. Replacement</h2>
+              <p>{form.replacementPolicy}</p>
+            </div>
+
+            <div className="agreement-section">
+              <h2>7. Termination & Jurisdiction</h2>
+              <p>Termination notice: <strong>{form.terminationNotice} days</strong>. {form.liabilityClause} Jurisdiction: <strong>{form.jurisdiction}</strong>.</p>
+            </div>
+
+            <div className="agreement-signatures" style={{ marginTop: 32 }}>
+              <div className="signature-block">
+                <div className="signature-line">Authorized Signatory (Provider)</div>
+                <p style={{ fontSize: 11, textAlign: 'center', margin: '4px 0 0' }}>RepairTech Enterprise</p>
+              </div>
+              <div className="signature-block">
+                <div className="signature-line">Authorized Signatory (Client)</div>
+                <p style={{ fontSize: 11, textAlign: 'center', margin: '4px 0 0' }}>{form.customerName || '—'}</p>
+              </div>
+            </div>
+
+            <div className="agreement-footer"><p>Generated by RepairTech Enterprise — Rental Management System</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

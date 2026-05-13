@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { inventoryService } from '../services/inventoryService';
 import { assetManagementService } from '../services/assetManagementService';
+import { useToast } from '../context/ToastContext';
 import './InventoryPremiumStyles.css';
 
 const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle'];
@@ -44,6 +45,7 @@ const statusTone = (status) => {
 
 const InventoryManagement = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { addToast } = useToast();
   const [items, setItems] = useState([]);
   const [assets, setAssets] = useState([]);
   const [stats, setStats] = useState({});
@@ -52,7 +54,6 @@ const InventoryManagement = () => {
   const [stockType, setStockType] = useState('All');
   const [assetStatus, setAssetStatus] = useState('All');
   const [showAssetModal, setShowAssetModal] = useState(false);
-  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     loadData();
@@ -69,7 +70,7 @@ const InventoryManagement = () => {
       setStats(nextStats);
       setAssets(nextAssets);
     } catch (error) {
-      setNotice(error.response?.data?.message || error.message || 'Inventory data failed to load.');
+      addToast(error.response?.data?.message || error.message || 'Inventory data failed to load.', 'error');
     }
   }
 
@@ -137,8 +138,6 @@ const InventoryManagement = () => {
 
   return (
     <div className="inventory-page">
-      {notice && <div className="inventory-notice">{notice}</div>}
-
       <section className="inventory-hero">
         <div>
           <span className="inventory-eyebrow">Inventory & Asset Management</span>
