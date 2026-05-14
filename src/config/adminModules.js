@@ -19,13 +19,6 @@ const adminModules = [
         description: 'Lead pipeline module shell for upcoming workflow and lifecycle requirements.',
         actions: ['Add', 'View List'],
       },
-      {
-        id: 'admin-discounts',
-        label: 'Discounts',
-        path: '/admin/discounts/dashboard',
-        description: 'Discount and coupon management — create codes, track usage, and measure revenue impact.',
-        actions: ['Add', 'Manage'],
-      },
     ],
   },
   {
@@ -94,13 +87,6 @@ const adminModules = [
         label: 'Inventory Listing',
         path: '/inventory',
         description: 'Manage billing items, spare parts, and stock levels.',
-        actions: ['Add', 'View List', 'Manage'],
-      },
-      {
-        id: 'admin-asset-management',
-        label: 'Asset Lifecycle',
-        path: '/admin/inventory/asset-management',
-        description: 'Individual tracking for company physical assets.',
         actions: ['Add', 'View List', 'Manage'],
       },
     ],

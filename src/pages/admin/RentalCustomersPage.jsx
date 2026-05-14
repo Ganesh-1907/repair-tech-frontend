@@ -1,11 +1,11 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import {
   Plus,
   Search,
   MoreVertical,
   RefreshCcw,
-  Eye,
   Edit2,
+  Eye,
   Trash2,
   CheckCircle2,
   AlertCircle,
@@ -35,6 +35,20 @@ const newAgreementDevice = () => ({
   type: 'Printer', brand: '', model: '', serial: '', qty: 1, monthlyRent: 0,
 });
 const fmt = (n) => Number(n || 0).toLocaleString('en-IN');
+const mapRentalCustomer = (row) => ({
+  id: row.id,
+  type: row.customerType || 'Corporate',
+  name: row.companyName || row.customerName || '',
+  person1: row.authorizedPerson1 || row.customerName || '',
+  person2: row.authorizedPerson2 || '-',
+  gst: row.gstNumber || '-',
+  phone: row.contactNumber || '',
+  email: row.email || '',
+  address: row.address || row.billingAddress || '',
+  locations: Array.isArray(row.locations) ? row.locations.length : Number(row.locations || 0),
+  status: row.status || 'Active',
+  raw: row,
+});
 
 /* ── Main Page ────────────────────────────────────────────────── */
 
@@ -58,20 +72,7 @@ const RentalCustomersPage = () => {
 
   const loadCustomers = async () => {
     const rows = await api.list('rentalCustomers');
-    setCustomers(rows.map((row) => ({
-      id: row.id,
-      type: row.customerType || 'Corporate',
-      name: row.companyName || row.customerName || '',
-      person1: row.authorizedPerson1 || row.customerName || '',
-      person2: row.authorizedPerson2 || '-',
-      gst: row.gstNumber || '-',
-      phone: row.contactNumber || '',
-      email: row.email || '',
-      address: row.address || row.billingAddress || '',
-      locations: Array.isArray(row.locations) ? row.locations.length : Number(row.locations || 0),
-      status: row.status || 'Active',
-      raw: row,
-    })));
+    setCustomers(rows.map(mapRentalCustomer));
   };
 
   useEffect(() => {
@@ -147,7 +148,17 @@ const RentalCustomersPage = () => {
 
   /* ── Sub-view renders ── */
   if (view === 'quotation' && selectedCustomer) {
-    return <RentalQuotationView customer={selectedCustomer} onBack={() => setView('list')} />;
+    return (
+      <RentalQuotationView
+        customer={selectedCustomer}
+        onBack={() => { loadCustomers(); setView('list'); }}
+        onSaved={(savedRow) => {
+          const mapped = mapRentalCustomer(savedRow);
+          setSelectedCustomer(mapped);
+          setCustomers((prev) => prev.map((row) => (row.id === mapped.id ? mapped : row)));
+        }}
+      />
+    );
   }
   if (view === 'agreement' && selectedCustomer) {
     return <RentalAgreementView customer={selectedCustomer} onBack={() => setView('list')} />;
@@ -204,7 +215,6 @@ const RentalCustomersPage = () => {
                   <td><span className={`status-badge status-${c.status.toLowerCase()}`}>{c.status}</span></td>
                   <td className="text-center">
                     <div className="actions-menu" style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                      <button className="icon-button" onClick={() => openCustomerProcess(c.id)} title="View Process"><Eye size={14} /></button>
                       <button className="icon-button" onClick={(e) => handleOpenMenu(e, c)}><MoreVertical size={14} /></button>
                     </div>
                   </td>
@@ -229,7 +239,7 @@ const RentalCustomersPage = () => {
               <>
                 <button className="menu-item" onClick={() => openQuotation(c)}><FileText size={14} /> Create Quotation</button>
                 <button className="menu-item" onClick={() => openAgreement(c)}><ClipboardCheck size={14} /> Create Agreement</button>
-                <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> Open Process</button>
+                <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> View Customer</button>
                 <div className="h-px bg-slate-100 my-1"></div>
                 <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); window.location.href = `/admin/rental/new?id=${c.id}`; }}><Edit2 size={14} /> Edit Customer</button>
                 <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button>
@@ -255,29 +265,43 @@ export default RentalCustomersPage;
 
 /* ── Rental Quotation View ────────────────────────────────────── */
 
-const RentalQuotationView = ({ customer, onBack }) => {
-  const buildQuote = () => ({
-    quoteNo: `RQT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-    date: new Date().toISOString().split('T')[0],
-    validity: '30 Days',
-    customerName: customer.name || '',
-    contactPerson: customer.person1 || '',
-    customerAddress: customer.address || '',
-    gstin: customer.gst || '',
-    phone: customer.phone || '',
-    email: customer.email || '',
-    minimumPeriod: '3 Months',
-    installationCharges: 0,
-    deliveryCharges: 0,
-    securityDeposit: 0,
-    gstPercent: 18,
-    paymentTerms: 'Advance',
-    slaResponse: '4-8 Working Hours',
-    scope: 'Device installation, preventive maintenance, breakdown support, remote support, on-site visits',
-    exclusions: 'Physical damage, consumables, accessories',
-  });
+const RentalQuotationView = ({ customer, onBack, onSaved }) => {
+  const buildQuote = () => {
+    const saved = customer.raw?.quotation;
+    return {
+      quoteNo: saved?.quoteNo || `RQT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      date: saved?.date || new Date().toISOString().split('T')[0],
+      validity: saved?.validity || '30 Days',
+      customerName: customer.name || '',
+      contactPerson: customer.person1 || '',
+      customerAddress: customer.address || '',
+      gstin: customer.gst || '',
+      phone: customer.phone || '',
+      email: customer.email || '',
+      minimumPeriod: saved?.minimumPeriod || '3 Months',
+      installationCharges: saved?.installationCharges ?? 0,
+      deliveryCharges: saved?.deliveryCharges ?? 0,
+      securityDeposit: saved?.securityDeposit ?? 0,
+      gstPercent: saved?.gstPercent ?? 18,
+      paymentTerms: saved?.paymentTerms || 'Advance',
+      slaResponse: saved?.slaResponse || '4-8 Working Hours',
+      scope: saved?.scope || 'Device installation, preventive maintenance, breakdown support, remote support, on-site visits',
+      exclusions: saved?.exclusions || 'Physical damage, consumables, accessories',
+    };
+  };
 
   const buildDevices = () => {
+    const savedDevices = customer.raw?.quotation?.devices;
+    if (Array.isArray(savedDevices) && savedDevices.length) {
+      return savedDevices.map((d) => ({
+        id: Date.now() + Math.random(),
+        device: d.device || 'Printer',
+        model: d.model || '',
+        qty: d.qty || 1,
+        monthlyRent: Number(d.monthlyRent || 0),
+        deposit: 0,
+      }));
+    }
     const raw = customer.raw?.devices;
     if (Array.isArray(raw) && raw.length) {
       return raw.map((d) => ({
@@ -294,6 +318,8 @@ const RentalQuotationView = ({ customer, onBack }) => {
 
   const [quote, setQuote] = useState(buildQuote);
   const [devices, setDevices] = useState(buildDevices);
+  const [saving, setSaving] = useState(false);
+  const printRef = useRef(null);
 
   const set = (field, val) => setQuote((q) => ({ ...q, [field]: val }));
   const updateDevice = (id, field, val) =>
@@ -303,14 +329,84 @@ const RentalQuotationView = ({ customer, onBack }) => {
   const gstAmount = () => Math.round(deviceTotal() * (Number(quote.gstPercent) / 100));
   const grandTotal = () => deviceTotal() + gstAmount() + Number(quote.installationCharges || 0) + Number(quote.deliveryCharges || 0);
 
+  const [saveError, setSaveError] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    setSaveSuccess(false);
+    try {
+      const savedRow = await api.patch('rentalCustomers', customer.id, {
+        quotation: { ...quote, devices },
+      });
+      onSaved?.(savedRow);
+      setSaveSuccess(true);
+    } catch (err) {
+      setSaveError(err?.response?.data?.message || 'Failed to save quotation. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleEmail = () => {
     const subject = encodeURIComponent(`Rental Quotation ${quote.quoteNo} - RepairTech Enterprise`);
     const body = encodeURIComponent(`Dear ${quote.contactPerson || quote.customerName},\n\nPlease find attached the rental quotation ${quote.quoteNo} for your reference.\n\nTotal: ₹${fmt(grandTotal())}/month\n\nRegards,\nRepairTech Enterprise`);
     window.open(`mailto:${quote.email}?subject=${subject}&body=${body}`);
   };
 
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=1200');
+    const printable = printRef.current;
+    if (!printWindow || !printable) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title></title>
+          <style>
+            @page { size: A4; margin: 0; }
+            * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            html, body { margin: 0; padding: 0; background: #ffffff; }
+            body { font-family: "Times New Roman", Times, serif; color: #0f172a; }
+            .print-sheet { width: 210mm; min-height: 297mm; padding: 14mm 16mm; margin: 0 auto; background: #ffffff; }
+            .agreement-document { width: 100%; max-width: none; min-height: auto; max-height: none; overflow: visible; padding: 0; margin: 0; border: 0; box-shadow: none; background: #ffffff; color: #0f172a; font-family: "Times New Roman", Times, serif; line-height: 1.6; }
+            .agreement-header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
+            .agreement-section { margin-bottom: 18px; }
+            .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 16px; line-height: 1.3; }
+            table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+            th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+            th { background: #f1f5f9; font-weight: 700; }
+            p, li { font-size: 12px; line-height: 1.6; }
+            .agreement-footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #64748b; font-size: 11px; }
+            @media print {
+              html, body { width: 210mm; min-height: 297mm; }
+              .print-sheet { margin: 0; box-shadow: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <main class="print-sheet">${printable.outerHTML}</main>
+          <script>
+            window.onload = () => {
+              window.focus();
+              window.print();
+              window.onafterprint = () => window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
-    <div className="plans-page">
+    <div className="plans-page rental-quotation-print-page">
       <header className="plans-header">
         <div className="plans-header-left">
           <button className="secondary-button" onClick={onBack} style={{ marginBottom: 12 }}>
@@ -325,57 +421,36 @@ const RentalQuotationView = ({ customer, onBack }) => {
               <Mail size={18} /> Send to Email
             </button>
           )}
-          <button className="secondary-button" onClick={() => window.print()}>
+          <button className="secondary-button" onClick={handlePrint}>
             <Printer size={18} /> Print Quote
           </button>
-          <button className="primary-button" onClick={onBack}>
-            <CheckCircle2 size={18} /> Save Quotation
+          <button className="primary-button" onClick={handleSave} disabled={saving}>
+            <CheckCircle2 size={18} /> {saving ? 'Saving...' : 'Save Quotation'}
           </button>
         </div>
       </header>
 
+      {saveSuccess && (
+        <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '12px 16px', color: '#15803d', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+          Quotation saved successfully.
+        </div>
+      )}
+      {saveError && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', color: '#b91c1c', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
+          {saveError}
+        </div>
+      )}
+
       <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         {/* ── LEFT: EDITOR ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Customer Details */}
-          <div className="table-card">
-            <div className="card-header"><div className="card-title-area"><h2>Customer Details</h2></div></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
-                <div className="form-group"><label>Customer Name</label><input className="form-input" value={quote.customerName} onChange={(e) => set('customerName', e.target.value)} /></div>
-                <div className="form-group"><label>Contact Person</label><input className="form-input" value={quote.contactPerson} onChange={(e) => set('contactPerson', e.target.value)} /></div>
-                <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Address</label><input className="form-input" value={quote.customerAddress} onChange={(e) => set('customerAddress', e.target.value)} /></div>
-                <div className="form-group"><label>Phone</label><input className="form-input" value={quote.phone} onChange={(e) => set('phone', e.target.value)} /></div>
-                <div className="form-group"><label>Email</label><input className="form-input" type="email" value={quote.email} onChange={(e) => set('email', e.target.value)} /></div>
-                <div className="form-group"><label>GSTIN</label><input className="form-input" value={quote.gstin} onChange={(e) => set('gstin', e.target.value)} /></div>
-                <div className="form-group"><label>Quote Number</label><input className="form-input" value={quote.quoteNo} readOnly style={{ background: '#f8fafc' }} /></div>
-                <div className="form-group"><label>Validity</label>
-                  <select className="form-select" value={quote.validity} onChange={(e) => set('validity', e.target.value)}>
-                    <option>15 Days</option><option>30 Days</option><option>60 Days</option>
-                  </select>
-                </div>
-                <div className="form-group"><label>Min. Rental Period</label>
-                  <select className="form-select" value={quote.minimumPeriod} onChange={(e) => set('minimumPeriod', e.target.value)}>
-                    <option>1 Month</option><option>3 Months</option><option>6 Months</option><option>12 Months</option>
-                  </select>
-                </div>
-                <div className="form-group"><label>Payment Terms</label>
-                  <select className="form-select" value={quote.paymentTerms} onChange={(e) => set('paymentTerms', e.target.value)}>
-                    <option>Advance</option><option>Net 7</option><option>Net 15</option><option>Net 30</option>
-                  </select>
-                </div>
-            </div>
-          </div>
-
           {/* Devices & Pricing */}
           <div className="table-card">
             <div className="card-header">
               <div className="card-title-area">
-                <h2>Devices & Pricing</h2>
-                <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>Add all devices to be covered under this quotation</p>
+                <h2>Devices &amp; Pricing</h2>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>Device details from customer profile — enter pricing only</p>
               </div>
-              <button className="secondary-button" onClick={() => setDevices((prev) => [...prev, newQuoteDevice()])}>
-                <Plus size={16} /> Add Device
-              </button>
             </div>
             <div style={{ padding: '0 20px 24px' }}>
               <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
@@ -384,36 +459,18 @@ const RentalQuotationView = ({ customer, onBack }) => {
                     <tr style={{ background: '#f8fafc' }}>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Device Type</th>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Model / Specs</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0', width: 70 }}>Qty</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0', width: 60 }}>Qty</th>
                       <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Monthly Rent (₹)</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Deposit (₹)</th>
-                      <th style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', width: 44 }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {devices.map((d, idx) => (
                       <tr key={d.id} style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                          <select className="form-select" style={{ height: 38, fontSize: 13, minWidth: 130 }} value={d.device} onChange={(e) => updateDevice(d.id, 'device', e.target.value)}>
-                            {DEVICE_OPTIONS.map((o) => <option key={o}>{o}</option>)}
-                          </select>
-                        </td>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                          <input className="form-input" style={{ height: 38, fontSize: 13 }} value={d.model} onChange={(e) => updateDevice(d.id, 'model', e.target.value)} placeholder="e.g. HP LaserJet Pro" />
-                        </td>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
-                          <input type="number" className="form-input" style={{ height: 38, width: 60, fontSize: 13, textAlign: 'center' }} min={1} value={d.qty} onChange={(e) => updateDevice(d.id, 'qty', e.target.value)} />
-                        </td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 13, color: '#374151', fontWeight: 500 }}>{d.device || '—'}</td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 13, color: '#374151' }}>{d.model || '—'}</td>
+                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center', fontSize: 13, color: '#374151' }}>{d.qty}</td>
                         <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
                           <input type="number" className="form-input" style={{ height: 38, width: 110, fontSize: 13, textAlign: 'right' }} min={0} value={d.monthlyRent} onChange={(e) => updateDevice(d.id, 'monthlyRent', e.target.value)} />
-                        </td>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
-                          <input type="number" className="form-input" style={{ height: 38, width: 110, fontSize: 13, textAlign: 'right' }} min={0} value={d.deposit} onChange={(e) => updateDevice(d.id, 'deposit', e.target.value)} />
-                        </td>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
-                          <button className="icon-button" style={{ color: '#ef4444', width: 32, height: 32 }} onClick={() => setDevices((prev) => prev.filter((x) => x.id !== d.id))}>
-                            <Trash2 size={14} />
-                          </button>
                         </td>
                       </tr>
                     ))}
@@ -422,8 +479,6 @@ const RentalQuotationView = ({ customer, onBack }) => {
                     <tr style={{ background: '#f0fdf4', borderTop: '2px solid #bbf7d0' }}>
                       <td colSpan={3} style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: '#15803d' }}>Monthly Total ({devices.length} device{devices.length !== 1 ? 's' : ''})</td>
                       <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: 15, fontWeight: 800, color: '#15803d' }}>₹{fmt(deviceTotal())}</td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: 13, color: '#64748b' }}>₹{fmt(devices.reduce((s, d) => s + Number(d.deposit || 0), 0))}</td>
-                      <td></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -452,7 +507,7 @@ const RentalQuotationView = ({ customer, onBack }) => {
 
         {/* ── RIGHT: LIVE PREVIEW ── */}
         <div className="agreement-preview-container no-print-hide">
-          <div className="agreement-document">
+          <div className="agreement-document" ref={printRef}>
             <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <h1 style={{ fontSize: 22, margin: '0 0 4px' }}>QUOTATION</h1>
@@ -465,20 +520,27 @@ const RentalQuotationView = ({ customer, onBack }) => {
               </div>
             </div>
 
-            <div className="agreement-grid" style={{ marginBottom: 16 }}>
-              <div className="agreement-section">
-                <h2>Quote For</h2>
-                <div className="agreement-field"><strong>Customer</strong>{quote.customerName || '—'}</div>
-                <div className="agreement-field"><strong>Contact</strong>{quote.contactPerson || '—'}</div>
-                <div className="agreement-field"><strong>Address</strong>{quote.customerAddress || '—'}</div>
-                <div className="agreement-field"><strong>GSTIN</strong>{quote.gstin || '—'}</div>
-                <div className="agreement-field"><strong>Phone</strong>{quote.phone || '—'}</div>
-              </div>
-              <div className="agreement-section">
-                <h2>Terms</h2>
-                <div className="agreement-field"><strong>Min. Period</strong>{quote.minimumPeriod}</div>
-                <div className="agreement-field"><strong>Payment</strong>{quote.paymentTerms}</div>
-                <div className="agreement-field"><strong>SLA Response</strong>{quote.slaResponse}</div>
+            <div className="agreement-section" style={{ marginBottom: 16 }}>
+              <h2>Customer Details</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[
+                  ['Customer Name', quote.customerName],
+                  ['Contact Person', quote.contactPerson],
+                  ['Address', quote.customerAddress],
+                  ['GSTIN', quote.gstin],
+                  ['Phone', quote.phone],
+                  ['Quote Number', quote.quoteNo],
+                  ['Validity', quote.validity],
+                  ['Min. Period', quote.minimumPeriod],
+                  ['Payment Terms', quote.paymentTerms],
+                  ['SLA Response', quote.slaResponse],
+                ].map(([key, val]) => (
+                  <div key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 0, fontSize: 12 }}>
+                    <span style={{ minWidth: 130, fontWeight: 600, color: '#64748b', flexShrink: 0 }}>{key}</span>
+                    <span style={{ color: '#94a3b8', marginRight: 10 }}>—</span>
+                    <span style={{ color: '#0f172a' }}>{val || '—'}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -504,20 +566,40 @@ const RentalQuotationView = ({ customer, onBack }) => {
               </table>
             </div>
 
-            <div className="agreement-section">
-              <h2>Scope of Services</h2>
-              <p style={{ fontSize: 12, lineHeight: 1.6 }}>{quote.scope}</p>
-            </div>
-            {quote.exclusions && (
-              <div className="agreement-section">
-                <h2>Exclusions</h2>
-                <p style={{ fontSize: 12, lineHeight: 1.6 }}>{quote.exclusions}</p>
+            <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+              <div className="agreement-section" style={{ flex: 1 }}>
+                <h2>Scope of Services</h2>
+                <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {quote.scope.split(',').map((item) => item.trim()).filter(Boolean).map((item, i) => (
+                    <li key={i} style={{ fontSize: 12, color: '#334155', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#6366f1', fontWeight: 700, flexShrink: 0 }}>•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            )}
+              {quote.exclusions && (
+                <div className="agreement-section" style={{ flex: 1 }}>
+                  <h2>Exclusions</h2>
+                  <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {quote.exclusions.split(',').map((item) => item.trim()).filter(Boolean).map((item, i) => (
+                      <li key={i} style={{ fontSize: 12, color: '#334155', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ color: '#ef4444', fontWeight: 700, flexShrink: 0 }}>•</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
 
-            <div className="agreement-signatures" style={{ marginTop: 32 }}>
-              <div className="signature-block"><div className="signature-line">Authorized Signatory (Provider)</div></div>
-              <div className="signature-block"><div className="signature-line">Authorized Signatory (Client)</div></div>
+            <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between', gap: 24 }}>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ marginTop: 40, borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Provider)</div>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <div style={{ marginTop: 40, borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Client)</div>
+              </div>
             </div>
             <div className="agreement-footer"><p>Generated by RepairTech Enterprise — Rental Management System</p></div>
           </div>
@@ -530,38 +612,56 @@ const RentalQuotationView = ({ customer, onBack }) => {
 /* ── Rental Agreement View ────────────────────────────────────── */
 
 const RentalAgreementView = ({ customer, onBack }) => {
+  const savedQuote = customer.raw?.quotation || {};
+  const toPercentValue = (value, fallback = 18) => Number(String(value ?? fallback).replace('%', '')) || fallback;
   const buildForm = () => ({
-    agreementNo: `AGR-${customer.type === 'Individual' ? 'I' : 'C'}-${Math.floor(100000 + Math.random() * 900000)}`,
-    agreementDate: new Date().toISOString().split('T')[0],
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+    agreementNo: savedQuote.agreementNo || `AGR-${customer.type === 'Individual' ? 'I' : 'C'}-${Math.floor(100000 + Math.random() * 900000)}`,
+    agreementDate: savedQuote.agreementDate || new Date().toISOString().split('T')[0],
+    startDate: savedQuote.startDate || new Date().toISOString().split('T')[0],
+    endDate: savedQuote.endDate || new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
     customerType: customer.type || 'Corporate',
-    customerName: customer.name || '',
-    contactPerson: customer.person1 || '',
-    customerAddress: customer.address || '',
-    gstin: customer.gst || '',
-    phone: customer.phone || '',
-    email: customer.email || '',
+    customerName: customer.name || savedQuote.customerName || '',
+    contactPerson: customer.person1 || savedQuote.contactPerson || '',
+    customerAddress: customer.address || savedQuote.customerAddress || '',
+    gstin: customer.gst || savedQuote.gstin || '',
+    phone: customer.phone || savedQuote.phone || '',
+    email: customer.email || savedQuote.email || '',
     providerName: 'RepairTech Enterprise',
     providerAddress: 'Plot 42, Tech Hub, City',
     providerGstin: '22AAAAA0000A1Z5',
     billingCycle: 'Monthly',
     paymentDueDays: '7',
-    gstPercent: '18',
-    slaResponse: '4',
+    gstPercent: toPercentValue(savedQuote.gstPercent),
+    slaResponse: savedQuote.slaResponse || '4-8 Working Hours',
     resolutionTime: '24 Hours',
-    minimumPeriod: '12 Months',
-    securityDeposit: '',
-    installationCharges: '',
+    minimumPeriod: savedQuote.minimumPeriod || '3 Months',
+    paymentTerms: savedQuote.paymentTerms || 'Advance',
+    securityDeposit: savedQuote.securityDeposit ?? 0,
+    installationCharges: savedQuote.installationCharges ?? 0,
+    deliveryCharges: savedQuote.deliveryCharges ?? 0,
     lateFee: '2',
     terminationNotice: '30',
-    replacementPolicy: 'Replacement provided if repair exceeds 48 hours.',
-    maintenanceCoverage: 'All parts and toner included in comprehensive plan.',
-    liabilityClause: 'The Client is responsible for all physical damage to the equipment.',
+    replacementPolicy: 'If service resolution exceeds 48 hours, a standby or replacement device may be provided based on availability.',
+    maintenanceCoverage: savedQuote.scope || 'Device installation, preventive maintenance, breakdown support, remote support, on-site visits',
+    liabilityClause: savedQuote.exclusions || 'Physical damage, consumables, and accessories are excluded unless separately approved.',
     jurisdiction: 'Indore',
+    sourceQuoteNo: savedQuote.quoteNo || '',
+    quoteDate: savedQuote.date || '',
   });
 
   const buildDevices = () => {
+    const quotedDevices = savedQuote.devices;
+    if (Array.isArray(quotedDevices) && quotedDevices.length) {
+      return quotedDevices.map((d) => ({
+        id: Date.now() + Math.random(),
+        type: d.device || d.type || 'Printer',
+        brand: d.brand || '',
+        model: d.model || '',
+        serial: d.serial || d.serialNumber || '',
+        qty: d.qty || 1,
+        monthlyRent: Number(d.monthlyRent || 0),
+      }));
+    }
     const raw = customer.raw?.devices;
     if (Array.isArray(raw) && raw.length) {
       return raw.map((d) => ({
@@ -578,13 +678,13 @@ const RentalAgreementView = ({ customer, onBack }) => {
   };
 
   const [form, setForm] = useState(buildForm);
-  const [devices, setDevices] = useState(buildDevices);
+  const [devices] = useState(buildDevices);
 
   const set = (field, val) => setForm((f) => ({ ...f, [field]: val }));
-  const updateDevice = (id, field, val) =>
-    setDevices((prev) => prev.map((d) => (d.id === id ? { ...d, [field]: val } : d)));
 
   const monthlyTotal = () => devices.reduce((s, d) => s + Number(d.qty || 0) * Number(d.monthlyRent || 0), 0);
+  const gstAmount = () => Math.round(monthlyTotal() * (Number(form.gstPercent || 0) / 100));
+  const grandTotal = () => monthlyTotal() + gstAmount() + Number(form.installationCharges || 0) + Number(form.deliveryCharges || 0);
 
   const handleEmail = () => {
     const subject = encodeURIComponent(`Rental Agreement ${form.agreementNo} - RepairTech Enterprise`);
@@ -618,28 +718,12 @@ const RentalAgreementView = ({ customer, onBack }) => {
       </header>
 
       <div className="main-grid" style={{ gridTemplateColumns: '1fr 1.2fr', gap: 24 }}>
-        {/* ── LEFT: FORM ── */}
+        {/* ── LEFT: AGREEMENT INPUTS ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="table-card">
-            <div className="card-header"><div className="card-title-area"><h2>Customer Info</h2><p>{form.customerName}</p></div></div>
+            <div className="card-header"><div className="card-title-area"><h2>Agreement Details</h2><p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>Customer and pricing details are taken from the saved quotation.</p></div></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
-              <div className="form-group"><label>Customer Name</label><input className="form-input" value={form.customerName} onChange={(e) => set('customerName', e.target.value)} /></div>
-              <div className="form-group"><label>Contact Person</label><input className="form-input" value={form.contactPerson} onChange={(e) => set('contactPerson', e.target.value)} /></div>
-              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Address</label><input className="form-input" value={form.customerAddress} onChange={(e) => set('customerAddress', e.target.value)} /></div>
-              <div className="form-group"><label>Phone</label><input className="form-input" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></div>
-              <div className="form-group"><label>Email</label><input className="form-input" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} /></div>
-              <div className="form-group"><label>GSTIN</label><input className="form-input" value={form.gstin} onChange={(e) => set('gstin', e.target.value)} /></div>
-              <div className="form-group"><label>Customer Type</label>
-                <select className="form-select" value={form.customerType} onChange={(e) => set('customerType', e.target.value)}>
-                  <option>Corporate</option><option>Individual</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div className="table-card">
-            <div className="card-header"><div className="card-title-area"><h2>Agreement Details</h2></div></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
+              <h3 style={{ gridColumn: '1/-1', margin: '0 0 -8px', fontSize: 13, textTransform: 'uppercase', color: '#0f172a' }}>Contract Period</h3>
               <div className="form-group"><label>Agreement Date</label><input type="date" className="form-input" value={form.agreementDate} onChange={(e) => set('agreementDate', e.target.value)} /></div>
               <div className="form-group"><label>Min. Rental Period</label>
                 <select className="form-select" value={form.minimumPeriod} onChange={(e) => set('minimumPeriod', e.target.value)}>
@@ -648,88 +732,33 @@ const RentalAgreementView = ({ customer, onBack }) => {
               </div>
               <div className="form-group"><label>Start Date</label><input type="date" className="form-input" value={form.startDate} onChange={(e) => set('startDate', e.target.value)} /></div>
               <div className="form-group"><label>End Date</label><input type="date" className="form-input" value={form.endDate} onChange={(e) => set('endDate', e.target.value)} /></div>
+
+              <h3 style={{ gridColumn: '1/-1', margin: '8px 0 -8px', paddingTop: 16, borderTop: '1px solid #e2e8f0', fontSize: 13, textTransform: 'uppercase', color: '#0f172a' }}>Payment Terms</h3>
               <div className="form-group"><label>Billing Cycle</label>
                 <select className="form-select" value={form.billingCycle} onChange={(e) => set('billingCycle', e.target.value)}>
                   <option>Monthly</option><option>Quarterly</option><option>Bi-Annual</option><option>Annual</option>
                 </select>
               </div>
               <div className="form-group"><label>Payment Due (Days)</label><input type="number" className="form-input" value={form.paymentDueDays} onChange={(e) => set('paymentDueDays', e.target.value)} /></div>
-              <div className="form-group"><label>SLA Response (Hours)</label><input type="number" className="form-input" value={form.slaResponse} onChange={(e) => set('slaResponse', e.target.value)} /></div>
+              <div className="form-group"><label>Late Fee (% / Month)</label><input type="number" className="form-input" value={form.lateFee} onChange={(e) => set('lateFee', e.target.value)} /></div>
               <div className="form-group"><label>GST (%)</label>
                 <select className="form-select" value={form.gstPercent} onChange={(e) => set('gstPercent', e.target.value)}>
                   <option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option>
                 </select>
               </div>
-              <div className="form-group"><label>Security Deposit (₹)</label><input type="number" className="form-input" min={0} value={form.securityDeposit} onChange={(e) => set('securityDeposit', e.target.value)} /></div>
-              <div className="form-group"><label>Installation Charges (₹)</label><input type="number" className="form-input" min={0} value={form.installationCharges} onChange={(e) => set('installationCharges', e.target.value)} /></div>
+
+              <h3 style={{ gridColumn: '1/-1', margin: '8px 0 -8px', paddingTop: 16, borderTop: '1px solid #e2e8f0', fontSize: 13, textTransform: 'uppercase', color: '#0f172a' }}>SLA &amp; Replacement</h3>
+              <div className="form-group"><label>SLA Response</label><input className="form-input" value={form.slaResponse} onChange={(e) => set('slaResponse', e.target.value)} /></div>
+              <div className="form-group"><label>Resolution Target</label><input className="form-input" value={form.resolutionTime} onChange={(e) => set('resolutionTime', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Replacement Policy</label><textarea className="form-input" style={{ height: 60 }} value={form.replacementPolicy} onChange={(e) => set('replacementPolicy', e.target.value)} /></div>
+
+              <h3 style={{ gridColumn: '1/-1', margin: '8px 0 -8px', paddingTop: 16, borderTop: '1px solid #e2e8f0', fontSize: 13, textTransform: 'uppercase', color: '#0f172a' }}>Service Coverage</h3>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Service Coverage</label><textarea className="form-input" style={{ height: 72 }} value={form.maintenanceCoverage} onChange={(e) => set('maintenanceCoverage', e.target.value)} /></div>
+
+              <h3 style={{ gridColumn: '1/-1', margin: '8px 0 -8px', paddingTop: 16, borderTop: '1px solid #e2e8f0', fontSize: 13, textTransform: 'uppercase', color: '#0f172a' }}>Exclusions &amp; Jurisdiction</h3>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Exclusions</label><textarea className="form-input" style={{ height: 60 }} value={form.liabilityClause} onChange={(e) => set('liabilityClause', e.target.value)} /></div>
               <div className="form-group"><label>Termination Notice (Days)</label><input type="number" className="form-input" value={form.terminationNotice} onChange={(e) => set('terminationNotice', e.target.value)} /></div>
               <div className="form-group"><label>Jurisdiction</label><input className="form-input" value={form.jurisdiction} onChange={(e) => set('jurisdiction', e.target.value)} /></div>
-              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Maintenance Coverage</label><textarea className="form-input" style={{ height: 72 }} value={form.maintenanceCoverage} onChange={(e) => set('maintenanceCoverage', e.target.value)} /></div>
-              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Replacement Policy</label><textarea className="form-input" style={{ height: 60 }} value={form.replacementPolicy} onChange={(e) => set('replacementPolicy', e.target.value)} /></div>
-            </div>
-          </div>
-
-          {/* Devices */}
-          <div className="table-card">
-            <div className="card-header">
-              <div className="card-title-area">
-                <h2>Devices Covered</h2>
-                <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>List all devices included in this agreement</p>
-              </div>
-              <button className="secondary-button" onClick={() => setDevices((p) => [...p, newAgreementDevice()])}>
-                <Plus size={16} /> Add Device
-              </button>
-            </div>
-            <div style={{ padding: '0 20px 24px' }}>
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Device Type</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Brand / Model</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Serial No.</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0', width: 70 }}>Qty</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Rent / Unit (₹)</th>
-                      <th style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', width: 44 }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {devices.map((d, idx) => (
-                      <tr key={d.id} style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                          <select className="form-select" style={{ height: 38, fontSize: 13, minWidth: 130 }} value={d.type} onChange={(e) => updateDevice(d.id, 'type', e.target.value)}>
-                            {DEVICE_OPTIONS.map((o) => <option key={o}>{o}</option>)}
-                          </select>
-                        </td>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                          <input className="form-input" style={{ height: 38, fontSize: 13 }} value={d.model} onChange={(e) => updateDevice(d.id, 'model', e.target.value)} placeholder="e.g. HP LaserJet Pro" />
-                        </td>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9' }}>
-                          <input className="form-input" style={{ height: 38, fontSize: 13 }} value={d.serial} onChange={(e) => updateDevice(d.id, 'serial', e.target.value)} placeholder="Serial No." />
-                        </td>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
-                          <input type="number" className="form-input" style={{ height: 38, width: 60, fontSize: 13, textAlign: 'center' }} min={1} value={d.qty} onChange={(e) => updateDevice(d.id, 'qty', e.target.value)} />
-                        </td>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
-                          <input type="number" className="form-input" style={{ height: 38, width: 110, fontSize: 13, textAlign: 'right' }} min={0} value={d.monthlyRent} onChange={(e) => updateDevice(d.id, 'monthlyRent', e.target.value)} />
-                        </td>
-                        <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center' }}>
-                          <button className="icon-button" style={{ color: '#ef4444', width: 32, height: 32 }} onClick={() => setDevices((p) => p.filter((x) => x.id !== d.id))}>
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr style={{ background: '#f0fdf4', borderTop: '2px solid #bbf7d0' }}>
-                      <td colSpan={4} style={{ padding: '14px 16px', fontSize: 13, fontWeight: 700, color: '#15803d' }}>Monthly Total ({devices.length} device{devices.length !== 1 ? 's' : ''})</td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: 15, fontWeight: 800, color: '#15803d' }}>₹{fmt(monthlyTotal())}</td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
             </div>
           </div>
         </div>
@@ -748,82 +777,106 @@ const RentalAgreementView = ({ customer, onBack }) => {
               </div>
             </div>
 
-            <div className="agreement-grid">
-              <div className="agreement-section">
-                <h2>Service Provider</h2>
-                <div className="agreement-field"><strong>Name</strong>{form.providerName}</div>
-                <div className="agreement-field"><strong>GSTIN</strong>{form.providerGstin}</div>
-                <div className="agreement-field"><strong>Address</strong>{form.providerAddress}</div>
+            <div className="agreement-section" style={{ marginBottom: 16 }}>
+              <h2>Customer Details</h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[
+                  ['Customer Name', form.customerName],
+                  ['Contact Person', form.contactPerson],
+                  ['Address', form.customerAddress],
+                  ['GSTIN', form.gstin],
+                  ['Phone', form.phone],
+                  ['Agreement Number', form.agreementNo],
+                  ['Quotation Number', form.sourceQuoteNo || '—'],
+                  ['Agreement Date', form.agreementDate],
+                  ['Period', `${form.startDate} to ${form.endDate}`],
+                  ['Minimum Period', form.minimumPeriod],
+                ].map(([key, val]) => (
+                  <div key={key} style={{ display: 'flex', alignItems: 'baseline', gap: 0, fontSize: 12 }}>
+                    <span style={{ minWidth: 138, fontWeight: 600, color: '#64748b', flexShrink: 0 }}>{key}</span>
+                    <span style={{ color: '#94a3b8', marginRight: 10 }}>—</span>
+                    <span style={{ color: '#0f172a' }}>{val || '—'}</span>
+                  </div>
+                ))}
               </div>
-              <div className="agreement-section">
-                <h2>Client</h2>
-                <div className="agreement-field"><strong>Name</strong>{form.customerName || '—'}</div>
-                <div className="agreement-field"><strong>GSTIN</strong>{form.gstin || '—'}</div>
-                <div className="agreement-field"><strong>Address</strong>{form.customerAddress || '—'}</div>
-                <div className="agreement-field"><strong>Contact</strong>{form.contactPerson || '—'}</div>
-                <div className="agreement-field"><strong>Phone</strong>{form.phone || '—'}</div>
+            </div>
+
+            {[
+              {
+                title: 'Provider Details',
+                body: (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, fontSize: 12 }}>
+                    <strong style={{ color: '#0f172a' }}>{form.providerName}</strong>
+                    <span>{form.providerAddress}</span>
+                    <span>GSTIN: {form.providerGstin}</span>
+                  </div>
+                ),
+              },
+              {
+                title: 'Devices Covered',
+                body: (
+                  <table className="agreement-table" style={{ margin: 0 }}>
+                    <thead><tr><th>Device</th><th>Model</th><th>Serial</th><th>Qty</th><th>Rent / Month</th></tr></thead>
+                    <tbody>
+                      {devices.map((d) => (
+                        <tr key={d.id}>
+                          <td>{d.type}</td><td>{d.model || '—'}</td><td>{d.serial || '—'}</td><td>{d.qty}</td>
+                          <td>₹{fmt(Number(d.qty) * Number(d.monthlyRent))}</td>
+                        </tr>
+                      ))}
+                      <tr><td colSpan={4} style={{ textAlign: 'right' }}><strong>Device Subtotal</strong></td><td><strong>₹{fmt(monthlyTotal())}</strong></td></tr>
+                      {Number(form.installationCharges) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Installation</td><td>₹{fmt(form.installationCharges)}</td></tr>}
+                      {Number(form.deliveryCharges) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Delivery</td><td>₹{fmt(form.deliveryCharges)}</td></tr>}
+                      <tr><td colSpan={4} style={{ textAlign: 'right' }}>GST ({form.gstPercent}%)</td><td>₹{fmt(gstAmount())}</td></tr>
+                      <tr style={{ background: '#f0fdf4' }}><td colSpan={4} style={{ textAlign: 'right' }}><strong>Grand Total / Month</strong></td><td><strong>₹{fmt(grandTotal())}</strong></td></tr>
+                      {Number(form.securityDeposit) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Security Deposit (one-time)</td><td>₹{fmt(form.securityDeposit)}</td></tr>}
+                    </tbody>
+                  </table>
+                ),
+              },
+              {
+                title: 'Payment Terms',
+                body: (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 18px', fontSize: 12 }}>
+                    <span>Payment: <strong>{form.paymentTerms}</strong></span>
+                    <span>Billing: <strong>{form.billingCycle}</strong></span>
+                    <span>Due: <strong>{form.paymentDueDays} days</strong></span>
+                    <span>Late Fee: <strong>{form.lateFee}% / month</strong></span>
+                  </div>
+                ),
+              },
+              {
+                title: 'Service Coverage',
+                body: <p style={{ margin: 0 }}>{form.maintenanceCoverage}</p>,
+              },
+              {
+                title: 'SLA & Replacement',
+                body: (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <p style={{ margin: 0 }}>Response: <strong>{form.slaResponse}</strong>. Resolution target: <strong>{form.resolutionTime}</strong>.</p>
+                    <p style={{ margin: 0 }}>{form.replacementPolicy}</p>
+                  </div>
+                ),
+              },
+              {
+                title: 'Exclusions & Jurisdiction',
+                body: <p style={{ margin: 0 }}>{form.liabilityClause} Termination notice: <strong>{form.terminationNotice} days</strong>. Jurisdiction: <strong>{form.jurisdiction}</strong>.</p>,
+              },
+            ].map((section) => (
+              <div key={section.title} className="agreement-section" style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16, marginBottom: 18 }}>
+                <h2 style={{ textAlign: 'left', borderBottom: 0, paddingBottom: 0, margin: '0 0 10px', fontSize: 13, color: '#0f172a' }}>{section.title}</h2>
+                <div style={{ color: '#334155', fontSize: 12, lineHeight: 1.6 }}>{section.body}</div>
               </div>
-            </div>
+            ))}
 
-            <div className="agreement-section">
-              <h2>1. Contract Period</h2>
-              <p>Valid from <strong>{form.startDate || '___'}</strong> to <strong>{form.endDate || '___'}</strong> (min. {form.minimumPeriod}).</p>
-            </div>
-
-            <div className="agreement-section">
-              <h2>2. Devices Covered</h2>
-              <table className="agreement-table">
-                <thead><tr><th>Type</th><th>Brand/Model</th><th>Serial</th><th>Qty</th><th>Monthly Rent</th></tr></thead>
-                <tbody>
-                  {devices.map((d) => (
-                    <tr key={d.id}>
-                      <td>{d.type}</td><td>{d.model || '—'}</td><td>{d.serial || '—'}</td><td>{d.qty}</td>
-                      <td>₹{fmt(Number(d.qty) * Number(d.monthlyRent))}</td>
-                    </tr>
-                  ))}
-                  <tr style={{ background: '#f0fdf4' }}>
-                    <td colSpan={4} style={{ textAlign: 'right' }}><strong>Total / Month</strong></td>
-                    <td><strong>₹{fmt(monthlyTotal())}</strong></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div className="agreement-section">
-              <h2>3. Payment Terms</h2>
-              <p>Billing: <strong>{form.billingCycle}</strong>. Due within <strong>{form.paymentDueDays} days</strong>. Late fee: <strong>{form.lateFee}%/month</strong>. GST: <strong>{form.gstPercent}%</strong>.</p>
-              {form.securityDeposit && <p>Security Deposit: <strong>₹{fmt(form.securityDeposit)}</strong> (refundable).</p>}
-              {form.installationCharges && <p>Installation: <strong>₹{fmt(form.installationCharges)}</strong> (one-time).</p>}
-            </div>
-
-            <div className="agreement-section">
-              <h2>4. SLA</h2>
-              <p>Response: <strong>{form.slaResponse} working hours</strong>. Resolution: <strong>{form.resolutionTime}</strong>.</p>
-            </div>
-
-            <div className="agreement-section">
-              <h2>5. Maintenance</h2>
-              <p>{form.maintenanceCoverage}</p>
-            </div>
-
-            <div className="agreement-section">
-              <h2>6. Replacement</h2>
-              <p>{form.replacementPolicy}</p>
-            </div>
-
-            <div className="agreement-section">
-              <h2>7. Termination & Jurisdiction</h2>
-              <p>Termination notice: <strong>{form.terminationNotice} days</strong>. {form.liabilityClause} Jurisdiction: <strong>{form.jurisdiction}</strong>.</p>
-            </div>
-
-            <div className="agreement-signatures" style={{ marginTop: 32 }}>
-              <div className="signature-block">
-                <div className="signature-line">Authorized Signatory (Provider)</div>
-                <p style={{ fontSize: 11, textAlign: 'center', margin: '4px 0 0' }}>RepairTech Enterprise</p>
+            <div style={{ marginTop: 56, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 80 }}>
+              <div style={{ width: 180, textAlign: 'center' }}>
+                <p style={{ fontSize: 11, margin: '0 0 14px', color: '#64748b' }}>RepairTech Enterprise</p>
+                <div style={{ borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory<br />(Provider)</div>
               </div>
-              <div className="signature-block">
-                <div className="signature-line">Authorized Signatory (Client)</div>
-                <p style={{ fontSize: 11, textAlign: 'center', margin: '4px 0 0' }}>{form.customerName || '—'}</p>
+              <div style={{ width: 180, textAlign: 'center' }}>
+                <p style={{ fontSize: 11, margin: '0 0 14px', color: '#64748b' }}>{form.customerName || '—'}</p>
+                <div style={{ borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory<br />(Client)</div>
               </div>
             </div>
 

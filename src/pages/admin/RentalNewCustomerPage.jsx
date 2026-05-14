@@ -142,7 +142,7 @@ const buildRentalAssetPayloads = (devices, customer) => {
   });
 };
 
-const LaptopFields = ({ device, onChange }) => {
+const LaptopFields = ({ device, onChange, errors = {} }) => {
   const updateConfig = (idx, field, value) => {
     const configs = [...device.configurations];
     configs[idx] = { ...configs[idx], [field]: value };
@@ -157,13 +157,15 @@ const LaptopFields = ({ device, onChange }) => {
   return (
     <div className="device-fields-section">
       <div className="device-fields-row">
-        <div className="form-group">
-          <label>Brand</label>
+        <div className={`form-group${errors.brand ? ' has-error' : ''}`}>
+          <label>Brand *</label>
           <input className="form-input" value={device.brand} onChange={(e) => onChange('brand', e.target.value)} placeholder="e.g. Dell, HP, Lenovo" />
+          {errors.brand && <span className="field-error">{errors.brand}</span>}
         </div>
-        <div className="form-group">
-          <label>Model</label>
+        <div className={`form-group${errors.model ? ' has-error' : ''}`}>
+          <label>Model *</label>
           <input className="form-input" value={device.model} onChange={(e) => onChange('model', e.target.value)} placeholder="e.g. Latitude 5420" />
+          {errors.model && <span className="field-error">{errors.model}</span>}
         </div>
         <div className="form-group">
           <label>Location</label>
@@ -204,7 +206,7 @@ const LaptopFields = ({ device, onChange }) => {
   );
 };
 
-const DesktopServerFields = ({ device, onChange }) => {
+const DesktopServerFields = ({ device, onChange, errors = {} }) => {
   const updateCpu = (field, value) => onChange('cpu', { ...device.cpu, [field]: value });
   const updateMonitor = (field, value) => onChange('monitor', { ...device.monitor, [field]: value });
   return (
@@ -212,23 +214,27 @@ const DesktopServerFields = ({ device, onChange }) => {
       <div className="desktop-subsection">
         <div className="subsection-title">CPU</div>
         <div className="device-fields-row">
-          <div className="form-group">
-            <label>Type</label>
+          <div className={`form-group${errors.cpuSubType ? ' has-error' : ''}`}>
+            <label>Type *</label>
             <input className="form-input" value={device.cpu.subType} onChange={(e) => updateCpu('subType', e.target.value)} placeholder="e.g. Tower, Mini" />
+            {errors.cpuSubType && <span className="field-error">{errors.cpuSubType}</span>}
           </div>
-          <div className="form-group">
-            <label>Brand</label>
+          <div className={`form-group${errors.cpuBrand ? ' has-error' : ''}`}>
+            <label>Brand *</label>
             <input className="form-input" value={device.cpu.brand} onChange={(e) => updateCpu('brand', e.target.value)} placeholder="e.g. Dell" />
+            {errors.cpuBrand && <span className="field-error">{errors.cpuBrand}</span>}
           </div>
-          <div className="form-group">
-            <label>Model</label>
+          <div className={`form-group${errors.cpuModel ? ' has-error' : ''}`}>
+            <label>Model *</label>
             <input className="form-input" value={device.cpu.model} onChange={(e) => updateCpu('model', e.target.value)} placeholder="e.g. OptiPlex 7000" />
+            {errors.cpuModel && <span className="field-error">{errors.cpuModel}</span>}
           </div>
         </div>
         <div className="device-fields-row">
-          <div className="form-group">
-            <label>Configuration</label>
+          <div className={`form-group${errors.cpuConfig ? ' has-error' : ''}`}>
+            <label>Configuration *</label>
             <input className="form-input" value={device.cpu.config} onChange={(e) => updateCpu('config', e.target.value)} placeholder="e.g. i5, 16GB, 512GB SSD" />
+            {errors.cpuConfig && <span className="field-error">{errors.cpuConfig}</span>}
           </div>
           <div className="form-group">
             <label>Location</label>
@@ -240,13 +246,15 @@ const DesktopServerFields = ({ device, onChange }) => {
       <div className="desktop-subsection" style={{ marginTop: '20px' }}>
         <div className="subsection-title">Monitor</div>
         <div className="device-fields-row">
-          <div className="form-group">
-            <label>Type</label>
+          <div className={`form-group${errors.monitorSubType ? ' has-error' : ''}`}>
+            <label>Type *</label>
             <input className="form-input" value={device.monitor.subType} onChange={(e) => updateMonitor('subType', e.target.value)} placeholder="e.g. LED, IPS" />
+            {errors.monitorSubType && <span className="field-error">{errors.monitorSubType}</span>}
           </div>
-          <div className="form-group">
-            <label>Brand</label>
+          <div className={`form-group${errors.monitorBrand ? ' has-error' : ''}`}>
+            <label>Brand *</label>
             <input className="form-input" value={device.monitor.brand} onChange={(e) => updateMonitor('brand', e.target.value)} placeholder="e.g. Samsung" />
+            {errors.monitorBrand && <span className="field-error">{errors.monitorBrand}</span>}
           </div>
           <div className="form-group">
             <label>Location</label>
@@ -258,26 +266,30 @@ const DesktopServerFields = ({ device, onChange }) => {
   );
 };
 
-const PrinterFields = ({ device, onChange }) => (
+const PrinterFields = ({ device, onChange, errors = {} }) => (
   <div className="device-fields-section">
     <div className="device-fields-row">
-      <div className="form-group">
-        <label>Type</label>
+      <div className={`form-group${errors.subType ? ' has-error' : ''}`}>
+        <label>Type *</label>
         <input className="form-input" value={device.subType} onChange={(e) => onChange('subType', e.target.value)} placeholder="e.g. Laser, Inkjet" />
+        {errors.subType && <span className="field-error">{errors.subType}</span>}
       </div>
-      <div className="form-group">
-        <label>Brand</label>
+      <div className={`form-group${errors.brand ? ' has-error' : ''}`}>
+        <label>Brand *</label>
         <input className="form-input" value={device.brand} onChange={(e) => onChange('brand', e.target.value)} placeholder="e.g. HP, Canon" />
+        {errors.brand && <span className="field-error">{errors.brand}</span>}
       </div>
-      <div className="form-group">
-        <label>Model</label>
+      <div className={`form-group${errors.model ? ' has-error' : ''}`}>
+        <label>Model *</label>
         <input className="form-input" value={device.model} onChange={(e) => onChange('model', e.target.value)} placeholder="e.g. LaserJet Pro" />
+        {errors.model && <span className="field-error">{errors.model}</span>}
       </div>
     </div>
     <div className="device-fields-row">
-      <div className="form-group">
-        <label>Input Field</label>
+      <div className={`form-group${errors.inputField ? ' has-error' : ''}`}>
+        <label>Input Field *</label>
         <input className="form-input" value={device.inputField} onChange={(e) => onChange('inputField', e.target.value)} placeholder="e.g. A4, Legal" />
+        {errors.inputField && <span className="field-error">{errors.inputField}</span>}
       </div>
       <div className="form-group">
         <label>Location</label>
@@ -288,7 +300,7 @@ const PrinterFields = ({ device, onChange }) => (
   </div>
 );
 
-const CCTVFields = ({ device, onChange }) => {
+const CCTVFields = ({ device, onChange, errors = {} }) => {
   const addSpec = () => onChange('specs', [...device.specs, '']);
   const updateSpec = (idx, value) => {
     const specs = [...device.specs];
@@ -302,17 +314,20 @@ const CCTVFields = ({ device, onChange }) => {
   return (
     <div className="device-fields-section">
       <div className="device-fields-row">
-        <div className="form-group">
-          <label>Type</label>
+        <div className={`form-group${errors.subType ? ' has-error' : ''}`}>
+          <label>Type *</label>
           <input className="form-input" value={device.subType} onChange={(e) => onChange('subType', e.target.value)} placeholder="e.g. IP, Analog, PTZ" />
+          {errors.subType && <span className="field-error">{errors.subType}</span>}
         </div>
-        <div className="form-group">
-          <label>Brand</label>
+        <div className={`form-group${errors.brand ? ' has-error' : ''}`}>
+          <label>Brand *</label>
           <input className="form-input" value={device.brand} onChange={(e) => onChange('brand', e.target.value)} placeholder="e.g. Hikvision, Dahua" />
+          {errors.brand && <span className="field-error">{errors.brand}</span>}
         </div>
-        <div className="form-group">
-          <label>Model</label>
+        <div className={`form-group${errors.model ? ' has-error' : ''}`}>
+          <label>Model *</label>
           <input className="form-input" value={device.model} onChange={(e) => onChange('model', e.target.value)} placeholder="Model number" />
+          {errors.model && <span className="field-error">{errors.model}</span>}
         </div>
       </div>
       <div className="device-fields-row">
@@ -341,7 +356,7 @@ const CCTVFields = ({ device, onChange }) => {
   );
 };
 
-const TotalMaintenanceFields = ({ device, onReplace }) => {
+const TotalMaintenanceFields = ({ device, onReplace, errors = {} }) => {
   const sub = device.subDeviceType || 'Laptop';
   const subData = device.subDeviceData || createBlankDevice(sub);
 
@@ -355,11 +370,11 @@ const TotalMaintenanceFields = ({ device, onReplace }) => {
 
   const renderSubFields = () => {
     switch (sub) {
-      case 'Laptop': return <LaptopFields device={subData} onChange={handleSubFieldChange} />;
+      case 'Laptop': return <LaptopFields device={subData} onChange={handleSubFieldChange} errors={errors} />;
       case 'Desktop':
-      case 'Server': return <DesktopServerFields device={subData} onChange={handleSubFieldChange} />;
-      case 'Printer': return <PrinterFields device={subData} onChange={handleSubFieldChange} />;
-      case 'CCTV': return <CCTVFields device={subData} onChange={handleSubFieldChange} />;
+      case 'Server': return <DesktopServerFields device={subData} onChange={handleSubFieldChange} errors={errors} />;
+      case 'Printer': return <PrinterFields device={subData} onChange={handleSubFieldChange} errors={errors} />;
+      case 'CCTV': return <CCTVFields device={subData} onChange={handleSubFieldChange} errors={errors} />;
       default: return null;
     }
   };
@@ -377,7 +392,7 @@ const TotalMaintenanceFields = ({ device, onReplace }) => {
   );
 };
 
-const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, onAdd }) => {
+const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, onAdd, errors = {} }) => {
   const onChange = (field, value) => {
     if (field === 'type') {
       onUpdate(index, createBlankDevice(value));
@@ -388,25 +403,28 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
 
   const renderFields = () => {
     switch (device.type) {
-      case 'Laptop': return <LaptopFields device={device} onChange={onChange} />;
+      case 'Laptop': return <LaptopFields device={device} onChange={onChange} errors={errors} />;
       case 'Desktop':
-      case 'Server': return <DesktopServerFields device={device} onChange={onChange} />;
-      case 'Printer': return <PrinterFields device={device} onChange={onChange} />;
-      case 'CCTV': return <CCTVFields device={device} onChange={onChange} />;
-      case 'Total Maintenance': return <TotalMaintenanceFields device={device} onReplace={(updated) => onUpdate(index, updated)} />;
+      case 'Server': return <DesktopServerFields device={device} onChange={onChange} errors={errors} />;
+      case 'Printer': return <PrinterFields device={device} onChange={onChange} errors={errors} />;
+      case 'CCTV': return <CCTVFields device={device} onChange={onChange} errors={errors} />;
+      case 'Total Maintenance': return <TotalMaintenanceFields device={device} onReplace={(updated) => onUpdate(index, updated)} errors={errors} />;
       default: return null;
     }
   };
 
+  const hasErrors = Object.keys(errors).length > 0;
+
   const summary = getDeviceSummary(device);
 
   return (
-    <div className={`device-accordion${isOpen ? ' open' : ''}`}>
+    <div className={`device-accordion${isOpen ? ' open' : ''}${hasErrors ? ' has-error' : ''}`}>
       <div className="accordion-header" onClick={onToggle}>
         <div className="accordion-title-area">
           <span className="accordion-device-index">Device {index + 1}</span>
           <span className="accordion-device-type-badge">{device.type}</span>
           {summary && <span className="accordion-device-summary">{summary}</span>}
+          {hasErrors && <span className="field-error" style={{ marginLeft: 8, fontSize: '12px' }}>Fill required fields</span>}
         </div>
         <div className="accordion-actions" onClick={(e) => e.stopPropagation()}>
           <select
@@ -446,6 +464,7 @@ const RentalNewCustomerPage = () => {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [openDevices, setOpenDevices] = useState(new Set([0]));
+  const [plans, setPlans] = useState([]);
 
   const [form, setForm] = useState({
     companyName: '',
@@ -456,8 +475,17 @@ const RentalNewCustomerPage = () => {
     registeredAddress: '',
     billingAddress: '',
     notes: '',
+    planId: '',
+    planName: '',
+    planDetails: null,
     devices: [createBlankDevice('Laptop')],
   });
+
+  useEffect(() => {
+    api.list('rentalPricingPlans')
+      .then((data) => setPlans(Array.isArray(data) ? data.filter((p) => p.status !== 'Inactive') : []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!editId) return;
@@ -482,6 +510,9 @@ const RentalNewCustomerPage = () => {
             registeredAddress: existing.address || '',
             billingAddress: existing.billingAddress || '',
             notes: existing.notes || '',
+            planId: existing.planId || '',
+            planName: existing.planName || '',
+            planDetails: existing.planDetails || null,
             devices: Array.isArray(existing.devices) && existing.devices.length > 0
               ? existing.devices
               : [createBlankDevice('Laptop')],
@@ -536,9 +567,55 @@ const RentalNewCustomerPage = () => {
     });
   };
 
+  const handlePlanChange = (planId) => {
+    const selected = plans.find((p) => p.id === planId) || null;
+    setForm((current) => ({
+      ...current,
+      planId: planId,
+      planName: selected?.name || '',
+      planDetails: selected,
+    }));
+    setErrors((current) => ({ ...current, planId: undefined }));
+  };
+
   const validate = () => {
     const nextErrors = {};
     if (!form.companyName.trim()) nextErrors.companyName = 'Company / customer name is required';
+    if (!form.gstNumber.trim()) nextErrors.gstNumber = 'GST number is required';
+    if (!form.primaryContact.name.trim()) nextErrors.primaryContactName = 'Primary contact name is required';
+    if (!form.primaryContact.mobile.trim()) nextErrors.primaryContactMobile = 'Primary contact mobile is required';
+    if (!form.primaryContact.email.trim()) nextErrors.primaryContactEmail = 'Primary contact email is required';
+    if (!form.registeredAddress.trim()) nextErrors.registeredAddress = 'Registered address is required';
+    if (!form.planId) nextErrors.planId = 'A rental plan is required';
+
+    const deviceErrors = form.devices.map((device) => {
+      const de = {};
+      const isTotal = device.type === 'Total Maintenance';
+      const base = isTotal ? (device.subDeviceData || {}) : device;
+      const baseType = isTotal ? (device.subDeviceType || 'Laptop') : device.type;
+      if (baseType === 'Laptop') {
+        if (!base.brand?.trim()) de.brand = 'Brand is required';
+        if (!base.model?.trim()) de.model = 'Model is required';
+      } else if (baseType === 'Desktop' || baseType === 'Server') {
+        if (!base.cpu?.subType?.trim()) de.cpuSubType = 'CPU Type is required';
+        if (!base.cpu?.brand?.trim()) de.cpuBrand = 'CPU Brand is required';
+        if (!base.cpu?.model?.trim()) de.cpuModel = 'CPU Model is required';
+        if (!base.cpu?.config?.trim()) de.cpuConfig = 'CPU Configuration is required';
+        if (!base.monitor?.subType?.trim()) de.monitorSubType = 'Monitor Type is required';
+        if (!base.monitor?.brand?.trim()) de.monitorBrand = 'Monitor Brand is required';
+      } else if (baseType === 'Printer') {
+        if (!base.subType?.trim()) de.subType = 'Printer type is required';
+        if (!base.brand?.trim()) de.brand = 'Brand is required';
+        if (!base.model?.trim()) de.model = 'Model is required';
+        if (!base.inputField?.trim()) de.inputField = 'Input field is required';
+      } else if (baseType === 'CCTV') {
+        if (!base.subType?.trim()) de.subType = 'CCTV type is required';
+        if (!base.brand?.trim()) de.brand = 'Brand is required';
+        if (!base.model?.trim()) de.model = 'Model is required';
+      }
+      return de;
+    });
+    if (deviceErrors.some((de) => Object.keys(de).length > 0)) nextErrors.devices = deviceErrors;
     return nextErrors;
   };
 
@@ -546,6 +623,13 @@ const RentalNewCustomerPage = () => {
     const nextErrors = validate();
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
+      if (nextErrors.devices) {
+        setOpenDevices((prev) => {
+          const next = new Set(prev);
+          nextErrors.devices.forEach((de, i) => { if (Object.keys(de).length > 0) next.add(i); });
+          return next;
+        });
+      }
       return;
     }
 
@@ -596,6 +680,9 @@ const RentalNewCustomerPage = () => {
         status: 'Active',
         locations,
         devices: form.devices,
+        planId: form.planId,
+        planName: form.planName,
+        planDetails: form.planDetails,
       };
 
       if (editId) {
@@ -664,14 +751,18 @@ const RentalNewCustomerPage = () => {
             </div>
 
             <div className="form-row-2">
-              <div className="form-group">
-                <label>GST Number</label>
+              <div className={`form-group${errors.gstNumber ? ' has-error' : ''}`}>
+                <label>GST Number *</label>
                 <input
                   className="form-input"
                   value={form.gstNumber}
-                  onChange={(e) => setForm((current) => ({ ...current, gstNumber: e.target.value }))}
-                  placeholder="GSTIN (optional)"
+                  onChange={(e) => {
+                    setForm((current) => ({ ...current, gstNumber: e.target.value }));
+                    setErrors((current) => ({ ...current, gstNumber: undefined }));
+                  }}
+                  placeholder="e.g. 22AAAAA0000A1Z5"
                 />
+                {errors.gstNumber && <span className="field-error">{errors.gstNumber}</span>}
               </div>
               <div className="form-group" />
             </div>
@@ -679,17 +770,20 @@ const RentalNewCustomerPage = () => {
             <div className="contact-section">
               <div className="contact-section-label">Primary Contact</div>
               <div className="form-row-3">
-                <div className="form-group">
-                  <label>Name</label>
-                  <input className="form-input" value={form.primaryContact.name} onChange={(e) => setContact('primaryContact', 'name', e.target.value)} placeholder="Contact person name" />
+                <div className={`form-group${errors.primaryContactName ? ' has-error' : ''}`}>
+                  <label>Name *</label>
+                  <input className="form-input" value={form.primaryContact.name} onChange={(e) => { setContact('primaryContact', 'name', e.target.value); setErrors((c) => ({ ...c, primaryContactName: undefined })); }} placeholder="Contact person name" />
+                  {errors.primaryContactName && <span className="field-error">{errors.primaryContactName}</span>}
                 </div>
-                <div className="form-group">
-                  <label>Mobile</label>
-                  <input className="form-input" value={form.primaryContact.mobile} onChange={(e) => setContact('primaryContact', 'mobile', e.target.value)} placeholder="+91 XXXXX XXXXX" />
+                <div className={`form-group${errors.primaryContactMobile ? ' has-error' : ''}`}>
+                  <label>Mobile *</label>
+                  <input className="form-input" value={form.primaryContact.mobile} onChange={(e) => { setContact('primaryContact', 'mobile', e.target.value); setErrors((c) => ({ ...c, primaryContactMobile: undefined })); }} placeholder="+91 XXXXX XXXXX" />
+                  {errors.primaryContactMobile && <span className="field-error">{errors.primaryContactMobile}</span>}
                 </div>
-                <div className="form-group">
-                  <label>Email</label>
-                  <input className="form-input" value={form.primaryContact.email} onChange={(e) => setContact('primaryContact', 'email', e.target.value)} placeholder="email@company.com" />
+                <div className={`form-group${errors.primaryContactEmail ? ' has-error' : ''}`}>
+                  <label>Email *</label>
+                  <input className="form-input" value={form.primaryContact.email} onChange={(e) => { setContact('primaryContact', 'email', e.target.value); setErrors((c) => ({ ...c, primaryContactEmail: undefined })); }} placeholder="email@company.com" />
+                  {errors.primaryContactEmail && <span className="field-error">{errors.primaryContactEmail}</span>}
                 </div>
               </div>
             </div>
@@ -715,15 +809,19 @@ const RentalNewCustomerPage = () => {
             </div>
 
             <div className="form-row-2">
-              <div className="form-group">
-                <label>Registered Address</label>
+              <div className={`form-group${errors.registeredAddress ? ' has-error' : ''}`}>
+                <label>Registered Address *</label>
                 <textarea
                   className="form-input"
                   style={{ height: '72px', paddingTop: '10px', resize: 'vertical' }}
                   value={form.registeredAddress}
-                  onChange={(e) => setForm((current) => ({ ...current, registeredAddress: e.target.value }))}
+                  onChange={(e) => {
+                    setForm((current) => ({ ...current, registeredAddress: e.target.value }));
+                    setErrors((current) => ({ ...current, registeredAddress: undefined }));
+                  }}
                   placeholder="Full company registered address"
                 />
+                {errors.registeredAddress && <span className="field-error">{errors.registeredAddress}</span>}
               </div>
               <div className="form-group">
                 <label>Billing Address <span className="optional-tag">(if different)</span></label>
@@ -750,9 +848,53 @@ const RentalNewCustomerPage = () => {
           </div>
         </div>
 
+        <div className="amc-form-card">
+          <div className="amc-form-card-header">
+            <h2 className="amc-form-section-title">2. Rental Plan *</h2>
+          </div>
+          <div className="amc-form-card-body">
+            <div className={`form-group${errors.planId ? ' has-error' : ''}`} style={{ maxWidth: 420 }}>
+              <label>Select Plan *</label>
+              <select
+                className="form-select"
+                value={form.planId}
+                onChange={(e) => handlePlanChange(e.target.value)}
+              >
+                <option value="">-- Select a rental plan --</option>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}{p.type ? ` — ${p.type}` : ''}{p.price ? ` (${p.price})` : ''}
+                  </option>
+                ))}
+              </select>
+              {errors.planId && <span className="field-error">{errors.planId}</span>}
+              {plans.length === 0 && (
+                <span className="field-error" style={{ color: '#f59e0b' }}>
+                  No active plans found. Add plans in Rental Plans before creating a customer.
+                </span>
+              )}
+            </div>
+
+            {form.planDetails && (
+              <div className="plan-summary-card">
+                <div className="plan-summary-row">
+                  <div className="plan-summary-item"><span>Plan Name</span><strong>{form.planDetails.name || '-'}</strong></div>
+                  <div className="plan-summary-item"><span>Type</span><strong>{form.planDetails.type || '-'}</strong></div>
+                  <div className="plan-summary-item"><span>Price</span><strong>{form.planDetails.price || '-'}</strong></div>
+                </div>
+                <div className="plan-summary-row">
+                  <div className="plan-summary-item"><span>Duration</span><strong>{form.planDetails.duration || '-'}</strong></div>
+                  <div className="plan-summary-item"><span>Visits / Year</span><strong>{form.planDetails.visits || '-'}</strong></div>
+                  <div className="plan-summary-item"><span>SLA</span><strong>{form.planDetails.sla || '-'}</strong></div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="amc-form-card card-devices">
           <div className="amc-form-card-header device-registry-header">
-            <h2 className="amc-form-section-title">2. Device Registry</h2>
+            <h2 className="amc-form-section-title">3. Device Registry</h2>
             <button className="primary-button" style={{ height: '36px', fontSize: '13px' }} onClick={addDevice}>
               <Plus size={16} /> Add Device
             </button>
@@ -774,6 +916,7 @@ const RentalNewCustomerPage = () => {
                   onUpdate={updateDevice}
                   onRemove={removeDevice}
                   onAdd={addDevice}
+                  errors={(errors.devices && errors.devices[index]) || {}}
                 />
               ))}
             </div>

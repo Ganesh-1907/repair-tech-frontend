@@ -849,29 +849,32 @@ const RentalOperationsBillingPage = () => {
                 <p>RepairTech Solutions</p>
               </div>
             </div>
+
             <div className="rm-quote-meta-grid">
               <label>Quotation Number<input value={quotationForm.quotationNumber || `QTN-${selected.id.split('-')[1]}-01`} readOnly /></label>
-              <label>Quotation Date<input type="date" value={quotationForm.quotationDate} readOnly={!quotationEditMode} onChange={(e) => setQuotationForm((c) => ({ ...c, quotationDate: e.target.value }))} /></label>
-              <label>Valid Until<input type="date" value={quotationForm.validUntil} readOnly={!quotationEditMode} onChange={(e) => setQuotationForm((c) => ({ ...c, validUntil: e.target.value }))} /></label>
+              <label>Quotation Date<input type="date" value={quotationForm.quotationDate} readOnly /></label>
+              <label>Valid Until<input type="date" value={quotationForm.validUntil} readOnly /></label>
             </div>
 
-            <div className="rm-quote-party-grid">
-              <div className="rm-quote-party-card">
-                <h4>From</h4>
-                <p>RepairTech Solutions</p>
-                <p>Bangalore</p>
-                <p>support@repairtech.com</p>
+            <div className="rm-quote-customer-block">
+              <h4 className="rm-quote-block-title">Customer Details</h4>
+              <div className="rm-quote-kv-list">
+                <div className="rm-quote-kv-row"><span className="rm-quote-kv-key">Company</span><span className="rm-quote-kv-val">{selected.companyName || '-'}</span></div>
+                <div className="rm-quote-kv-row"><span className="rm-quote-kv-key">Contact Person</span><span className="rm-quote-kv-val">{selected.authorizedPerson1Name || '-'}</span></div>
+                <div className="rm-quote-kv-row"><span className="rm-quote-kv-key">Address</span><span className="rm-quote-kv-val">{selected.primaryAddress || '-'}</span></div>
+                <div className="rm-quote-kv-row"><span className="rm-quote-kv-key">Email</span><span className="rm-quote-kv-val">{selected.email || '-'}</span></div>
               </div>
-              <div className="rm-quote-party-card">
-                <h4>To</h4>
-                <p><strong>{selected.companyName}</strong></p>
-                <p>{selected.authorizedPerson1Name}</p>
-                <p>{selected.primaryAddress}</p>
-                <p>{selected.email}</p>
+            </div>
+
+            <div className="rm-quote-customer-block">
+              <h4 className="rm-quote-block-title">Plan</h4>
+              <div className="rm-quote-kv-list">
+                <div className="rm-quote-kv-row"><span className="rm-quote-kv-key">Billing Type</span><span className="rm-quote-kv-val">{selected.billingType || '-'}</span></div>
               </div>
             </div>
 
             <div className="rm-quote-lines">
+              <h4 className="rm-quote-block-title">Devices &amp; Pricing</h4>
               <table>
                 <thead>
                   <tr>
@@ -883,7 +886,7 @@ const RentalOperationsBillingPage = () => {
                 </thead>
                 <tbody>
                   <tr>
-                    <td>Rental Service Plan</td>
+                    <td>Monthly Rent</td>
                     <td>1</td>
                     <td><input value={quotationForm.monthlyRent} readOnly={!quotationEditMode} onChange={(e) => setQuotationForm((c) => ({ ...c, monthlyRent: e.target.value }))} /></td>
                     <td>{quotationForm.monthlyRent || '0'}</td>
@@ -912,8 +915,9 @@ const RentalOperationsBillingPage = () => {
               </table>
             </div>
 
-            <div className="rm-form-grid">
-              <label className="full">Terms & Conditions<textarea value={quotationForm.terms} readOnly={!quotationEditMode} onChange={(e) => setQuotationForm((c) => ({ ...c, terms: e.target.value }))} /></label>
+            <div className="rm-form-grid rm-quote-terms-block">
+              <h4 className="rm-quote-block-title full">Charges &amp; Terms</h4>
+              <label className="full">Terms &amp; Conditions<textarea value={quotationForm.terms} readOnly={!quotationEditMode} onChange={(e) => setQuotationForm((c) => ({ ...c, terms: e.target.value }))} /></label>
               <label className="full">Notes<textarea value={quotationForm.notes} readOnly={!quotationEditMode} onChange={(e) => setQuotationForm((c) => ({ ...c, notes: e.target.value }))} /></label>
             </div>
 

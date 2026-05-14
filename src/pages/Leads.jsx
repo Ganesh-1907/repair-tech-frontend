@@ -425,18 +425,63 @@ const AssignTechnicianModal = ({ lead, technicians, onClose, onAssign }) => {
 
   return (
     <div className="modal-overlay" role="presentation">
-      <div className="modal-panel" role="dialog" aria-modal="true" style={{ maxWidth: '450px' }}>
+      <div className="modal-panel" role="dialog" aria-modal="true" style={{ maxWidth: '620px', width: '100%' }}>
         <div className="modal-header">
           <div>
             <h2>{currentTechnician ? 'Edit Assigned Technician' : 'Assign Technician'}</h2>
-            <p>{lead?.customerName ? `Lead: ${lead.customerName}` : 'Select a technician for this lead'}</p>
+            <p>Select a technician for this lead</p>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close assignment modal"><X size={18} /></button>
         </div>
 
         <div className="modal-body">
+          <div style={{
+            background: 'var(--surface-muted, #f8fafc)',
+            border: '1px solid var(--border-light, #e2e8f0)',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            marginBottom: '20px',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '12px',
+          }}>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Customer</span>
+              <p style={{ margin: '2px 0 0', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary, #1e293b)' }}>{lead?.customerName || '—'}</p>
+              {lead?.company && <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'var(--text-muted, #64748b)' }}>{lead.company}</p>}
+            </div>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Mobile</span>
+              <p style={{ margin: '2px 0 0', fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary, #1e293b)' }}>{lead?.mobileNumber || '—'}</p>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Service Type</span>
+              <p style={{ margin: '2px 0 0', fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary, #1e293b)' }}>{lead?.serviceType || '—'}</p>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Device</span>
+              <p style={{ margin: '2px 0 0', fontWeight: 600, fontSize: '0.92rem', color: 'var(--text-primary, #1e293b)' }}>{lead?.device || '—'}</p>
+            </div>
+            {(lead?.problemInwardNote || lead?.deviceCheckNote) && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Issue / Problem</span>
+                <p style={{ margin: '2px 0 0', fontSize: '0.88rem', color: 'var(--text-primary, #1e293b)', lineHeight: 1.5 }}>
+                  {lead?.problemInwardNote || lead?.deviceCheckNote}
+                </p>
+              </div>
+            )}
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Status</span>
+              <p style={{ margin: '2px 0 0', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary, #1e293b)' }}>{lead?.category || '—'}</p>
+            </div>
+            <div>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Created</span>
+              <p style={{ margin: '2px 0 0', fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary, #1e293b)' }}>{lead?.createdAt || '—'}</p>
+            </div>
+          </div>
+
           {currentTechnician && (
-            <div className="assigned-tech-summary">
+            <div className="assigned-tech-summary" style={{ marginBottom: '16px' }}>
               <span>Currently Assigned</span>
               <strong>{currentTechnician}</strong>
             </div>
@@ -444,7 +489,7 @@ const AssignTechnicianModal = ({ lead, technicians, onClose, onAssign }) => {
 
           <div className="form-group">
             <label htmlFor="tech-select">{currentTechnician ? 'Assign New Technician' : 'Available Technicians'}</label>
-            <select 
+            <select
               id="tech-select"
               className="form-input"
               value={selectedTechId}
@@ -461,9 +506,9 @@ const AssignTechnicianModal = ({ lead, technicians, onClose, onAssign }) => {
 
           <div className="modal-actions" style={{ marginTop: '24px' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button 
-              type="button" 
-              className="btn btn-primary" 
+            <button
+              type="button"
+              className="btn btn-primary"
               onClick={handleAssign}
               disabled={!selectedTechId}
             >
@@ -471,6 +516,268 @@ const AssignTechnicianModal = ({ lead, technicians, onClose, onAssign }) => {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+const ViewLeadModal = ({ lead, onClose, onEdit }) => {
+  const infoRow = (label, value) => value ? (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>{label}</span>
+      <span style={{ fontSize: '0.92rem', color: 'var(--text-primary, #1e293b)', fontWeight: 500 }}>{value}</span>
+    </div>
+  ) : null;
+
+  return (
+    <div className="modal-overlay" role="presentation">
+      <div className="modal-panel" role="dialog" aria-modal="true" style={{ maxWidth: '660px', width: '100%' }}>
+        <div className="modal-header">
+          <div>
+            <h2>Lead Details</h2>
+            <p>{lead.customerName} — {lead.company || 'Individual'}</p>
+          </div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close lead details"><X size={18} /></button>
+        </div>
+
+        <div style={{ padding: '0 24px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+          {infoRow('Customer Name', lead.customerName)}
+          {infoRow('Company', lead.company)}
+          {infoRow('Mobile Number', lead.mobileNumber)}
+          {infoRow('Source', lead.source)}
+          {infoRow('Service Type', lead.serviceType)}
+          {infoRow('Device', lead.device)}
+          {infoRow('Status', lead.category)}
+          {infoRow('Assigned To', lead.assignedTechnician || 'Unassigned')}
+          {infoRow('Quote', lead.quote)}
+          {infoRow('Billing', lead.billing)}
+          {infoRow('Created', lead.createdAt)}
+          {lead.locationLink && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Location</span>
+              <a href={lead.locationLink} target="_blank" rel="noreferrer" className="lead-map-link">Open Maps</a>
+            </div>
+          )}
+        </div>
+
+        {(lead.problemInwardNote || lead.deviceCheckNote) && (
+          <div style={{ margin: '8px 24px 0', padding: '14px 16px', background: 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border-light, #e2e8f0)' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>
+              {lead.serviceType === 'Onsite service' ? 'Device Check / Internal Report' : 'Problem Inward'}
+            </span>
+            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary, #1e293b)', lineHeight: 1.6 }}>
+              {lead.problemInwardNote || lead.deviceCheckNote}
+            </p>
+          </div>
+        )}
+
+        {lead.reviewMessageLink && (
+          <div style={{ margin: '8px 24px 0' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>Review Link</span>
+            <a href={lead.reviewMessageLink} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', color: 'var(--primary, #6366f1)' }}>Open Review Link</a>
+          </div>
+        )}
+
+        <div className="modal-actions" style={{ marginTop: '20px' }}>
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+          <button type="button" className="btn btn-primary" onClick={onEdit}>
+            <Edit size={15} /> Edit Lead
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate }) => {
+  const [form, setForm] = useState({
+    customerName: lead.customerName || '',
+    company: lead.company || '',
+    mobileNumber: lead.mobileNumber || '',
+    serviceType: lead.serviceType || 'Walk-in',
+    source: lead.source || 'Google',
+    assignedTechnicianId: lead.assignedTechnicianId || '',
+    device: lead.device || 'Laptop',
+    locationLink: lead.locationLink || '',
+    problemInwardNote: lead.problemInwardNote || '',
+    deviceCheckNote: lead.deviceCheckNote || '',
+    quote: lead.quote || '',
+    billing: lead.billing || '',
+    reviewMessageLink: lead.reviewMessageLink || '',
+    deviceReceiveConfirmed: lead.deviceReceiveConfirmed || false,
+    deviceDeliveryConfirmed: lead.deviceDeliveryConfirmed || false,
+    category: lead.category || 'Pending',
+  });
+  const [errors, setErrors] = useState({});
+
+  const updateForm = (field, value) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: '' }));
+  };
+
+  const selectedServiceType = normalizeServiceType(form.serviceType);
+  const selectedTechnician = technicians.find((tech) => tech.id === form.assignedTechnicianId);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting) return;
+
+    const nextErrors = {};
+    if (!form.company.trim()) nextErrors.company = 'Company is required.';
+    if (!form.customerName.trim()) nextErrors.customerName = 'Customer name is required.';
+    if (!form.mobileNumber.trim()) {
+      nextErrors.mobileNumber = 'Mobile number is required.';
+    } else if (!/^\d{10}$/.test(form.mobileNumber.trim())) {
+      nextErrors.mobileNumber = 'Enter a valid 10 digit mobile number.';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    await onUpdate({
+      customerName: form.customerName.trim(),
+      company: form.company.trim(),
+      mobileNumber: form.mobileNumber.trim(),
+      serviceType: selectedServiceType,
+      source: form.source.trim(),
+      device: form.device.trim(),
+      locationLink: form.locationLink.trim(),
+      problemInwardNote: form.problemInwardNote.trim(),
+      deviceCheckNote: form.deviceCheckNote.trim(),
+      quote: form.quote.trim(),
+      billing: form.billing.trim(),
+      reviewMessageLink: form.reviewMessageLink.trim(),
+      deviceReceiveConfirmed: form.deviceReceiveConfirmed,
+      deviceDeliveryConfirmed: form.deviceDeliveryConfirmed,
+      assignedTechnician: selectedTechnician?.name || lead.assignedTechnician || '',
+      assignedTechnicianId: selectedTechnician?.id || form.assignedTechnicianId || '',
+      category: selectedTechnician ? 'Assigned' : form.category,
+    });
+  };
+
+  return (
+    <div className="modal-overlay" role="presentation">
+      <div className="modal-panel lead-form-modal" role="dialog" aria-modal="true" aria-labelledby="edit-lead-title">
+        <div className="modal-header">
+          <div>
+            <h2 id="edit-lead-title">Edit Lead</h2>
+            <p>{lead.customerName}</p>
+          </div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close edit lead form"><X size={18} /></button>
+        </div>
+
+        <form className="modal-form" onSubmit={handleSubmit}>
+          <div className="form-grid">
+            <div className="form-group">
+              <label htmlFor="edit-lead-company">Company</label>
+              <input id="edit-lead-company" type="text" placeholder="Enter company" value={form.company} onChange={(e) => updateForm('company', e.target.value)} aria-invalid={Boolean(errors.company)} />
+              {errors.company && <span className="form-error">{errors.company}</span>}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-customer">Customer Name</label>
+              <input id="edit-lead-customer" type="text" placeholder="Enter customer name" value={form.customerName} onChange={(e) => updateForm('customerName', e.target.value)} aria-invalid={Boolean(errors.customerName)} />
+              {errors.customerName && <span className="form-error">{errors.customerName}</span>}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-mobile">Mobile Number</label>
+              <input id="edit-lead-mobile" type="tel" inputMode="numeric" placeholder="Enter mobile number" value={form.mobileNumber} onChange={(e) => updateForm('mobileNumber', e.target.value.replace(/\D/g, '').slice(0, 10))} aria-invalid={Boolean(errors.mobileNumber)} />
+              {errors.mobileNumber && <span className="form-error">{errors.mobileNumber}</span>}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-service-type">Service Type</label>
+              <select id="edit-lead-service-type" value={form.serviceType} onChange={(e) => updateForm('serviceType', e.target.value)}>
+                {serviceTypeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-source">Source</label>
+              <select id="edit-lead-source" value={form.source} onChange={(e) => updateForm('source', e.target.value)}>
+                {sourceOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-status">Status</label>
+              <select id="edit-lead-status" value={form.category} onChange={(e) => updateForm('category', e.target.value)}>
+                {['Pending', 'Assigned', 'Completed', 'Missed'].map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-assign">Assigned Technician</label>
+              <select id="edit-lead-assign" value={form.assignedTechnicianId} onChange={(e) => updateForm('assignedTechnicianId', e.target.value)}>
+                <option value="">Unassigned</option>
+                {technicians.map((tech) => (
+                  <option key={tech.id} value={tech.id}>{tech.name} ({tech.departmentSkill || 'General'})</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-device">Device</label>
+              <select id="edit-lead-device" value={form.device} onChange={(e) => updateForm('device', e.target.value)}>
+                {deviceOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
+
+            {selectedServiceType === 'Onsite service' && (
+              <div className="form-group">
+                <label htmlFor="edit-lead-location">Location Link</label>
+                <input id="edit-lead-location" type="url" placeholder="https://maps.google.com/..." value={form.locationLink} onChange={(e) => updateForm('locationLink', e.target.value)} />
+              </div>
+            )}
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-quote">Quote</label>
+              <input id="edit-lead-quote" type="text" placeholder="Enter quote amount/details" value={form.quote} onChange={(e) => updateForm('quote', e.target.value)} />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-billing">Billing</label>
+              <input id="edit-lead-billing" type="text" placeholder="Enter billing details" value={form.billing} onChange={(e) => updateForm('billing', e.target.value)} />
+            </div>
+
+            <div className="form-group form-group-full">
+              <label htmlFor="edit-lead-review-link">Review Message Link</label>
+              <input id="edit-lead-review-link" type="url" placeholder="Google review / message link" value={form.reviewMessageLink} onChange={(e) => updateForm('reviewMessageLink', e.target.value)} />
+            </div>
+
+            {selectedServiceType === 'Walk-in' ? (
+              <div className="form-group form-group-full">
+                <label htmlFor="edit-lead-problem-note">Problem Inward</label>
+                <textarea id="edit-lead-problem-note" value={form.problemInwardNote} onChange={(e) => updateForm('problemInwardNote', e.target.value)} rows={3} placeholder="Problem reported during inward" />
+              </div>
+            ) : (
+              <>
+                <div className="form-group form-group-full">
+                  <label htmlFor="edit-lead-device-check">Device Check / Internal Report</label>
+                  <textarea id="edit-lead-device-check" value={form.deviceCheckNote} onChange={(e) => updateForm('deviceCheckNote', e.target.value)} rows={3} placeholder="Internal report / problem inward" />
+                </div>
+                <label className="lead-check-row">
+                  <input type="checkbox" checked={form.deviceReceiveConfirmed} onChange={(e) => updateForm('deviceReceiveConfirmed', e.target.checked)} />
+                  Device receive confirmation needed in Customer Portal
+                </label>
+                <label className="lead-check-row">
+                  <input type="checkbox" checked={form.deviceDeliveryConfirmed} onChange={(e) => updateForm('deviceDeliveryConfirmed', e.target.checked)} />
+                  Device delivery confirmation needed in Customer Portal
+                </label>
+              </>
+            )}
+          </div>
+
+          <div className="modal-actions">
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={submitting}>
+              {submitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -697,9 +1004,12 @@ const Leads = () => {
   const [trackingLead, setTrackingLead] = useState(null);
   const [messagingLead, setMessagingLead] = useState(null);
   const [repairLead, setRepairLead] = useState(null);
+  const [viewingLead, setViewingLead] = useState(null);
+  const [editingLead, setEditingLead] = useState(null);
   const [activeLeadMenu, setActiveLeadMenu] = useState(null);
   const [notice, setNotice] = useState('');
   const [creatingLead, setCreatingLead] = useState(false);
+  const [savingLead, setSavingLead] = useState(false);
 
   const loadLeads = () => {
     leadManagementService.listLeads()
@@ -796,6 +1106,21 @@ const Leads = () => {
       setNotice(error.response?.data?.message || error.message || 'Lead creation failed.');
     } finally {
       setCreatingLead(false);
+    }
+  };
+
+  const handleUpdateLead = async (updates) => {
+    if (savingLead || !editingLead) return;
+    setSavingLead(true);
+    try {
+      await leadManagementService.updateLead(editingLead.id, updates);
+      setNotice(`Lead updated for ${updates.customerName}.`);
+      setEditingLead(null);
+      loadLeads();
+    } catch (error) {
+      setNotice(error.response?.data?.message || error.message || 'Lead update failed.');
+    } finally {
+      setSavingLead(false);
     }
   };
 
@@ -1031,10 +1356,10 @@ const Leads = () => {
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <button type="button" className="account-menu-item">
+          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setViewingLead(activeMenuLead); }}>
             <Eye size={14} className="icon-muted" /> View Details
           </button>
-          <button type="button" className="account-menu-item">
+          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setEditingLead(activeMenuLead); }}>
             <Edit size={14} className="icon-muted" /> Edit Lead
           </button>
           <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setAssigningLead(activeMenuLead); }}>
@@ -1097,6 +1422,24 @@ const Leads = () => {
           collection="leadRepairs"
           onClose={() => setRepairLead(null)}
           showToast={(message) => setNotice(message)}
+        />
+      )}
+
+      {viewingLead && (
+        <ViewLeadModal
+          lead={viewingLead}
+          onClose={() => setViewingLead(null)}
+          onEdit={() => { setViewingLead(null); setEditingLead(viewingLead); }}
+        />
+      )}
+
+      {editingLead && (
+        <EditLeadModal
+          lead={editingLead}
+          technicians={technicians}
+          submitting={savingLead}
+          onClose={() => setEditingLead(null)}
+          onUpdate={handleUpdateLead}
         />
       )}
     </div>

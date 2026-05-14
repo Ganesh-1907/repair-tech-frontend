@@ -1165,7 +1165,9 @@
 
   /* Show only the document and its children */
   .document-view-container,
-  .document-view-container * {
+  .document-view-container *,
+  .agreement-preview-container,
+  .agreement-preview-container * {
     visibility: visible;
   }
 
@@ -1176,6 +1178,22 @@
     top: 0;
     width: 100%;
     background: white !important;
+  }
+
+  .agreement-preview-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  .agreement-document {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: none !important;
+    width: 100% !important;
   }
 
   /* Force hide UI elements even if they were set to visible */
@@ -1202,6 +1220,42 @@
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+}
+
+@media print {
+  .rental-quotation-print-page .main-grid {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  .rental-quotation-print-page .main-grid > div:first-child,
+  .rental-quotation-print-page .plans-header,
+  .rental-quotation-print-page .plans-header * {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .rental-quotation-print-page .agreement-preview-container,
+  .rental-quotation-print-page .agreement-preview-container *,
+  .rental-quotation-print-page .agreement-document,
+  .rental-quotation-print-page .agreement-document * {
+    display: revert;
+    visibility: visible !important;
+  }
+
+  .rental-quotation-print-page .agreement-preview-container {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    min-height: 0 !important;
+  }
+
+  .rental-quotation-print-page .agreement-document {
+    display: block !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
   }
 }
 
@@ -1725,4 +1779,41 @@
   justify-content: flex-end;
   gap: 12px;
   padding-top: 8px;
+}
+/* Plan summary card — shown after plan selection in Add Customer */
+.plan-summary-card {
+  margin-top: 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.plan-summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 24px;
+}
+
+.plan-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plan-summary-item span {
+  font-size: 0.72rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+
+.plan-summary-item strong {
+  font-size: 0.875rem;
+  color: #111827;
+  font-weight: 600;
 }

@@ -216,6 +216,59 @@
   resize: none;
 }
 
+.rm-quote-block-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #475569;
+  margin: 0 0 10px;
+}
+
+.rm-quote-customer-block {
+  margin-top: 18px;
+  border: 1px solid #e8eef6;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #f8fafc;
+}
+
+.rm-quote-kv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rm-quote-kv-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.rm-quote-kv-key {
+  min-width: 130px;
+  font-weight: 600;
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.rm-quote-kv-val {
+  color: #0f172a;
+}
+
+.rm-quote-lines .rm-quote-block-title {
+  margin-bottom: 10px;
+}
+
+.rm-quote-terms-block {
+  margin-top: 18px;
+  border: 1px solid #e8eef6;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #f8fafc;
+}
+
 .rm-quote-mode {
   font-size: 11px;
   font-weight: 800;
