@@ -66,7 +66,7 @@ const RentalIndividualAgreementPage = () => {
 
         <div className="document-paper">
           <div className="paper-header">
-            <div className="company-info"><h2 style={{ color: 'var(--secondary)', margin: 0 }}>RepairTech Solutions</h2><p>Rental Management Division</p></div>
+            <div className="company-info"><h2 style={{ color: 'var(--secondary)', margin: 0 }}>RepairBoy Solutions</h2><p>Rental Management Division</p></div>
             <div className="doc-type" style={{ textAlign: 'right' }}>
               <h1 style={{ margin: 0, fontSize: '28px' }}>INDIVIDUAL AGREEMENT</h1>
               <p><strong>Date:</strong> {form.agreementDate}</p><p><strong>Agreement #:</strong> {form.agreementNo}</p>

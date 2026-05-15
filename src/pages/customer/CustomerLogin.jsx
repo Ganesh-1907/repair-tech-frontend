@@ -44,8 +44,9 @@ const CustomerLogin = () => {
           <div style={{ width: 52, height: 52, background: '#ede9fe', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
             <Wrench size={26} color="#4f46e5" />
           </div>
-          <h1>Customer Portal</h1>
-          <p>RepairTech Enterprise — Sign in to view your contracts & services</p>
+          <h1>Repair Boy</h1>
+          <h2 style={{ fontSize: '1rem', fontWeight: 600, color: '#4f46e5', margin: '4px 0 6px', letterSpacing: '0.01em' }}>Customer Portal</h2>
+          <p>Sign in to view your contracts & services</p>
         </div>
 
         {error && <div className="cp-login-error">{error}</div>}
@@ -82,7 +83,7 @@ const CustomerLogin = () => {
           </Link>
         </div>
         <p style={{ marginTop: 12, textAlign: 'center', fontSize: '0.8rem', color: '#94a3b8' }}>
-          Credentials are sent to you by RepairTech team. Contact support if you need help.
+          Credentials are sent to you by RepairBoy team. Contact support if you need help.
         </p>
       </div>
     </div>

@@ -184,7 +184,7 @@ const Sidebar = ({ isOpen = false, onClose }) => {
             <span>R</span>
           </div>
           <div className="logo-text">
-            <span className="logo-name">RepairTech</span>
+            <span className="logo-name">RepairBoy</span>
             <span className="logo-tagline">Enterprise</span>
           </div>
         </div>

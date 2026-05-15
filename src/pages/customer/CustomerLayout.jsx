@@ -25,7 +25,7 @@ const CustomerLayout = () => {
     <div className="cp-shell">
       <aside className="cp-sidebar">
         <div className="cp-sidebar-brand">
-          <h2>RepairTech</h2>
+          <h2>RepairBoy</h2>
           <p>{user?.customerName || user?.email || 'Customer'}</p>
         </div>
 

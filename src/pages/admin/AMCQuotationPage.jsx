@@ -175,7 +175,7 @@ const AMCQuotationPage = () => {
                     <p>Date: {quoteData.date}</p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <h2 style={{ fontSize: '20px', margin: 0 }}>RepairTech Enterprise</h2>
+                    <h2 style={{ fontSize: '20px', margin: 0 }}>RepairBoy Enterprise</h2>
                     <p style={{ fontSize: '12px' }}>Authorized Service Center</p>
                   </div>
                 </div>

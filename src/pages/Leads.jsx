@@ -105,7 +105,7 @@ const normalizePhoneForWhatsApp = (mobileNumber = '') => {
 const openWhatsAppForLead = (lead) => {
   const phone = normalizePhoneForWhatsApp(lead.mobileNumber);
   if (!phone) return;
-  const message = encodeURIComponent(`Hi ${lead.customerName || 'Customer'}, thank you for contacting RepairTech. We will update you about your ${lead.serviceType || 'service'} request shortly.`);
+  const message = encodeURIComponent(`Hi ${lead.customerName || 'Customer'}, thank you for contacting RepairBoy. We will update you about your ${lead.serviceType || 'service'} request shortly.`);
   window.open(`https://wa.me/${phone}?text=${message}`, '_blank', 'noopener,noreferrer');
 };
 
@@ -113,17 +113,17 @@ const messageTemplates = [
   {
     id: 'welcome',
     label: 'Welcome Message',
-    content: 'Hi {{customer_name}},\n\nThank you for contacting RepairTech. We received your enquiry and our team will connect with you shortly.\n\nRegards,\nRepairTech Team',
+    content: 'Hi {{customer_name}},\n\nThank you for contacting RepairBoy. We received your enquiry and our team will connect with you shortly.\n\nRegards,\nRepairBoy Team',
   },
   {
     id: 'followup',
     label: 'Follow-up Message',
-    content: 'Hi {{customer_name}},\n\nJust following up on your service enquiry. Please let us know a convenient time to connect and help you further.\n\nRegards,\nRepairTech Team',
+    content: 'Hi {{customer_name}},\n\nJust following up on your service enquiry. Please let us know a convenient time to connect and help you further.\n\nRegards,\nRepairBoy Team',
   },
   {
     id: 'service_update',
     label: 'Service Update Preview',
-    content: 'Hi {{customer_name}},\n\nService update for your request: our team is reviewing the details and will share the next step soon.\n\nStatus: {{lead_status}}\nAssigned to: {{technician}}\n\nRegards,\nRepairTech Team',
+    content: 'Hi {{customer_name}},\n\nService update for your request: our team is reviewing the details and will share the next step soon.\n\nStatus: {{lead_status}}\nAssigned to: {{technician}}\n\nRegards,\nRepairBoy Team',
   },
 ];
 

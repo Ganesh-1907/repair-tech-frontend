@@ -126,7 +126,7 @@ const RentalOperationsBillingPage = () => {
   const [agreementSnapshot, setAgreementSnapshot] = useState(null);
   const [agreementDoc, setAgreementDoc] = useState({
     introDate: '',
-    serviceProvider: 'RepairTech Solutions, Bangalore (Hereinafter referred to as The Company)',
+    serviceProvider: 'RepairBoy Solutions, Bangalore (Hereinafter referred to as The Company)',
     client: '',
     scope: 'The Company agrees to provide maintenance services for the equipment listed in the Asset Registry below as per the Standard CMC.',
     period: '',
@@ -846,7 +846,7 @@ const RentalOperationsBillingPage = () => {
             <div className="rm-quote-head rm-quote-doc-head">
               <div>
                 <h3>RENTAL QUOTATION</h3>
-                <p>RepairTech Solutions</p>
+                <p>RepairBoy Solutions</p>
               </div>
             </div>
 
@@ -923,7 +923,7 @@ const RentalOperationsBillingPage = () => {
 
             <div className="rm-signature-row">
               <div><div className="line"></div><p>For {selected.companyName}</p></div>
-              <div><div className="line"></div><p>For RepairTech Solutions</p></div>
+              <div><div className="line"></div><p>For RepairBoy Solutions</p></div>
             </div>
           </div>
         </div>
@@ -979,7 +979,7 @@ const RentalOperationsBillingPage = () => {
 
             <div className="rm-signature-row rm-agreement-signatures">
               <div><div className="line"></div><p>For {selected.companyName}</p></div>
-              <div><div className="line"></div><p>For RepairTech Solutions</p></div>
+              <div><div className="line"></div><p>For RepairBoy Solutions</p></div>
             </div>
           </div>
         </div>

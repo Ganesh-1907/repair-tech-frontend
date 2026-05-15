@@ -81,7 +81,7 @@ const Login = () => {
       <div className="login-card card">
         <div className="login-header">
           <div className="logo-icon">R</div>
-          <h1>RepairTech</h1>
+          <h1>RepairBoy</h1>
           <p>Sign in to your account</p>
         </div>
 

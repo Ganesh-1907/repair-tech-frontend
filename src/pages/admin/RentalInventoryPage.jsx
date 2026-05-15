@@ -904,9 +904,9 @@ const RentalQuotationView = ({ customer, onBack }) => {
       <div className="document-paper" ref={printRef}>
         <div className="paper-header">
           <div className="company-info">
-            <h2 style={{ color: 'var(--secondary)', margin: 0 }}>RepairTech Solutions</h2>
+            <h2 style={{ color: 'var(--secondary)', margin: 0 }}>RepairBoy Solutions</h2>
             <p>123 Service Hub, Tech Park, Bangalore</p>
-            <p>Email: support@repairtech.com | Phone: +91 98765 43210</p>
+            <p>Email: support@repairboy.com | Phone: +91 98765 43210</p>
           </div>
           <div className="doc-type" style={{ textAlign: 'right' }}>
             <h1 style={{ margin: 0, fontSize: '28px' }}>RENTAL QUOTATION</h1>
@@ -997,7 +997,7 @@ const RentalQuotationView = ({ customer, onBack }) => {
               </div>
               <div className="sig-box">
                 <div className="sig-line"></div>
-                <p>For RepairTech Solutions</p>
+                <p>For RepairBoy Solutions</p>
               </div>
             </div>
           </div>
@@ -1036,7 +1036,7 @@ const RentalAgreementView = ({ customer, onBack, onEdit }) => {
         
         <div style={{ margin: '20px 0' }}>
           <strong>SERVICE PROVIDER:</strong>
-          <p>RepairTech Solutions, Bangalore (Hereinafter referred to as "The Company")</p>
+          <p>RepairBoy Solutions, Bangalore (Hereinafter referred to as "The Company")</p>
         </div>
 
         <div style={{ margin: '20px 0' }}>
@@ -1088,7 +1088,7 @@ const RentalAgreementView = ({ customer, onBack, onEdit }) => {
           </div>
           <div className="sig-box">
             <div className="sig-line"></div>
-            <p>For RepairTech Solutions</p>
+            <p>For RepairBoy Solutions</p>
           </div>
         </div>
       </div>

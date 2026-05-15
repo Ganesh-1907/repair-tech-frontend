@@ -134,7 +134,7 @@ const basePageMetadata = [
 export const pageMetadata = [...basePageMetadata, ...adminPageMetadata];
 
 export const fallbackPageMetadata = {
-  title: 'RepairTechSuite',
+  title: 'RepairBoySuite',
   subtitle: 'Operations workspace.',
   searchPlaceholder: 'Search workspace...',
 };
