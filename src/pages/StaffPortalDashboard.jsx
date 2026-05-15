@@ -19,14 +19,10 @@ import {
 import { staffManagementService } from '../services/staffManagementService';
 
 const WORKFLOW_STEPS = [
-  'Lead Captured',
-  'Initial Contact',
-  'Technical Assessment',
-  'Quotation Prepared',
+  'Technician Assigned',
+  'Quotation Preparation',
   'Quotation Approved',
-  'Parts Procurement',
-  'Repair/Service Started',
-  'Quality Check',
+  'Repair / Service Started',
   'Ready for Collection',
   'Delivered & Closed',
 ];

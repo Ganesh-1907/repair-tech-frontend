@@ -295,7 +295,7 @@ const StaffListingPage = () => {
         </div>
       )}
 
-      <div className="card overflow-hidden">
+      <div className="card" style={{ overflowX: 'hidden' }}>
         <table className="leads-table">
           <thead>
             <tr>
@@ -305,36 +305,24 @@ const StaffListingPage = () => {
               <th>Email</th>
               <th>Department / Skill</th>
               <th>Status</th>
-              <th>Attendance Status</th>
               <th>Assigned Jobs</th>
-              <th>Last Seen</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredStaff.map((row) => (
               <tr key={row.id}>
-                <td>{row.id}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>{row.id}</td>
                 <td>{row.name}</td>
                 <td>{row.phone}</td>
                 <td>{row.email || '-'}</td>
-                <td>{row.departmentSkill || '-'}</td>
+                <td>{row.departmentSkill || row.department || '-'}</td>
                 <td>
                   <span className={`status-pill status-${row.status === 'Active' ? 'success' : 'danger'}`}>
                     {row.status}
                   </span>
                 </td>
-                <td>
-                  <span className={`status-pill status-${
-                    row.attendanceStatus === 'Present' ? 'success' : 
-                    row.attendanceStatus === 'On Job' ? 'warning' : 
-                    row.attendanceStatus === 'On Leave' ? 'info' : 'danger'
-                  }`}>
-                    {row.attendanceStatus || 'Absent'}
-                  </span>
-                </td>
                 <td>{row.assignedJobs}</td>
-                <td>{row.lastSeen || '-'}</td>
                 <td>
                   <div style={{ position: 'relative' }}>
                     <button
@@ -363,7 +351,7 @@ const StaffListingPage = () => {
               </tr>
             ))}
             {filteredStaff.length === 0 && (
-              <tr><td colSpan="10" className="text-muted">No staff found.</td></tr>
+              <tr><td colSpan="8" className="text-muted">No staff found.</td></tr>
             )}
           </tbody>
         </table>
@@ -415,20 +403,18 @@ const StaffListingPage = () => {
 
       {modalMode === 'view' && selectedStaff && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-panel">
+          <div className="modal-panel staff-view-modal">
             <div className="modal-header">
-              <div><h2>View Staff</h2><p>Read-only staff details.</p></div>
+              <div><h2>View Staff</h2><p className="admin-mini-kpi" style={{ marginTop: 4 }}>Staff ID: <strong>{selectedStaff.id}</strong></p></div>
               <button className="icon-btn" onClick={closeModal} aria-label="Close view staff modal"><X size={16} /></button>
             </div>
             <div className="modal-form">
-              <div className="detail-list">
-                <div><span>Staff ID</span><strong>{selectedStaff.id}</strong></div>
+              <div className="detail-list staff-detail-grid">
                 <div><span>Name</span><strong>{selectedStaff.name}</strong></div>
                 <div><span>Age</span><strong>{selectedStaff.age || '-'}</strong></div>
                 <div><span>Phone</span><strong>{selectedStaff.phone}</strong></div>
                 <div><span>Email</span><strong>{selectedStaff.email || '-'}</strong></div>
-                <div><span>Department</span><strong>{selectedStaff.department || '-'}</strong></div>
-                <div><span>Department / Skill</span><strong>{selectedStaff.departmentSkill || '-'}</strong></div>
+                <div><span>Department / Skill</span><strong>{selectedStaff.department || selectedStaff.departmentSkill || '-'}</strong></div>
                 <div><span>Designation</span><strong>{selectedStaff.designation || '-'}</strong></div>
                 <div><span>Salary</span><strong>{selectedStaff.salary || '-'}</strong></div>
                 <div><span>Joining Date</span><strong>{selectedStaff.joiningDate || '-'}</strong></div>
@@ -437,10 +423,10 @@ const StaffListingPage = () => {
                 <div><span>Attendance Status</span><strong>{selectedStaff.attendanceStatus || '-'}</strong></div>
                 <div><span>Assigned Jobs</span><strong>{selectedStaff.assignedJobs}</strong></div>
                 <div><span>Last Seen</span><strong>{selectedStaff.lastSeen || '-'}</strong></div>
-                <div><span>Residence Address</span><strong>{selectedStaff.address || '-'}</strong></div>
-                <div><span>Aadhaar Address</span><strong>{selectedStaff.aadhaarAddress || '-'}</strong></div>
                 <div><span>Attached Documents</span><strong>{selectedStaff.attachedDocuments?.length || 0}</strong></div>
-                <div><span>Notes</span><strong>{selectedStaff.notes || '-'}</strong></div>
+                <div className="staff-detail-full"><span>Residence Address</span><strong>{selectedStaff.address || '-'}</strong></div>
+                <div className="staff-detail-full"><span>Aadhaar Address</span><strong>{selectedStaff.aadhaarAddress || '-'}</strong></div>
+                <div className="staff-detail-full"><span>Notes</span><strong>{selectedStaff.notes || '-'}</strong></div>
               </div>
               <div className="modal-actions">
                 <button className="btn btn-secondary" type="button" onClick={closeModal}>Close</button>

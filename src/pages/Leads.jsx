@@ -48,52 +48,33 @@ const serviceTypeOptions = ['Walk-in', 'Onsite service'];
 const sourceOptions = ['Google', 'FB', 'Insta', 'Walkin'];
 const deviceOptions = ['Laptop', 'Desktop', 'CCTV'];
 
-const walkInTrackerSteps = [
-  'Lead Captured',
-  'Assign',
-  'Device Check',
-  'Problem Inward',
-  'Quote',
-  'Billing',
-  'Review Message Link',
-];
+const ADMIN_TRACKER_STEPS = ['Lead Captured', 'Assign to Technician'];
 
-const onsiteTrackerSteps = [
-  'Lead Captured',
-  'Location Visit',
-  'Assign',
-  'Device Check / Internal Report',
-  'Device Receive Customer Confirmation',
-  'Quote',
-  'Device Delivery Customer Confirmation',
-  'Billing',
-  'Images Upload',
-  'Review Message Link',
+const STAFF_PROGRESS_STEPS = [
+  'Technician Assigned',
+  'Quotation Preparation',
+  'Quotation Approved',
+  'Repair / Service Started',
+  'Ready for Collection',
+  'Delivered & Closed',
 ];
 
 const normalizeServiceType = (value = '') => String(value).toLowerCase().includes('onsite') ? 'Onsite service' : 'Walk-in';
 
 const buildLeadTracker = (serviceType, assigned = false) => {
-  const steps = normalizeServiceType(serviceType) === 'Onsite service' ? onsiteTrackerSteps : walkInTrackerSteps;
-  return steps.map((step, index) => ({
+  return ADMIN_TRACKER_STEPS.map((step, index) => ({
     step,
-    status: index === 0 || (assigned && step === 'Assign') ? 'completed' : index === (assigned ? 2 : 1) ? 'current' : 'pending',
-    date: index === 0 || (assigned && step === 'Assign') ? new Date().toISOString() : null,
+    status: index === 0 || assigned ? 'completed' : 'current',
+    date: index === 0 || assigned ? new Date().toISOString() : null,
   }));
 };
 
 const completeAssignStep = (lead) => {
-  const tracker = lead.tracker?.length ? [...lead.tracker] : buildLeadTracker(lead.serviceType);
-  const assignIndex = tracker.findIndex((item) => item.step === 'Assign');
-  const nextTracker = tracker.map((item, index) => {
-    if (index === 0 || index === assignIndex) {
-      return { ...item, status: 'completed', date: item.date || new Date().toISOString() };
-    }
-    return { ...item, status: item.status === 'current' ? 'pending' : item.status };
-  });
-  const nextIndex = nextTracker.findIndex((item, index) => index > assignIndex && item.status !== 'completed');
-  if (nextIndex >= 0) nextTracker[nextIndex] = { ...nextTracker[nextIndex], status: 'current' };
-  return nextTracker;
+  return ADMIN_TRACKER_STEPS.map((step) => ({
+    step,
+    status: 'completed',
+    date: new Date().toISOString(),
+  }));
 };
 
 const normalizePhoneForWhatsApp = (mobileNumber = '') => {
@@ -425,7 +406,7 @@ const AssignTechnicianModal = ({ lead, technicians, onClose, onAssign }) => {
 
   return (
     <div className="modal-overlay" role="presentation">
-      <div className="modal-panel" role="dialog" aria-modal="true" style={{ maxWidth: '620px', width: '100%' }}>
+      <div className="modal-panel" role="dialog" aria-modal="true">
         <div className="modal-header">
           <div>
             <h2>{currentTechnician ? 'Edit Assigned Technician' : 'Assign Technician'}</h2>
@@ -521,64 +502,110 @@ const AssignTechnicianModal = ({ lead, technicians, onClose, onAssign }) => {
   );
 };
 
+const statusColors = {
+  Pending:   { bg: '#fef9c3', color: '#854d0e', dot: '#eab308' },
+  Assigned:  { bg: '#ede9fe', color: '#5b21b6', dot: '#7c3aed' },
+  Completed: { bg: '#dcfce7', color: '#166534', dot: '#16a34a' },
+  Missed:    { bg: '#fee2e2', color: '#991b1b', dot: '#dc2626' },
+};
+
 const ViewLeadModal = ({ lead, onClose, onEdit }) => {
-  const infoRow = (label, value) => value ? (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-      <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>{label}</span>
-      <span style={{ fontSize: '0.92rem', color: 'var(--text-primary, #1e293b)', fontWeight: 500 }}>{value}</span>
+  const sc = statusColors[lead.category] || { bg: '#f1f5f9', color: '#475569', dot: '#94a3b8' };
+
+  const chip = (label, value, full = false) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border-light, #e2e8f0)', gridColumn: full ? '1 / -1' : undefined }}>
+      <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted, #64748b)' }}>{label}</span>
+      <span style={{ fontSize: '0.9rem', fontWeight: value ? 600 : 400, color: value ? 'var(--text-main, #0f172a)' : 'var(--text-muted, #94a3b8)' }}>{value || '-'}</span>
     </div>
-  ) : null;
+  );
+
+  const isOnsite = lead.serviceType === 'Onsite service';
 
   return (
     <div className="modal-overlay" role="presentation">
-      <div className="modal-panel" role="dialog" aria-modal="true" style={{ maxWidth: '660px', width: '100%' }}>
-        <div className="modal-header">
-          <div>
-            <h2>Lead Details</h2>
-            <p>{lead.customerName} — {lead.company || 'Individual'}</p>
-          </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close lead details"><X size={18} /></button>
-        </div>
+      <div className="modal-panel" role="dialog" aria-modal="true" style={{ padding: 0, overflow: 'hidden' }}>
 
-        <div style={{ padding: '0 24px 8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
-          {infoRow('Customer Name', lead.customerName)}
-          {infoRow('Company', lead.company)}
-          {infoRow('Mobile Number', lead.mobileNumber)}
-          {infoRow('Source', lead.source)}
-          {infoRow('Service Type', lead.serviceType)}
-          {infoRow('Device', lead.device)}
-          {infoRow('Status', lead.category)}
-          {infoRow('Assigned To', lead.assignedTechnician || 'Unassigned')}
-          {infoRow('Quote', lead.quote)}
-          {infoRow('Billing', lead.billing)}
-          {infoRow('Created', lead.createdAt)}
-          {lead.locationLink && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em' }}>Location</span>
-              <a href={lead.locationLink} target="_blank" rel="noreferrer" className="lead-map-link">Open Maps</a>
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', padding: '22px 24px 20px', position: 'relative' }}>
+          <button className="icon-btn" onClick={onClose} aria-label="Close lead details" style={{ position: 'absolute', top: 14, right: 14, color: '#94a3b8', background: 'rgba(255,255,255,0.08)' }}><X size={18} /></button>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+              {(lead.customerName || 'L')[0].toUpperCase()}
             </div>
-          )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{lead.customerName || '-'}</h2>
+              <p style={{ margin: '3px 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>{lead.company || 'No company'}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color, fontSize: '0.75rem', fontWeight: 700 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: sc.dot, display: 'inline-block' }} />
+                  {lead.category || 'Pending'}
+                </span>
+                <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 600 }}>
+                  {lead.serviceType || '-'}
+                </span>
+                <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 600 }}>
+                  {lead.device || '-'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <a href={`tel:${lead.mobileNumber}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.08)', color: '#e2e8f0', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <Phone size={14} /> {lead.mobileNumber || 'No phone'}
+            </a>
+            <button type="button" onClick={() => openWhatsAppForLead(lead)} disabled={!lead.mobileNumber} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: '#16a34a', color: '#fff', fontSize: '0.82rem', fontWeight: 600, border: 'none', cursor: lead.mobileNumber ? 'pointer' : 'not-allowed', opacity: lead.mobileNumber ? 1 : 0.5 }}>
+              <MessageCircleMore size={14} /> WhatsApp
+            </button>
+          </div>
         </div>
 
-        {(lead.problemInwardNote || lead.deviceCheckNote) && (
-          <div style={{ margin: '8px 24px 0', padding: '14px 16px', background: 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border-light, #e2e8f0)' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em', display: 'block', marginBottom: '6px' }}>
-              {lead.serviceType === 'Onsite service' ? 'Device Check / Internal Report' : 'Problem Inward'}
-            </span>
-            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary, #1e293b)', lineHeight: 1.6 }}>
-              {lead.problemInwardNote || lead.deviceCheckNote}
-            </p>
-          </div>
-        )}
+        {/* All fields */}
+        <div style={{ padding: '16px 20px', maxHeight: '55vh', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          {chip('Customer Name', lead.customerName)}
+          {chip('Company', lead.company)}
+          {chip('Mobile Number', lead.mobileNumber)}
+          {chip('Source', lead.source)}
+          {chip('Service Type', lead.serviceType)}
+          {chip('Device', lead.device)}
+          {chip('Status', lead.category)}
+          {chip('Assigned To', lead.assignedTechnician || (lead.assignedTechnicianId ? lead.assignedTechnicianId : null))}
+          {chip('Quote', lead.quote)}
+          {chip('Billing', lead.billing)}
+          {chip('Created', lead.createdAt)}
 
-        {lead.reviewMessageLink && (
-          <div style={{ margin: '8px 24px 0' }}>
-            <span style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted, #64748b)', letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>Review Link</span>
-            <a href={lead.reviewMessageLink} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', color: 'var(--primary, #6366f1)' }}>Open Review Link</a>
+          {/* Location link — always shown */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border-light, #e2e8f0)' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted, #64748b)' }}>Location Link</span>
+            {lead.locationLink
+              ? <a href={lead.locationLink} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', color: '#6366f1', fontWeight: 600 }}>Open Maps →</a>
+              : <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>-</span>}
           </div>
-        )}
 
-        <div className="modal-actions" style={{ marginTop: '20px' }}>
+          {/* Review link — always shown */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border-light, #e2e8f0)' }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted, #64748b)' }}>Review Message Link</span>
+            {lead.reviewMessageLink
+              ? <a href={lead.reviewMessageLink} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', color: '#6366f1', fontWeight: 600 }}>Open Link →</a>
+              : <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>-</span>}
+          </div>
+
+          {chip('Device Receive Confirmation', lead.deviceReceiveConfirmed ? 'Yes' : 'No')}
+          {chip('Device Delivery Confirmation', lead.deviceDeliveryConfirmed ? 'Yes' : 'No')}
+
+          {/* Problem note — full width, always shown */}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: lead.problemInwardNote ? '#fffbeb' : 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: `1px solid ${lead.problemInwardNote ? '#fde68a' : 'var(--border-light, #e2e8f0)'}` }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: lead.problemInwardNote ? '#92400e' : 'var(--text-muted, #64748b)' }}>Problem Inward Note</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: lead.problemInwardNote ? 500 : 400, color: lead.problemInwardNote ? '#78350f' : '#94a3b8', lineHeight: 1.6 }}>{lead.problemInwardNote || '-'}</span>
+          </div>
+
+          {/* Device check note — full width, always shown */}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: lead.deviceCheckNote ? '#fffbeb' : 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: `1px solid ${lead.deviceCheckNote ? '#fde68a' : 'var(--border-light, #e2e8f0)'}` }}>
+            <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: lead.deviceCheckNote ? '#92400e' : 'var(--text-muted, #64748b)' }}>Device Check / Internal Report</span>
+            <span style={{ fontSize: '0.9rem', fontWeight: lead.deviceCheckNote ? 500 : 400, color: lead.deviceCheckNote ? '#78350f' : '#94a3b8', lineHeight: 1.6 }}>{lead.deviceCheckNote || '-'}</span>
+          </div>
+        </div>
+
+        <div className="modal-actions" style={{ margin: 0, padding: '14px 20px', borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
           <button type="button" className="btn btn-primary" onClick={onEdit}>
             <Edit size={15} /> Edit Lead
@@ -783,82 +810,124 @@ const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate }) => 
   );
 };
 
-const LeadTrackerModal = ({ lead, onClose, onUpdateStep }) => {
-  const tracker = lead.tracker?.length ? lead.tracker : buildLeadTracker(lead.serviceType);
+const stepDotStyle = (status) => {
+  if (status === 'completed') return { bg: '#10b981', color: '#fff', border: '#10b981' };
+  if (status === 'current')   return { bg: '#6366f1', color: '#fff', border: '#6366f1' };
+  if (status === 'cancelled') return { bg: '#ef4444', color: '#fff', border: '#ef4444' };
+  return { bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' };
+};
+
+const LeadTrackerModal = ({ lead, onClose, onUpdateStep, onCancelLead }) => {
+  const tracker = lead.tracker?.length ? lead.tracker : buildLeadTracker(lead.serviceType, Boolean(lead.assignedTechnician));
+  const isCancelled = tracker.some(s => s.status === 'cancelled');
+  const isAssigned = tracker.every(s => s.status === 'completed') && !isCancelled;
+  const completedCount = tracker.filter(s => s.status === 'completed').length;
+  const totalCount = tracker.length;
 
   return (
     <div className="modal-overlay" role="presentation">
-      <div className="modal-panel" role="dialog" aria-modal="true" style={{ maxWidth: '600px' }}>
-        <div className="modal-header">
-          <div>
-            <h2>Service Tracker</h2>
-            <p>Tracking progress for <strong>{lead.customerName}</strong></p>
+      <div className="modal-panel" role="dialog" aria-modal="true" style={{ padding: 0, overflow: 'hidden' }}>
+
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', padding: '24px 28px 20px', position: 'relative' }}>
+          <button className="icon-btn" onClick={onClose} aria-label="Close tracker modal" style={{ position: 'absolute', top: 14, right: 14, color: '#94a3b8', background: 'rgba(255,255,255,0.08)' }}><X size={18} /></button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.15rem', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+              {(lead.customerName || 'L')[0].toUpperCase()}
+            </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#fff' }}>Service Tracker</h2>
+              <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>{lead.customerName} · {lead.serviceType || 'Walk-in'}</p>
+            </div>
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close tracker modal"><X size={18} /></button>
+          {/* Progress bar */}
+          <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.round((completedCount / totalCount) * 100)}%`, background: isCancelled ? '#ef4444' : '#10b981', borderRadius: 99, transition: 'width 0.4s' }} />
+            </div>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isCancelled ? '#fca5a5' : '#6ee7b7', whiteSpace: 'nowrap' }}>
+              {isCancelled ? 'Cancelled' : `${completedCount} / ${totalCount} done`}
+            </span>
+          </div>
         </div>
 
-        <div className="tracker-timeline" style={{ padding: '20px 0', maxHeight: '400px', overflowY: 'auto' }}>
-          {tracker.map((item, index, array) => (
-            <div key={item.step} className={`tracker-step ${item.status}`} style={{ 
-              display: 'flex', 
-              gap: '16px', 
-              marginBottom: '20px',
-              position: 'relative'
-            }}>
-              <div className="step-indicator" style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                backgroundColor: item.status === 'completed' ? '#10b981' : item.status === 'current' ? '#6366f1' : '#e2e8f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '12px',
-                fontWeight: 'bold',
-                zIndex: 2
-              }}>
-                {item.status === 'completed' ? '✓' : index + 1}
-              </div>
-              {index < (array.length - 1) && (
-                <div className="step-line" style={{
-                  position: 'absolute',
-                  left: '11px',
-                  top: '24px',
-                  width: '2px',
-                  height: '20px',
-                  backgroundColor: '#e2e8f0',
-                  zIndex: 1
-                }}></div>
-              )}
-              <div className="step-content" style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ 
-                    fontSize: '14px', 
-                    fontWeight: 'bold', 
-                    color: item.status === 'pending' ? '#94a3b8' : '#1e293b' 
-                  }}>{item.step}</span>
-                  {item.status !== 'completed' && (
-                    <button 
-                      className="btn-mini-glass" 
-                      onClick={() => onUpdateStep(lead, index)}
-                      style={{ fontSize: '10px', padding: '4px 8px' }}
-                    >
-                      Mark Done
-                    </button>
+        {/* Admin Steps */}
+        <div style={{ padding: '20px 28px 16px' }}>
+          <p style={{ margin: '0 0 14px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748b' }}>Admin Actions</p>
+          {tracker.map((item, index, array) => {
+            const dot = stepDotStyle(item.status);
+            const isLast = index === array.length - 1;
+            const isCurrent = item.status === 'current';
+            return (
+              <div key={item.step} style={{ display: 'flex', gap: 16, position: 'relative' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 36 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: dot.bg, border: `2px solid ${dot.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: dot.color, fontSize: '0.8rem', fontWeight: 800, zIndex: 1 }}>
+                    {item.status === 'completed' ? '✓' : item.status === 'cancelled' ? '✕' : index + 1}
+                  </div>
+                  {!isLast && <div style={{ width: 2, flex: 1, minHeight: 18, background: item.status === 'completed' ? '#10b981' : '#e2e8f0', margin: '4px 0' }} />}
+                </div>
+                <div style={{ flex: 1, paddingBottom: isLast ? 0 : 18, paddingTop: 7 }}>
+                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: item.status === 'cancelled' ? '#ef4444' : item.status === 'pending' ? '#94a3b8' : '#0f172a', display: 'block', marginBottom: isCurrent ? 10 : 0 }}>
+                    {item.step}
+                    {item.status === 'cancelled' && <span style={{ marginLeft: 8, fontSize: '0.7rem', fontWeight: 700, background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: 20 }}>Cancelled</span>}
+                  </span>
+                  {isCurrent && (
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button onClick={() => onUpdateStep(lead, index)} style={{ padding: '6px 18px', borderRadius: 8, background: '#6366f1', color: '#fff', border: 'none', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                        Assign Technician
+                      </button>
+                      <button onClick={() => onCancelLead(lead, index)} style={{ padding: '6px 16px', borderRadius: 8, background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
+                        ✕ Cancel Lead
+                      </button>
+                    </div>
+                  )}
+                  {item.date && (
+                    <p style={{ margin: '5px 0 0', fontSize: '0.72rem', color: item.status === 'cancelled' ? '#ef4444' : '#64748b' }}>
+                      {item.status === 'cancelled' ? 'Cancelled on' : 'Done on'} {new Date(item.date).toLocaleString()}
+                    </p>
                   )}
                 </div>
-                {item.date && (
-                  <p style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                    Completed on {new Date(item.date).toLocaleString()}
-                  </p>
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        <div className="modal-actions">
+        {/* Staff Progress — read-only with current step highlighted */}
+        {(() => {
+          const staffIdx = STAFF_PROGRESS_STEPS.findIndex(s => s.toLowerCase() === (lead.category || '').toLowerCase());
+          const isDone = lead.category === 'Completed' || lead.category === 'Delivered & Closed';
+          return (
+            <div style={{ margin: '0 28px 20px', padding: '16px', background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
+              <p style={{ margin: '0 0 14px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748b' }}>
+                {isAssigned ? `Staff Progress — ${lead.assignedTechnician}` : 'Staff Progress (visible after assignment)'}
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {STAFF_PROGRESS_STEPS.map((step, i) => {
+                  const isStepDone    = isDone || i < staffIdx;
+                  const isStepCurrent = !isDone && i === staffIdx && isAssigned;
+
+                  let dotBg = '#e2e8f0', dotColor = '#94a3b8', chipBg = '#f1f5f9', chipBorder = '#e2e8f0', textColor = '#94a3b8';
+                  if (!isAssigned) { /* keep gray */ }
+                  else if (isStepDone)    { dotBg = '#10b981'; dotColor = '#fff'; chipBg = '#dcfce7'; chipBorder = '#86efac'; textColor = '#15803d'; }
+                  else if (isStepCurrent) { dotBg = '#6366f1'; dotColor = '#fff'; chipBg = '#eef2ff'; chipBorder = '#a5b4fc'; textColor = '#4338ca'; }
+
+                  return (
+                    <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, background: chipBg, border: `1px solid ${chipBorder}` }}>
+                      <span style={{ width: 20, height: 20, borderRadius: '50%', background: dotBg, color: dotColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 800, flexShrink: 0 }}>
+                        {isStepDone ? '✓' : i + 1}
+                      </span>
+                      <span style={{ fontSize: '0.78rem', fontWeight: isStepCurrent ? 800 : 600, color: textColor, whiteSpace: 'nowrap' }}>{step}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {isAssigned && <p style={{ margin: '12px 0 0', fontSize: '0.72rem', color: '#64748b' }}>Staff updates these steps from their portal. View in <strong>Staff Portal → Staff Tasks</strong>.</p>}
+              {!isAssigned && <p style={{ margin: '12px 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>Steps become active once a technician is assigned.</p>}
+            </div>
+          );
+        })()}
+
+        <div className="modal-actions" style={{ padding: '14px 28px', borderTop: '1px solid var(--border-light, #e2e8f0)', margin: 0 }}>
           <button className="btn btn-secondary" onClick={onClose}>Close</button>
         </div>
       </div>
@@ -911,7 +980,7 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
 
   return (
     <div className="modal-overlay" role="presentation" onClick={onClose}>
-      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="lead-message-title" style={{ width: 'min(100%, 720px)' }} onClick={(event) => event.stopPropagation()}>
+      <div className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="lead-message-title" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <div>
             <h2 id="lead-message-title">Instant Message</h2>
@@ -1142,6 +1211,20 @@ const Leads = () => {
     }
   };
 
+  const handleCancelLead = async (lead, stepIndex) => {
+    try {
+      const nextTracker = (lead.tracker || []).map((item, i) =>
+        i === stepIndex ? { ...item, status: 'cancelled', date: new Date().toISOString() } : item
+      );
+      await leadManagementService.updateLead(lead.id, { tracker: nextTracker, category: 'Missed' });
+      setNotice(`Lead for ${lead.customerName} cancelled at "${lead.tracker[stepIndex]?.step}".`);
+      setTrackingLead(null);
+      loadLeads();
+    } catch (error) {
+      setNotice(error.response?.data?.message || error.message || 'Failed to cancel lead.');
+    }
+  };
+
   const handleUpdateTrackerStep = async (lead, stepIndex) => {
     try {
       const nextTracker = [...(lead.tracker || [])];
@@ -1192,13 +1275,19 @@ const Leads = () => {
     setActiveLeadMenu({ id: lead.id, top, left, width: menuWidth });
   };
 
-  const getStatusColor = (status) => {
+  const getStatusMeta = (status) => {
     switch (status) {
-      case 'Completed': return 'status-completed';
-      case 'Pending': return 'status-pending';
-      case 'Assigned': return 'status-assigned';
-      case 'Missed': return 'status-missed';
-      default: return '';
+      case 'Pending':               return { bg: '#fef3c7', color: '#b45309', dot: '#f59e0b' };
+      case 'Assigned':              return { bg: '#dbeafe', color: '#1d4ed8', dot: '#3b82f6' };
+      case 'Missed':                return { bg: '#fee2e2', color: '#b91c1c', dot: '#ef4444' };
+      case 'Completed':
+      case 'Delivered & Closed':    return { bg: '#dcfce7', color: '#15803d', dot: '#16a34a' };
+      case 'Technician Assigned':   return { bg: '#ede9fe', color: '#6d28d9', dot: '#7c3aed' };
+      case 'Quotation Preparation': return { bg: '#fae8ff', color: '#a21caf', dot: '#c026d3' };
+      case 'Quotation Approved':    return { bg: '#ccfbf1', color: '#0f766e', dot: '#14b8a6' };
+      case 'Repair / Service Started': return { bg: '#ffedd5', color: '#c2410c', dot: '#f97316' };
+      case 'Ready for Collection':  return { bg: '#cffafe', color: '#0e7490', dot: '#06b6d4' };
+      default:                      return { bg: '#f1f5f9', color: '#475569', dot: '#94a3b8' };
     }
   };
 
@@ -1286,9 +1375,11 @@ const Leads = () => {
                 </td>
                 <td>{lead.mobileNumber}</td>
                 <td>
-                  <span className={`status-pill ${getStatusColor(lead.category)}`}>
+                  {(() => { const m = getStatusMeta(lead.category); return (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 999, background: m.bg, color: m.color, fontSize: '0.75rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: m.dot, flexShrink: 0 }} />
                     {lead.category}
-                  </span>
+                  </span>); })()}
                 </td>
                 <td>
                   {lead.assignedTechnician ? (
@@ -1402,10 +1493,11 @@ const Leads = () => {
       )}
 
       {trackingLead && (
-        <LeadTrackerModal 
-          lead={trackingLead} 
-          onClose={() => setTrackingLead(null)} 
-          onUpdateStep={handleUpdateTrackerStep} 
+        <LeadTrackerModal
+          lead={trackingLead}
+          onClose={() => setTrackingLead(null)}
+          onUpdateStep={handleUpdateTrackerStep}
+          onCancelLead={handleCancelLead}
         />
       )}
 

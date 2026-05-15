@@ -32,7 +32,7 @@ export const staffManagementService = {
       email: payload.email || '',
       role: 'Staff',
       department: payload.department || '',
-      departmentSkill: payload.departmentSkill || '',
+      departmentSkill: payload.department || '',
       designation: payload.designation || '',
       salary: payload.salary || '',
       joiningDate: payload.joiningDate || '',

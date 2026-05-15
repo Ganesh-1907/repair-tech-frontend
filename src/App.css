@@ -960,11 +960,11 @@ a:focus-visible,
 }
 
 .modal-panel {
-  width: min(100%, 760px);
-  max-height: min(88vh, 760px);
+  width: min(96vw, 900px);
+  max-height: min(75vh, 620px);
   overflow-y: auto;
   border: 1px solid var(--border-light);
-  border-radius: 26px;
+  border-radius: 20px;
   background: var(--bg-card);
   box-shadow: var(--shadow-card-hover);
 }
@@ -974,9 +974,9 @@ a:focus-visible,
 }
 
 .lead-form-modal {
-  width: min(96vw, 1180px);
-  max-height: min(92vh, 780px);
-  border-radius: 24px;
+  width: min(96vw, 1200px);
+  max-height: min(82vh, 700px);
+  border-radius: 20px;
 }
 
 .lead-form-modal .form-grid {
@@ -6080,6 +6080,19 @@ a:focus-visible,
   color: var(--text-main);
   font-size: 0.78rem;
   overflow-wrap: anywhere;
+}
+
+.staff-view-modal {
+  width: min(96vw, 900px);
+  max-height: min(75vh, 620px);
+}
+
+.staff-detail-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.staff-detail-grid .staff-detail-full {
+  grid-column: 1 / -1;
 }
 
 .qr-sticker {

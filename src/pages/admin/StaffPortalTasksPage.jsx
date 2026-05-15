@@ -16,14 +16,10 @@ import { staffManagementService } from '../../services/staffManagementService';
 import { useAuth } from '../../context/AuthContext';
 
 const WORKFLOW_STEPS = [
-  'Lead Captured',
-  'Initial Contact',
-  'Technical Assessment',
-  'Quotation Prepared',
+  'Technician Assigned',
+  'Quotation Preparation',
   'Quotation Approved',
-  'Parts Procurement',
-  'Repair/Service Started',
-  'Quality Check',
+  'Repair / Service Started',
   'Ready for Collection',
   'Delivered & Closed',
 ];
@@ -455,23 +451,7 @@ const LedgerList = ({ title, rows, kind, emptyText }) => (
 
 const normalizeStatus = (value) => String(value || '').trim().toLowerCase();
 
-const getWorkflowSteps = (task) => {
-  if (task.source === 'Job') {
-    return [
-      'Assigned',
-      'Technical Assessment',
-      'Quotation Prepared',
-      'Quotation Approved',
-      'Parts Procurement',
-      'Repair/Service Started',
-      'Quality Check',
-      'Ready for Collection',
-      'Delivered & Closed',
-    ];
-  }
-
-  return ['Assigned', ...WORKFLOW_STEPS];
-};
+const getWorkflowSteps = () => WORKFLOW_STEPS;
 
 const getWorkflowIndex = (steps, status) => {
   const exactIndex = steps.findIndex((step) => normalizeStatus(step) === normalizeStatus(status));
@@ -481,18 +461,23 @@ const getWorkflowIndex = (steps, status) => {
 };
 
 const StatusModal = ({ task, isAdmin, updating, onClose, onChange }) => {
-  const steps = getWorkflowSteps(task);
+  const steps = getWorkflowSteps();
   const currentIndex = getWorkflowIndex(steps, task.status);
   const nextStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
-  const previousStep = steps[Math.max(currentIndex - 1, 0)];
   const progress = Math.round(((currentIndex + 1) / steps.length) * 100);
 
   return (
-    <ModalShell title="Change Task Status" subtitle={`${task.title} - ${task.customerName}`} onClose={onClose}>
+    <ModalShell title={isAdmin ? 'Task Progress (View Only)' : 'Update Task Status'} subtitle={`${task.title} - ${task.customerName}`} onClose={onClose}>
+      {isAdmin && (
+        <div style={{ margin: '0 0 14px', padding: '8px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, fontSize: '0.82rem', color: '#1d4ed8', fontWeight: 600 }}>
+          Admin view — only the assigned technician can update this status.
+        </div>
+      )}
+
       <div className="staff-status-overview">
         <div>
           <span>Current Status</span>
-          <strong>{task.status || 'Assigned'}</strong>
+          <strong>{task.status || 'Technician Assigned'}</strong>
         </div>
         <div>
           <span>Progress</span>
@@ -500,7 +485,7 @@ const StatusModal = ({ task, isAdmin, updating, onClose, onChange }) => {
         </div>
         <div>
           <span>Next Step</span>
-          <strong>{nextStep || 'Completed'}</strong>
+          <strong>{currentIndex >= steps.length - 1 ? 'Completed' : nextStep}</strong>
         </div>
       </div>
 
@@ -511,14 +496,14 @@ const StatusModal = ({ task, isAdmin, updating, onClose, onChange }) => {
       <div className="staff-status-flow">
         {steps.map((step, index) => {
           const state = index < currentIndex ? 'completed' : index === currentIndex ? 'active' : 'pending';
-
           return (
             <button
               type="button"
               key={step}
               className={`staff-status-flow-card ${state}`}
-              onClick={() => onChange(task.id, step)}
-              disabled={updating === task.id}
+              onClick={() => !isAdmin && onChange(task.id, step)}
+              disabled={isAdmin || updating === task.id}
+              style={isAdmin ? { cursor: 'default' } : undefined}
             >
               <span className="staff-status-flow-index">{index + 1}</span>
               <strong>{step}</strong>
@@ -527,26 +512,18 @@ const StatusModal = ({ task, isAdmin, updating, onClose, onChange }) => {
         })}
       </div>
 
-      <div className="staff-status-actions">
-        {isAdmin && (
+      {!isAdmin && (
+        <div className="staff-status-actions">
           <button
-            className="btn btn-outline"
-            disabled={currentIndex <= 0 || updating === task.id}
-            onClick={() => onChange(task.id, previousStep)}
+            className="btn btn-primary"
+            disabled={currentIndex >= steps.length - 1 || updating === task.id}
+            onClick={() => onChange(task.id, nextStep)}
           >
-            <ChevronLeft size={18} />
-            <span>Previous Step</span>
+            <span>{updating === task.id ? 'Updating...' : 'Mark Done / Next Step'}</span>
+            <ChevronRight size={18} />
           </button>
-        )}
-        <button
-          className="btn btn-primary"
-          disabled={currentIndex >= steps.length - 1 || updating === task.id}
-          onClick={() => onChange(task.id, nextStep)}
-        >
-          <span>{updating === task.id ? 'Updating...' : 'Mark Done / Next Step'}</span>
-          <ChevronRight size={18} />
-        </button>
-      </div>
+        </div>
+      )}
     </ModalShell>
   );
 };
