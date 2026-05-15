@@ -36,6 +36,8 @@ const Layout = ({ children }) => {
 
   if (loading) return <div className="loading-container">Loading...</div>;
   if (!isAuthenticated) return <Navigate to="/login" />;
+  if (user?.role === 'customer') return <Navigate to="/customer/dashboard" replace />;
+  if (user?.forcePasswordChange) return <Navigate to="/set-new-password" replace />;
   if (user?.role === 'staff' && !location.pathname.startsWith('/admin/staff-portal')) {
     return <Navigate to="/admin/staff-portal" replace />;
   }

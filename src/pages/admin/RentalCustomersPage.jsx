@@ -15,12 +15,15 @@ import {
   Printer,
   ShieldCheck,
   Mail,
+  Wrench,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import './RentalCustomerManagement.css';
 import './RentalDocuments.css';
 import './PlansCustomers.css';
 import { api } from '../../services/apiClient';
+import SendCredentialsModal from '../../components/common/SendCredentialsModal';
 
 /* ── Helpers ──────────────────────────────────────────────────── */
 
@@ -53,6 +56,7 @@ const mapRentalCustomer = (row) => ({
 /* ── Main Page ────────────────────────────────────────────────── */
 
 const RentalCustomersPage = () => {
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All Types');
@@ -63,6 +67,7 @@ const RentalCustomersPage = () => {
   // Sub-view state
   const [view, setView] = useState('list'); // 'list' | 'quotation' | 'agreement'
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [credentialsTarget, setCredentialsTarget] = useState(null);
 
   const addToast = (message, type = 'success') => {
     const id = Date.now();
@@ -76,7 +81,10 @@ const RentalCustomersPage = () => {
   };
 
   useEffect(() => {
-    loadCustomers().catch(() => addToast('Failed to load customers', 'info'));
+    const timerId = window.setTimeout(() => {
+      loadCustomers().catch(() => addToast('Failed to load customers', 'info'));
+    }, 0);
+    return () => window.clearTimeout(timerId);
   }, []);
 
   useEffect(() => {
@@ -119,7 +127,7 @@ const RentalCustomersPage = () => {
     }
   };
 
-  const openCustomerProcess = (customerId) => { window.location.href = `/admin/rental/customers/${customerId}`; };
+  const openCustomerProcess = (customerId) => { navigate(`/admin/rental/customers/${customerId}`); };
 
   const handleOpenMenu = (event, customer) => {
     event.stopPropagation();
@@ -173,7 +181,7 @@ const RentalCustomersPage = () => {
           <input type="text" className="filter-search" placeholder="Search customer, phone, GST..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
         </div>
-        <button className="primary-button" onClick={() => { window.location.href = '/admin/rental/new'; }}><Plus size={18} /> Add Customer</button>
+        <button className="primary-button" onClick={() => { navigate('/admin/rental/new'); }}><Plus size={18} /> Add Customer</button>
         <select className="filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
           <option>All Types</option><option>Corporate</option><option>Individual</option>
         </select>
@@ -239,9 +247,11 @@ const RentalCustomersPage = () => {
               <>
                 <button className="menu-item" onClick={() => openQuotation(c)}><FileText size={14} /> Create Quotation</button>
                 <button className="menu-item" onClick={() => openAgreement(c)}><ClipboardCheck size={14} /> Create Agreement</button>
+                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/repair/${c.id}`); }}><Wrench size={14} /> Manage Repair</button>
+                <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu(prev => ({ ...prev, open: false, id: null })); }}><CheckCircle2 size={14} /> Send Portal Access</button>
                 <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> View Customer</button>
                 <div className="h-px bg-slate-100 my-1"></div>
-                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); window.location.href = `/admin/rental/new?id=${c.id}`; }}><Edit2 size={14} /> Edit Customer</button>
+                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/new?id=${c.id}`); }}><Edit2 size={14} /> Edit Customer</button>
                 <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button>
               </>
             );
@@ -252,11 +262,20 @@ const RentalCustomersPage = () => {
       {/* --- Toasts --- */}
       <div className="fixed bottom-6 right-6 z-[2000] flex flex-col gap-3">
         <AnimatePresence>{toasts.map(t => (
-          <motion.div key={t.id} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }} className="toast">
+          <Motion.div key={t.id} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }} className="toast">
             {t.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-400" /> : <AlertCircle size={18} className="text-sky-400" />} {t.message}
-          </motion.div>
+          </Motion.div>
         ))}</AnimatePresence>
       </div>
+
+      {credentialsTarget && (
+        <SendCredentialsModal
+          contractId={credentialsTarget.id}
+          customerName={credentialsTarget.name || credentialsTarget.customerName || ''}
+          email={credentialsTarget.email || ''}
+          onClose={() => setCredentialsTarget(null)}
+        />
+      )}
     </div>
   );
 };
@@ -368,7 +387,7 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
       <!doctype html>
       <html>
         <head>
-          <title></title>
+          <title>Rental Quotation ${quote.quoteNo} - ${customer.name || ''}</title>
           <style>
             @page { size: A4; margin: 0; }
             * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -595,10 +614,12 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
 
             <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between', gap: 24 }}>
               <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ marginTop: 40, borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Provider)</div>
+                <p style={{ fontSize: 11, margin: '0 0 14px', color: '#64748b' }}>RepairTech Enterprise</p>
+                <div style={{ borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Provider)</div>
               </div>
               <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ marginTop: 40, borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Client)</div>
+                <p style={{ fontSize: 11, margin: '0 0 14px', color: '#64748b' }}>{customer.name || '—'}</p>
+                <div style={{ borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Client)</div>
               </div>
             </div>
             <div className="agreement-footer"><p>Generated by RepairTech Enterprise — Rental Management System</p></div>
@@ -612,6 +633,7 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
 /* ── Rental Agreement View ────────────────────────────────────── */
 
 const RentalAgreementView = ({ customer, onBack }) => {
+  const agreementRef = useRef(null);
   const savedQuote = customer.raw?.quotation || {};
   const toPercentValue = (value, fallback = 18) => Number(String(value ?? fallback).replace('%', '')) || fallback;
   const buildForm = () => ({
@@ -692,6 +714,36 @@ const RentalAgreementView = ({ customer, onBack }) => {
     window.open(`mailto:${form.email}?subject=${subject}&body=${body}`);
   };
 
+  const handleAgreementPrint = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=1200');
+    const printable = agreementRef.current;
+    if (!printWindow || !printable) { window.print(); return; }
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html><html><head><title>Rental Agreement ${form.agreementNo} - ${customer.name || ''}</title>
+        <style>
+          @page { size: A4; margin: 0; }
+          * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          html, body { margin: 0; padding: 0; background: #ffffff; font-family: "Times New Roman", Times, serif; color: #0f172a; }
+          body { padding: 1.5cm; }
+          .agreement-document { width: 100%; max-width: none; overflow: visible; padding: 0; margin: 0; border: 0; box-shadow: none; background: #ffffff; line-height: 1.6; }
+          .agreement-header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
+          .agreement-section { margin-bottom: 18px; }
+          .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 16px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; }
+          th { background: #f1f5f9; font-weight: 700; }
+          p, li { font-size: 12px; line-height: 1.6; }
+          @media print { html, body { width: 100%; } }
+        </style>
+      </head>
+      <body>${printable.outerHTML}
+        <script>window.onload=()=>{window.focus();window.print();window.onafterprint=()=>window.close();}</script>
+      </body></html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="plans-page">
       <header className="plans-header">
@@ -708,7 +760,7 @@ const RentalAgreementView = ({ customer, onBack }) => {
               <Mail size={18} /> Send to Email
             </button>
           )}
-          <button className="secondary-button" onClick={() => window.print()}>
+          <button className="secondary-button" onClick={handleAgreementPrint}>
             <Printer size={18} /> Print Agreement
           </button>
           <button className="primary-button" onClick={onBack}>
@@ -765,7 +817,7 @@ const RentalAgreementView = ({ customer, onBack }) => {
 
         {/* ── RIGHT: LIVE PREVIEW ── */}
         <div className="agreement-preview-container">
-          <div className="agreement-document">
+          <div className="agreement-document" ref={agreementRef}>
             <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <h1 style={{ fontSize: 20 }}>{form.customerType.toUpperCase()} RENTAL AGREEMENT</h1>

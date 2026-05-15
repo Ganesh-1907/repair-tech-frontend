@@ -2,55 +2,64 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, Plus, Filter, Download, MoreVertical,
-  Users, Calendar, IndianRupee, Eye, Edit, Trash2, X, FileText, FileEdit, RefreshCw,
-  ArrowLeft, Printer, Wrench
+  Users, Calendar, IndianRupee, Eye, Edit, Trash2, FileText, FileEdit, RefreshCw,
+  ArrowLeft, Printer, Wrench, CheckCircle
 } from 'lucide-react';
 import { api } from '../../services/apiClient';
-import RepairModal from './RepairModal';
+import SendCredentialsModal from '../../components/common/SendCredentialsModal';
 import './PlansCustomers.css';
 
 const AMCInventoryPage = () => {
   const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
-  const [amcPlans, setAmcPlans]   = useState([]);
+  const [amcPlans, setAmcPlans] = useState([]);
 
   const [viewMode, setViewMode] = useState('list'); // 'list', 'quotation', 'agreement'
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [editingItem, setEditingItem] = useState(null);
+  const [credentialsTarget, setCredentialsTarget] = useState(null);
   // Floating Menu State (CMC Style)
   const [activeMenu, setActiveMenu] = useState({ id: null, open: false, x: 0, y: 0, width: 220 });
-  const [repairContract, setRepairContract] = useState(null);
   const [toast, setToast] = useState('');
 
   const fetchContracts = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [data, plans] = await Promise.all([
+      const [data, plansData] = await Promise.all([
         api.list('amcContracts'),
         api.list('amcPlans'),
       ]);
-      setAmcPlans(Array.isArray(plans) ? plans : []);
       const rows = Array.isArray(data) ? data : [];
-      const mapped = rows.map(item => ({
-        ...item,
-        name: item.customerName || item.name || 'Unnamed Customer',
-        contractId: item.id || item.contractId,
-        plan: item.amcDetails?.planName || item.plan || '',
-        expiry: item.expiryDate || item.endDate || item.expiry,
-        value: item.contractValue || item.value,
-        status: item.status || 'Active',
-        authorizedPerson1: item.amcDetails?.authorizedPerson1 || item.authorizedPerson1,
-        authorizedPerson2: item.amcDetails?.authorizedPerson2 || item.authorizedPerson2,
-        gstin: item.amcDetails?.gstin || item.gstin,
-        address: item.amcDetails?.address || item.address,
-        contact: item.amcDetails?.contact || item.contact,
-        locations: item.amcDetails?.locations || item.locations || ['Head Office'],
-        devices: item.amcDetails?.devices || item.devices || [],
-      }));
+      const plans = Array.isArray(plansData) ? plansData : [];
+      setAmcPlans(plans);
+      const mapped = rows.map(item => {
+        const details = item.amcDetails || {};
+        const planName = details.planName || item.plan || '';
+        return {
+          ...item,
+          name: item.customerName || item.name || 'Unnamed Customer',
+          contractId: item.id || item.contractId,
+          plan: planName,
+          planDetails: plans.find((plan) => plan.name === planName) || null,
+          expiry: item.expiryDate || item.endDate || item.expiry,
+          start: item.startDate || item.start || '',
+          value: item.contractValue || item.value,
+          status: item.status || 'Active',
+          authorizedPerson1: details.authorizedPerson1 || item.authorizedPerson1,
+          authorizedPerson2: details.authorizedPerson2 || item.authorizedPerson2,
+          primaryMobile: details.primaryContact?.mobile || details.contact || details.contactPhone || item.contact || item.contactPhone,
+          primaryEmail: details.primaryContact?.email || details.email || item.email,
+          secondaryMobile: details.secondaryContact?.mobile || item.secondaryContact?.mobile,
+          secondaryEmail: details.secondaryContact?.email || item.secondaryContact?.email,
+          gstin: details.gstin || item.gstin,
+          address: details.address || item.address,
+          contact: details.contact || item.contact,
+          locations: details.locations || item.locations || ['Head Office'],
+          devices: details.devices || item.devices || [],
+          quotation: details.quotation,
+        };
+      });
       setCustomers(mapped);
     } catch (error) {
       console.error('Failed to fetch AMC contracts:', error);
@@ -88,29 +97,10 @@ const AMCInventoryPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!showModal && !showDetailModal) {
-      return undefined;
-    }
-
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [showModal, showDetailModal]);
-
-  useEffect(() => {
     if (!toast) return undefined;
     const timerId = window.setTimeout(() => setToast(''), 2500);
     return () => window.clearTimeout(timerId);
   }, [toast]);
-
-  const handleOpenDetail = (cust) => {
-    setSelectedCustomer(cust);
-    setShowDetailModal(true);
-    setActiveMenu({ id: null, open: false, x: 0, y: 0, width: 220 });
-  };
 
   // Smart Positioning Menu Trigger (CMC Style)
   const handleOpenMenu = (event, customer) => {
@@ -130,44 +120,6 @@ const AMCInventoryPage = () => {
     setActiveMenu({ id: customer.id, open: true, x, y, width });
   };
 
-  const handleSave = async (data) => {
-    try {
-      const payload = {
-        id: data.contractId,
-        contractType: 'AMC',
-        customerId: data.name.replace(/\s+/g, '-').toLowerCase(), // Simple slug for customerId
-        customerName: data.name,
-        startDate: data.start,
-        endDate: data.expiry,
-        status: data.status,
-        contractValue: data.value,
-        amcDetails: {
-          planName: data.plan,
-          authorizedPerson1: data.authorizedPerson1,
-          authorizedPerson2: data.authorizedPerson2,
-          gstin: data.gstin,
-          address: data.address,
-          contact: data.contact,
-          locations: data.locations,
-          devices: data.devices
-        }
-      };
-
-      if (editingItem) {
-        await api.update('amcContracts', data.contractId, payload);
-      } else {
-        await api.create('amcContracts', payload);
-      }
-      
-      await fetchContracts();
-      setShowModal(false);
-      setEditingItem(null);
-    } catch (error) {
-      console.error('Failed to save AMC contract:', error);
-      alert('Error saving AMC. Please check console.');
-    }
-  };
-
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this AMC record?')) {
       try {
@@ -180,18 +132,53 @@ const AMCInventoryPage = () => {
     }
   };
 
-  const handleEditFromDoc = (cust) => {
-    setEditingItem(cust);
-    setShowModal(true);
-    setViewMode('list');
-  };
-
   // --- Sub-Views ---
   if (viewMode === 'quotation') {
-    return <AMCQuotationView customer={selectedCustomer} onBack={() => setViewMode('list')} onEdit={() => handleEditFromDoc(selectedCustomer)} />;
+    return (
+      <AMCQuotationView
+        customer={selectedCustomer}
+        onBack={() => setViewMode('list')}
+        onSaved={(updated) => {
+          setSelectedCustomer((prev) => ({ ...prev, ...updated, quotation: updated.amcDetails?.quotation }));
+          setCustomers((prev) => prev.map((row) => (row.contractId === updated.id ? { ...row, ...updated, quotation: updated.amcDetails?.quotation } : row)));
+          setToast('Quotation saved successfully.');
+        }}
+      />
+    );
   }
   if (viewMode === 'agreement') {
-    return <AMCAgreementView customer={selectedCustomer} onBack={() => setViewMode('list')} onEdit={() => handleEditFromDoc(selectedCustomer)} />;
+    return (
+      <AMCAgreementView
+        customer={selectedCustomer}
+        onBack={() => setViewMode('list')}
+        onSaved={(updated) => {
+          const mapped = {
+            ...updated,
+            name: updated.customerName || updated.name || selectedCustomer?.name,
+            contractId: updated.id || updated.contractId || selectedCustomer?.contractId,
+            plan: updated.amcDetails?.planName || updated.plan || selectedCustomer?.plan,
+            planDetails: amcPlans.find((plan) => plan.name === (updated.amcDetails?.planName || updated.plan || selectedCustomer?.plan)) || selectedCustomer?.planDetails || null,
+            expiry: updated.expiryDate || updated.endDate || updated.expiry || selectedCustomer?.expiry,
+            start: updated.startDate || updated.start || selectedCustomer?.start,
+            value: updated.contractValue || updated.value || selectedCustomer?.value,
+            status: updated.status || selectedCustomer?.status,
+            authorizedPerson1: updated.amcDetails?.authorizedPerson1 || updated.authorizedPerson1 || selectedCustomer?.authorizedPerson1,
+            authorizedPerson2: updated.amcDetails?.authorizedPerson2 || updated.authorizedPerson2 || selectedCustomer?.authorizedPerson2,
+            primaryMobile: updated.amcDetails?.primaryContact?.mobile || updated.amcDetails?.contact || updated.contact || selectedCustomer?.primaryMobile,
+            primaryEmail: updated.amcDetails?.primaryContact?.email || updated.email || selectedCustomer?.primaryEmail,
+            secondaryMobile: updated.amcDetails?.secondaryContact?.mobile || selectedCustomer?.secondaryMobile,
+            secondaryEmail: updated.amcDetails?.secondaryContact?.email || selectedCustomer?.secondaryEmail,
+            gstin: updated.amcDetails?.gstin || updated.gstin || selectedCustomer?.gstin,
+            address: updated.amcDetails?.address || updated.address || selectedCustomer?.address,
+            contact: updated.amcDetails?.contact || updated.contact || selectedCustomer?.contact,
+            devices: updated.amcDetails?.devices || updated.devices || selectedCustomer?.devices || [],
+          };
+          setSelectedCustomer(mapped);
+          setCustomers((prev) => prev.map((row) => (row.contractId === mapped.contractId || row.id === mapped.id ? { ...row, ...mapped } : row)));
+          setToast('Agreement saved successfully.');
+        }}
+      />
+    );
   }
 
   if (isLoading) {
@@ -291,7 +278,8 @@ const AMCInventoryPage = () => {
                 <button className="menu-item" onClick={() => navigate(`/admin/amc/new?id=${c.id}`)}><Edit size={14} /> Edit AMC</button>
                 <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileEdit size={14} /> AMC Quotation</button>
                 <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileText size={14} /> AMC Agreement</button>
-                <button className="menu-item" onClick={() => { setRepairContract(c); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><Wrench size={14} /> Manage Repair</button>
+                <button className="menu-item" onClick={() => navigate(`/admin/amc/repair/${c.contractId || c.id}`)}><Wrench size={14} /> Manage Repair</button>
+                <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><CheckCircle size={14} /> Send Portal Access</button>
                 <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>
               </>
             );
@@ -299,696 +287,438 @@ const AMCInventoryPage = () => {
         </div>
       )}
 
-      {showModal && (
-        <CustomerModal
-          onClose={() => setShowModal(false)}
-          onSubmit={handleSave}
-          editingItem={editingItem}
-          customers={customers}
-          amcPlans={amcPlans}
-        />
-      )}
-
-
-      {repairContract && (
-        <RepairModal
-          contract={repairContract}
-          collection="amcRepairs"
-          onClose={() => setRepairContract(null)}
-          showToast={(msg) => setToast(msg)}
-        />
-      )}
-
       {toast && <div className="toast">{toast}</div>}
+
+      {credentialsTarget && (
+        <SendCredentialsModal
+          contractId={credentialsTarget.contractId || credentialsTarget.id}
+          customerName={credentialsTarget.customerName || credentialsTarget.name || ''}
+          email={credentialsTarget.primaryEmail || credentialsTarget.email || ''}
+          onClose={() => setCredentialsTarget(null)}
+        />
+      )}
     </div>
   );
 };
 
-const CustomerModal = ({ onClose, onSubmit, editingItem, customers, amcPlans = [] }) => {
-  const createBlankDevice = () => ({ type: 'Laptop', brand: '', sn: '', config: '', status: 'Healthy' });
-  const getNextContractId = () => {
-    const year = new Date().getFullYear();
-    const prefix = `AMC-${year}-`;
-    
-    // Filter IDs for current year and extract the serial number
-    const serials = customers
-      .filter(c => c.contractId?.startsWith(prefix))
-      .map(c => {
-        const parts = c.contractId.split('-');
-        return parseInt(parts[parts.length - 1]);
-      })
-      .filter(n => !isNaN(n));
-
-    const nextSerial = serials.length > 0 ? Math.max(...serials) + 1 : 1001;
-    return `${prefix}${nextSerial}`;
-  };
-
-  const createInitialFormData = () => {
-    const defaults = {
-      name: '', 
-      contractId: getNextContractId(), 
-      plan: '',
-      start: new Date().toISOString().split('T')[0], 
-      expiry: '', 
-      value: '', 
-      status: 'Active',
-      authorizedPerson1: '',
-      authorizedPerson2: '',
-      gstin: '',
-      address: '',
-      contact: '',
-      locations: ['Head Office'],
-      devices: [{ type: 'Laptop', brand: '', sn: '', config: '', status: 'Healthy' }]
-    };
-
-    if (!editingItem) {
-      return defaults;
+const AMCQuotationView = ({ customer, onBack, onSaved }) => {
+  const printRef = useRef(null);
+  const currentCustomer = customer || {};
+  const saved = currentCustomer.quotation || currentCustomer.amcDetails?.quotation || {};
+  const devices = (Array.isArray(currentCustomer.devices) && currentCustomer.devices.length ? currentCustomer.devices : [{}]).map((device, index) => ({
+    id: index + 1,
+    device: device.type || '-',
+    model: [device.brand, device.model || device.cpu?.model].filter(Boolean).join(' ') || '-',
+    serial: device.serialNumber || device.monitor?.serialNumber || '-',
+    qty: 1,
+    unitPrice: Number(saved.devices?.[index]?.unitPrice ?? saved.unitPrice ?? 0),
+  }));
+  const [quote, setQuote] = useState({
+    quoteNo: saved.quoteNo || `AMC-QT-${String(currentCustomer.contractId || currentCustomer.id || '1001').split('-').pop()}`,
+    date: saved.date || new Date().toISOString().split('T')[0],
+    validity: saved.validity || '30 Days',
+    gstPercent: saved.gstPercent ?? 18,
+    slaResponse: saved.slaResponse || '4-8 Working Hours',
+    slaResolution: saved.slaResolution || '24-48 Working Hours',
+    scope: saved.scope || 'Quarterly preventive maintenance, Unlimited breakdown support calls, Remote support, OS installation and software troubleshooting, Printer service and minor adjustments',
+    exclusions: saved.exclusions || 'Replacement of spare parts, Consumables, Physical damage or water logged devices, External cables and connectors',
+  });
+  const [quoteDevices, setQuoteDevices] = useState(devices);
+  const [saving, setSaving] = useState(false);
+  const set = (field, val) => setQuote((prev) => ({ ...prev, [field]: val }));
+  const updateDevice = (id, value) => setQuoteDevices((prev) => prev.map((row) => (row.id === id ? { ...row, unitPrice: value } : row)));
+  const subtotal = () => quoteDevices.reduce((sum, row) => sum + Number(row.qty || 0) * Number(row.unitPrice || 0), 0);
+  const gstAmount = () => Math.round(subtotal() * (Number(quote.gstPercent || 0) / 100));
+  const grandTotal = () => subtotal() + gstAmount();
+  const save = async () => {
+    if (!customer) return;
+    setSaving(true);
+    try {
+      const payload = { ...quote, devices: quoteDevices };
+      const updated = await api.patch('amcContracts', customer.contractId || customer.id, {
+        amcDetails: { ...(customer.amcDetails || {}), quotation: payload },
+      });
+      onSaved?.(updated);
+    } finally {
+      setSaving(false);
     }
-
-    return {
-      ...defaults,
-      ...editingItem,
-      locations: Array.isArray(editingItem.locations) && editingItem.locations.length > 0 ? editingItem.locations : defaults.locations,
-      devices: Array.isArray(editingItem.devices) && editingItem.devices.length > 0 ? editingItem.devices : defaults.devices
-    };
-  };
-  const [formData, setFormData] = useState(createInitialFormData);
-
-  const addDevice = () => {
-    setFormData({ ...formData, devices: [...formData.devices, createBlankDevice()] });
   };
 
-  const removeDevice = (index) => {
-    if (formData.devices.length === 1) {
-      setFormData({ ...formData, devices: [createBlankDevice()] });
-      return;
-    }
-
-    const newDevices = formData.devices.filter((_, i) => i !== index);
-    setFormData({ ...formData, devices: newDevices });
+  const handlePrint = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=1200');
+    const printable = printRef.current;
+    if (!printWindow || !printable) { window.print(); return; }
+    printWindow.document.open();
+    printWindow.document.write(`
+      <!doctype html><html><head><title>AMC Quotation ${quote.quoteNo} - ${currentCustomer.name || ''}</title>
+        <style>
+          @page { size: A4; margin: 0; }
+          * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          html, body { margin: 0; padding: 0; background: #ffffff; font-family: "Times New Roman", Times, serif; color: #0f172a; }
+          body { padding: 1.5cm; }
+          .agreement-document { width: 100%; overflow: visible; padding: 0; margin: 0; border: 0; box-shadow: none; background: #fff; line-height: 1.6; }
+          .agreement-header { border-bottom: 2px solid #333; padding-bottom: 16px; margin-bottom: 32px; }
+          .agreement-section { margin-bottom: 18px; }
+          .agreement-section h2 { margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; }
+          th { background: #f1f5f9; font-weight: 700; }
+          p, li { font-size: 12px; line-height: 1.6; }
+          .agreement-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #eee; text-align: center; color: #64748b; font-size: 11px; }
+        </style>
+      </head>
+      <body>${printable.outerHTML}
+        <script>window.onload=()=>{window.focus();window.print();window.onafterprint=()=>window.close();}</script>
+      </body></html>
+    `);
+    printWindow.document.close();
   };
 
-  const updateDevice = (index, field, value) => {
-    const newDevices = [...formData.devices];
-    newDevices[index][field] = value;
-    setFormData({ ...formData, devices: newDevices });
-  };
-
-  const addLocation = () => {
-    setFormData({ ...formData, locations: [...formData.locations, ''] });
-  };
-
-  const hasPrinter = formData.devices.some(d => d.type === 'Printer');
+  if (!customer) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card amc-enrollment-modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{editingItem ? 'Edit AMC Registry' : 'New AMC Enrollment'}</h3>
-          <button className="icon-button" onClick={onClose} style={{ border: 'none' }}><X size={20} /></button>
+    <div className="plans-page">
+      <header className="plans-header">
+        <div className="plans-header-left">
+          <button className="secondary-button" onClick={onBack} style={{ marginBottom: 12 }}><ArrowLeft size={16} /> Back to Inventory</button>
+          <h1>AMC Quotation</h1>
+          <p>For: <strong>{customer.name}</strong></p>
         </div>
-        <div className="modal-body amc-enrollment-body">
-          <div style={{ padding: '32px' }}>
-            {/* 1. Customer Profile */}
-            <div className="form-section">
-              <h4 className="section-title" style={{ fontSize: '16px', color: 'var(--text-color)', marginBottom: '20px' }}>1. Customer Profile</h4>
-              
-              <div className="amc-form-stack">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group">
-                    <label>Company / Customer Name</label>
-                    <input className="form-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Enter company name" />
-                  </div>
-                  <div className="form-group">
-                    <label>GST Number</label>
-                    <input className="form-input" value={formData.gstin} onChange={e => setFormData({...formData, gstin: e.target.value})} placeholder="GSTIN" />
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group">
-                    <label>Contact Phone / Email</label>
-                    <input className="form-input" value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} placeholder="Phone or Email" />
-                  </div>
-                  <div className="form-group">
-                    <label>Authorized Person 1</label>
-                    <input className="form-input" value={formData.authorizedPerson1} onChange={e => setFormData({...formData, authorizedPerson1: e.target.value})} placeholder="Primary Contact" />
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group">
-                    <label>Authorized Person 2</label>
-                    <input className="form-input" value={formData.authorizedPerson2} onChange={e => setFormData({...formData, authorizedPerson2: e.target.value})} placeholder="Secondary (Optional)" />
-                  </div>
-                  <div />
-                </div>
-                <div className="form-group">
-                  <label>Registered Address</label>
-                  <textarea className="form-input" style={{ height: '60px', paddingTop: '12px' }} value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="Full company address" />
-                </div>
-              </div>
+        <div className="plans-header-actions">
+          <button className="secondary-button" onClick={handlePrint}><Printer size={18} /> Print Quote</button>
+          <button className="primary-button" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Quotation'}</button>
+        </div>
+      </header>
+
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="table-card">
+            <div className="card-header"><div className="card-title-area"><h2>Devices &amp; Pricing</h2><p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>Device details come from AMC enrollment — enter pricing only.</p></div></div>
+            <div style={{ padding: '0 20px 24px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead><tr style={{ background: '#f8fafc' }}><th style={{ padding: 12, textAlign: 'left' }}>Device</th><th style={{ padding: 12, textAlign: 'left' }}>Model / Serial</th><th style={{ padding: 12, textAlign: 'center' }}>Qty</th><th style={{ padding: 12, textAlign: 'right' }}>Unit Price (₹)</th></tr></thead>
+                <tbody>{quoteDevices.map((row) => (
+                  <tr key={row.id}><td style={{ padding: 12 }}>{row.device}</td><td style={{ padding: 12 }}>{row.model}<br /><span style={{ color: '#64748b' }}>{row.serial}</span></td><td style={{ padding: 12, textAlign: 'center' }}>{row.qty}</td><td style={{ padding: 12, textAlign: 'right' }}><input type="number" className="form-input" style={{ width: 120, textAlign: 'right' }} value={row.unitPrice} onChange={(e) => updateDevice(row.id, e.target.value)} /></td></tr>
+                ))}</tbody>
+                <tfoot><tr style={{ background: '#f0fdf4' }}><td colSpan={3} style={{ padding: 14, fontWeight: 800 }}>Subtotal</td><td style={{ padding: 14, textAlign: 'right', fontWeight: 800 }}>₹{subtotal().toLocaleString('en-IN')}</td></tr></tfoot>
+              </table>
             </div>
-
-            <hr style={{ border: 'none', borderTop: '1px solid var(--slate-100)', margin: '32px 0' }} />
-
-            {/* 2. Contract Details */}
-            <div className="form-section">
-              <h4 className="section-title" style={{ fontSize: '16px', color: 'var(--text-color)', marginBottom: '20px' }}>2. Contract Details</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group">
-                    <label>AMC ID</label>
-                    <input className="form-input" value={formData.contractId} readOnly style={{ background: 'var(--slate-50)', color: 'var(--text-muted)' }} />
-                  </div>
-                  <div className="form-group">
-                    <label>AMC Plan</label>
-                    <select className="form-select" value={formData.plan} onChange={e => setFormData({...formData, plan: e.target.value})}>
-                      <option value="">— Select Plan —</option>
-                      {amcPlans.filter(p => p.status !== 'Inactive').map(p => (
-                        <option key={p.id} value={p.name}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div className="form-group">
-                    <label>Expiry Date</label>
-                    <input type="date" className="form-input" value={formData.expiry} onChange={e => setFormData({...formData, expiry: e.target.value})} />
-                  </div>
-                  <div className="form-group">
-                    <label>Status</label>
-                    <select className="form-select" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
-                      <option>Active</option>
-                      <option>Expired</option>
-                      <option>Pending Approval</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
+          </div>
+          <div className="table-card">
+            <div className="card-header"><div className="card-title-area"><h2>Charges &amp; Terms</h2></div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
+              <div className="form-group"><label>GST (%)</label><select className="form-select" value={quote.gstPercent} onChange={(e) => set('gstPercent', e.target.value)}><option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option></select></div>
+              <div className="form-group"><label>Validity</label><input className="form-input" value={quote.validity} onChange={(e) => set('validity', e.target.value)} /></div>
+              <div className="form-group"><label>SLA Response</label><input className="form-input" value={quote.slaResponse} onChange={(e) => set('slaResponse', e.target.value)} /></div>
+              <div className="form-group"><label>SLA Resolution</label><input className="form-input" value={quote.slaResolution} onChange={(e) => set('slaResolution', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Scope of Work</label><textarea className="form-input" style={{ height: 80 }} value={quote.scope} onChange={(e) => set('scope', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Exclusions</label><textarea className="form-input" style={{ height: 64 }} value={quote.exclusions} onChange={(e) => set('exclusions', e.target.value)} /></div>
             </div>
-
-            <hr style={{ border: 'none', borderTop: '1px solid var(--slate-100)', margin: '32px 0' }} />
-
-            {/* 3. Device Registry */}
-            <div className="form-section">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h4 className="section-title" style={{ margin: 0, fontSize: '16px', color: 'var(--text-color)' }}>3. Device Registry</h4>
-              </div>
-              <div className="device-table-wrapper">
-                <table className="device-entry-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th>Type</th>
-                      <th>Brand / Model</th>
-                      <th>Serial Number</th>
-                      <th>Configuration</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {formData.devices.map((device, index) => (
-                      <tr key={index}>
-                        <td>
-                          <select className="form-select" value={device.type} onChange={e => updateDevice(index, 'type', e.target.value)}>
-                            <option>Laptop</option>
-                            <option>Desktop</option>
-                            <option>Printer</option>
-                            <option>Server</option>
-                            <option>UPS</option>
-                            <option>Scanner</option>
-                          </select>
-                        </td>
-                        <td>
-                          <input className="form-input" value={device.brand} onChange={e => updateDevice(index, 'brand', e.target.value)} placeholder="e.g. Dell Latitude 5420" />
-                        </td>
-                        <td>
-                          <input className="form-input" value={device.sn} onChange={e => updateDevice(index, 'sn', e.target.value)} placeholder="S/N" />
-                        </td>
-                        <td>
-                          <input className="form-input" value={device.config} onChange={e => updateDevice(index, 'config', e.target.value)} placeholder="e.g. i5, 8GB, 256GB" />
-                        </td>
-                        <td>
-                          <div className="device-row-actions">
-                            <button className="device-action-button delete" title="Delete device row" aria-label={`Delete device row ${index + 1}`} onClick={() => removeDevice(index)}>
-                              <Trash2 size={16} />
-                            </button>
-                            {index === formData.devices.length - 1 && (
-                              <button className="device-action-button add" title="Add device row" aria-label="Add device row" onClick={addDevice}>
-                                <Plus size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {hasPrinter && (
-              <>
-                <hr style={{ border: 'none', borderTop: '1px solid var(--slate-100)', margin: '32px 0' }} />
-                <div className="form-section" style={{ animation: 'fadeIn 0.3s ease' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                    <h4 className="section-title" style={{ margin: 0, fontSize: '16px', color: 'var(--text-color)' }}>4. Printer Service Locations</h4>
-                    <button className="secondary-button" style={{ height: '36px', fontSize: '13px' }} onClick={addLocation}><Plus size={16} /> Add Location</button>
-                  </div>
-                  <div className="amc-form-stack">
-                     {formData.locations.map((loc, index) => (
-                       <div key={index} className="amc-location-row">
-                        <input 
-                          className="form-input" 
-                          value={loc} 
-                          onChange={e => {
-                            const newLocs = [...formData.locations];
-                            newLocs[index] = e.target.value;
-                            setFormData({ ...formData, locations: newLocs });
-                          }} 
-                          placeholder="e.g. Floor 2 / Branch" 
-                        />
-                        <button 
-                          onClick={() => {
-                            const newLocs = formData.locations.filter((_, i) => i !== index);
-                            setFormData({ ...formData, locations: newLocs });
-                          }}
-                          style={{ background: 'transparent', color: 'var(--red)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}
-                          title="Remove location"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                       </div>
-                     ))}
-                     {formData.locations.length === 0 && (
-                       <div style={{ textAlign: 'center', padding: '20px', background: 'var(--slate-50)', borderRadius: '12px', border: '1px dashed var(--slate-300)', color: 'var(--text-muted)' }}>
-                         No locations added. Click "Add Location" to start.
-                       </div>
-                     )}
-                  </div>
-                </div>
-              </>
-            )}
           </div>
         </div>
-        <div className="modal-footer amc-enrollment-footer">
-          <button className="secondary-button" onClick={onClose} style={{ minWidth: '120px' }}>Cancel</button>
-          <button className="primary-button" style={{ padding: '0 40px' }} onClick={() => onSubmit(formData)}>Save Enrollment</button>
+
+        <div className="agreement-preview-container">
+          <div className="agreement-document" ref={printRef}>
+            <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div><h1 style={{ fontSize: 22, margin: '0 0 4px' }}>AMC QUOTATION</h1><p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo}</p><p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Date: {quote.date} | Valid: {quote.validity}</p></div>
+              <div style={{ textAlign: 'right' }}><h2 style={{ fontSize: 16, margin: 0 }}>RepairTech Enterprise</h2><p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>Authorized Service Center</p></div>
+            </div>
+            <div className="agreement-section" style={{ marginBottom: 16 }}><h2>Customer Details</h2><div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>{[
+              ['Customer Name', customer.name], ['Contact Person', customer.authorizedPerson1], ['Address', customer.address], ['GSTIN', customer.gstin], ['AMC ID', customer.contractId], ['AMC Plan', customer.plan], ['SLA Response', quote.slaResponse],
+            ].map(([key, val]) => <div key={key} style={{ display: 'flex', fontSize: 12 }}><span style={{ minWidth: 130, fontWeight: 700, color: '#64748b' }}>{key}</span><span style={{ color: '#94a3b8', marginRight: 10 }}>—</span><span>{val || '—'}</span></div>)}</div></div>
+            <div className="agreement-section"><h2>Device & Pricing Details</h2><table className="agreement-table"><thead><tr><th>Device</th><th>Model / Serial</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>{quoteDevices.map((row) => <tr key={row.id}><td>{row.device}</td><td>{row.model}<br />{row.serial}</td><td>{row.qty}</td><td>₹{Number(row.unitPrice || 0).toLocaleString('en-IN')}</td><td>₹{(Number(row.qty || 0) * Number(row.unitPrice || 0)).toLocaleString('en-IN')}</td></tr>)}<tr><td colSpan={4} style={{ textAlign: 'right' }}><strong>Subtotal</strong></td><td><strong>₹{subtotal().toLocaleString('en-IN')}</strong></td></tr><tr><td colSpan={4} style={{ textAlign: 'right' }}>GST ({quote.gstPercent}%)</td><td>₹{gstAmount().toLocaleString('en-IN')}</td></tr><tr style={{ background: '#f0fdf4' }}><td colSpan={4} style={{ textAlign: 'right' }}><strong>Grand Total</strong></td><td><strong>₹{grandTotal().toLocaleString('en-IN')}</strong></td></tr></tbody></table></div>
+            <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+              <div className="agreement-section" style={{ flex: 1 }}><h2>Scope of Work</h2><ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>{quote.scope.split(',').map((item) => item.trim()).filter(Boolean).map((item, i) => <li key={i} style={{ fontSize: 12, marginBottom: 4 }}>• {item}</li>)}</ul></div>
+              <div className="agreement-section" style={{ flex: 1 }}><h2>Exclusions</h2><ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>{quote.exclusions.split(',').map((item) => item.trim()).filter(Boolean).map((item, i) => <li key={i} style={{ fontSize: 12, marginBottom: 4 }}>• {item}</li>)}</ul></div>
+            </div>
+            <div style={{ marginTop: 48, display: 'flex', justifyContent: 'space-between', gap: 24 }}>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <p style={{ fontSize: 11, margin: '0 0 14px', color: '#64748b' }}>RepairTech Enterprise</p>
+                <div style={{ borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Provider)</div>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <p style={{ fontSize: 11, margin: '0 0 14px', color: '#64748b' }}>{customer.name || '—'}</p>
+                <div style={{ borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Client)</div>
+              </div>
+            </div>
+            <div className="agreement-footer"><p>Generated by RepairTech Enterprise — AMC Management System</p></div>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
+const getDeviceModel = (device = {}) => (
+  [device.brand, device.model || device.cpu?.model || device.monitor?.subType || device.subType]
+    .filter(Boolean)
+    .join(' ') || '-'
+);
 
-const AMCQuotationView = ({ customer, onBack, onEdit }) => {
-  const [mode, setMode] = useState('form'); // 'form' or 'preview'
-  const [quoteData, setQuoteData] = useState({
-    date: new Date().toISOString().split('T')[0],
-    number: `QT-${customer.contractId.split('-')[2]}`,
-    unitPrice: Math.round((parseInt(String(customer.value || '0').replace(/[^0-9]/g, '')) || 0) / (customer.devices?.length || 1)),
-    gstType: 'Exclusive',
-    scope: [
-      'Quarterly Preventive Maintenance (4 visits per year)',
-      'Unlimited Breakdown Support Calls',
-      'Remote Desktop Support (within 1 hour)',
-      'OS Installation & Software Troubleshooting',
-      'Printer Service & Minor Adjustments',
-      'Network Connectivity Management'
-    ],
-    exclusions: [
-      'Replacement of Spare Parts',
-      'Consumables (Ink, Toner, Cartridges, Ribbons)',
-      'Physical damage or water logged devices',
-      'External Cables and Connectors'
-    ],
-    sla: {
-      response: '4-8 Working Hours',
-      resolution: '24-48 Working Hours'
-    },
-    validity: '30 Days'
+const getDeviceSerial = (device = {}) => (
+  device.serialNumber
+  || device.sn
+  || device.monitor?.serialNumber
+  || device.configurations?.map((conf) => conf.serialNumber).filter(Boolean).join(', ')
+  || '-'
+);
+
+const AgreementDetailRows = ({ rows }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    {rows.map(([label, value], index) => (
+      <div key={`${label}-${index}`} style={{ display: 'grid', gridTemplateColumns: '150px 18px 1fr', gap: 8, alignItems: 'start', fontSize: 12 }}>
+        <strong style={{ color: '#64748b' }}>{label}</strong>
+        <span style={{ color: '#94a3b8' }}>—</span>
+        <span>{value || '-'}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const splitAgreementItems = (value) => String(value || '')
+  .split(/[,\n]/)
+  .map((item) => item.trim())
+  .filter(Boolean);
+
+const AMCAgreementView = ({ customer, onBack, onSaved }) => {
+  const agreeRef = useRef(null);
+  const currentCustomer = customer || {};
+  const planDetails = currentCustomer.planDetails || {};
+  const savedAgreement = currentCustomer.amcDetails?.agreement || {};
+  const savedQuotation = currentCustomer.quotation || currentCustomer.amcDetails?.quotation || {};
+  const quotationDevices = Array.isArray(savedQuotation.devices) ? savedQuotation.devices : [];
+  const registryDevices = Array.isArray(currentCustomer.devices) ? currentCustomer.devices : [];
+  const agreementDevices = registryDevices.length ? registryDevices : [{}];
+  const pricingRows = quotationDevices.length
+    ? quotationDevices
+    : agreementDevices.map((device, index) => ({
+      id: index + 1,
+      device: device.type || '-',
+      model: getDeviceModel(device),
+      serial: getDeviceSerial(device),
+      qty: 1,
+      unitPrice: 0,
+    }));
+  const quotationSubtotal = pricingRows.reduce((sum, row) => sum + (Number(row.qty || 0) * Number(row.unitPrice || 0)), 0);
+  const quotationGstPercent = Number(savedQuotation.gstPercent ?? 18);
+  const quotationGstAmount = Math.round(quotationSubtotal * (quotationGstPercent / 100));
+  const quotationGrandTotal = quotationSubtotal + quotationGstAmount;
+  const [agreement, setAgreement] = useState({
+    agreementNo: savedAgreement.agreementNo || `AMC-AGR-${String(currentCustomer.contractId || currentCustomer.id || '1001').split('-').pop()}`,
+    agreementDate: savedAgreement.agreementDate || new Date().toISOString().split('T')[0],
+    scope: savedAgreement.scope || savedQuotation.scope || 'Preventive maintenance, breakdown support, remote support, software troubleshooting, printer service and minor adjustments',
+    exclusions: savedAgreement.exclusions || savedQuotation.exclusions || 'Spare parts, consumables, physical damage, water damage, external accessories and third-party software licenses',
+    paymentTerms: savedAgreement.paymentTerms || 'Payment to be made as per approved quotation / invoice terms.',
+    sparePolicy: savedAgreement.sparePolicy || 'Spares are handled as per AMC plan and approved quotation terms.',
+    terminationNotice: savedAgreement.terminationNotice || '30',
+    renewalNotice: savedAgreement.renewalNotice || '15',
+    jurisdiction: savedAgreement.jurisdiction || 'Bangalore',
+    specialTerms: savedAgreement.specialTerms || 'All service visits must be logged through the authorized service channel.',
   });
+  const scopeItems = splitAgreementItems(agreement.scope);
+  const exclusionItems = splitAgreementItems(agreement.exclusions);
+  const paymentItems = splitAgreementItems(agreement.paymentTerms);
+  const [saving, setSaving] = useState(false);
+  const setAgreementField = (field, value) => setAgreement((prev) => ({ ...prev, [field]: value }));
 
-  if (!customer) return null;
+  const saveAgreement = async () => {
+    if (!customer) return;
+    setSaving(true);
+    try {
+      const updated = await api.patch('amcContracts', customer.contractId || customer.id, {
+        amcDetails: { ...(customer.amcDetails || {}), agreement },
+      });
+      onSaved?.(updated);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  const totalBase = quoteData.unitPrice * (customer.devices?.length || 1);
-  const gstAmount = quoteData.gstType === 'Exclusive' ? totalBase * 0.18 : 0;
-  const grandTotal = totalBase + gstAmount;
+  const printAgreement = () => {
+    const pw = window.open('', '_blank', 'width=900,height=1200');
+    const el = agreeRef.current;
+    if (!pw || !el) { window.print(); return; }
+    pw.document.open();
+    pw.document.write(`<!doctype html><html><head><title>AMC Agreement ${agreement.agreementNo}</title><style>@page{size:A4;margin:0}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{margin:0;padding:0;background:#fff;font-family:"Times New Roman",Times,serif;color:#0f172a}body{padding:1.5cm}.agreement-document{width:100%;overflow:visible;padding:0;margin:0;border:0;box-shadow:none;background:#fff;line-height:1.6}.agreement-header{border-bottom:2px solid #333;padding-bottom:16px;margin-bottom:24px}.agreement-section{margin-bottom:18px}.agreement-section h2{margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid #e2e8f0;text-align:center;text-transform:uppercase;font-size:14px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px;border:1px solid #ddd;text-align:left;vertical-align:top}th{background:#f1f5f9;font-weight:700}p,li{font-size:12px;line-height:1.6}.agreement-footer{margin-top:32px;padding-top:16px;border-top:1px solid #eee;text-align:center;color:#64748b;font-size:11px}</style></head><body>${el.outerHTML}<script>window.onload=()=>{window.focus();window.print();window.onafterprint=()=>window.close();}</script></body></html>`);
+    pw.document.close();
+  };
 
-  if (mode === 'form') {
+  if (!customer) {
     return (
-      <div className="document-view-container">
-        <div className="document-header">
-          <button className="back-button" onClick={onBack}>
-            <ArrowLeft size={20} /> Back to Inventory
-          </button>
-          <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Quotation Settings</h2>
-          <button className="secondary-button" onClick={onEdit} style={{ marginLeft: 'auto', marginRight: '12px' }}>
-            <Edit size={16} /> Edit AMC Record
-          </button>
-          <button className="primary-button" onClick={() => setMode('preview')}>
-            Generate Preview <Eye size={16} style={{ marginLeft: '8px' }} />
-          </button>
-        </div>
-
-        <div className="quotation-form-card" style={{ background: 'white', padding: '40px', borderRadius: '24px', maxWidth: '1200px', margin: '0 auto', border: '1px solid var(--slate-200)', boxShadow: 'var(--shadow-premium)' }}>
-          <div className="form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px' }}>
-            {/* Left Column */}
-            <div>
-              <div className="form-section">
-                <h4 className="section-title" style={{ color: 'var(--secondary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>🧾</span> Basic Details
-                </h4>
-                <div style={{ padding: '20px', background: 'var(--slate-50)', borderRadius: '12px', marginBottom: '32px' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '14px' }}><strong>Customer:</strong> {customer.name}</p>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '14px' }}><strong>Contact:</strong> {customer.authorizedPerson1}</p>
-                  <p style={{ margin: '0 0 16px 0', fontSize: '14px', color: 'var(--text-muted)' }}>{customer.address}</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div className="form-group">
-                      <label>Quote Date</label>
-                      <input type="date" className="form-input" value={quoteData.date} onChange={e => setQuoteData({...quoteData, date: e.target.value})} />
-                    </div>
-                    <div className="form-group">
-                      <label>Quote Number</label>
-                      <input type="text" className="form-input" value={quoteData.number} onChange={e => setQuoteData({...quoteData, number: e.target.value})} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-section">
-                <h4 className="section-title" style={{ color: 'var(--secondary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>💰</span> Pricing
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
-                  <div className="form-group">
-                    <label>Price per Device (₹)</label>
-                    <input type="number" className="form-input" value={quoteData.unitPrice} onChange={e => setQuoteData({...quoteData, unitPrice: parseInt(e.target.value) || 0})} />
-                  </div>
-                  <div className="form-group">
-                    <label>GST Configuration</label>
-                    <select className="form-select" value={quoteData.gstType} onChange={e => setQuoteData({...quoteData, gstType: e.target.value})}>
-                      <option>Exclusive</option>
-                      <option>Inclusive</option>
-                    </select>
-                  </div>
-                </div>
-                <div style={{ padding: '16px', borderTop: '1px solid var(--slate-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                   <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Estimated Grand Total:</span>
-                   <strong style={{ fontSize: '20px', color: 'var(--secondary)' }}>₹{grandTotal.toLocaleString()}</strong>
-                </div>
-              </div>
-
-              <div className="form-section" style={{ marginTop: '32px' }}>
-                <h4 className="section-title" style={{ color: 'var(--secondary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>⏱</span> SLA & <span>🔁</span> Validity
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div className="form-group">
-                    <label>Response Time</label>
-                    <input type="text" className="form-input" value={quoteData.sla.response} onChange={e => setQuoteData({...quoteData, sla: {...quoteData.sla, response: e.target.value}})} />
-                  </div>
-                  <div className="form-group">
-                    <label>Resolution Time</label>
-                    <input type="text" className="form-input" value={quoteData.sla.resolution} onChange={e => setQuoteData({...quoteData, sla: {...quoteData.sla, resolution: e.target.value}})} />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label>Validity Period</label>
-                  <input type="text" className="form-input" value={quoteData.validity} onChange={e => setQuoteData({...quoteData, validity: e.target.value})} />
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column */}
-            <div>
-              <div className="form-section">
-                <h4 className="section-title" style={{ color: 'var(--secondary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>📌</span> Scope of Work
-                </h4>
-                <div className="list-editor" style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px' }}>
-                  {quoteData.scope.map((item, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '8px' }}>
-                      <input className="form-input" value={item} onChange={e => {
-                        const newScope = [...quoteData.scope];
-                        newScope[i] = e.target.value;
-                        setQuoteData({...quoteData, scope: newScope});
-                      }} />
-                      <button className="icon-button" style={{ color: 'var(--red)' }} onClick={() => setQuoteData({...quoteData, scope: quoteData.scope.filter((_, idx) => idx !== i)})}><Trash2 size={14} /></button>
-                    </div>
-                  ))}
-                  <button className="secondary-button" style={{ width: '100%', borderStyle: 'dashed' }} onClick={() => setQuoteData({...quoteData, scope: [...quoteData.scope, 'New scope item']})}>
-                    <Plus size={14} /> Add Scope Point
-                  </button>
-                </div>
-              </div>
-
-              <div className="form-section">
-                <h4 className="section-title" style={{ color: 'var(--secondary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>❌</span> Exclusions
-                </h4>
-                <div className="list-editor" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {quoteData.exclusions.map((item, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '8px' }}>
-                      <input className="form-input" value={item} onChange={e => {
-                        const newEx = [...quoteData.exclusions];
-                        newEx[i] = e.target.value;
-                        setQuoteData({...quoteData, exclusions: newEx});
-                      }} />
-                      <button className="icon-button" style={{ color: 'var(--red)' }} onClick={() => setQuoteData({...quoteData, exclusions: quoteData.exclusions.filter((_, idx) => idx !== i)})}><Trash2 size={14} /></button>
-                    </div>
-                  ))}
-                  <button className="secondary-button" style={{ width: '100%', borderStyle: 'dashed' }} onClick={() => setQuoteData({...quoteData, exclusions: [...quoteData.exclusions, 'New exclusion']})}>
-                    <Plus size={14} /> Add Exclusion Point
-                  </button>
-                </div>
-              </div>
-
-              <div className="form-section" style={{ marginTop: '32px' }}>
-                <h4 className="section-title" style={{ color: 'var(--secondary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>💻</span> Asset Details (Preview)
-                </h4>
-                <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid var(--slate-100)', borderRadius: '12px', padding: '12px' }}>
-                  <table style={{ width: '100%', fontSize: '12px' }}>
-                    <thead style={{ position: 'sticky', top: 0, background: 'white' }}>
-                      <tr style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
-                        <th style={{ paddingBottom: '8px' }}>Type</th>
-                        <th style={{ paddingBottom: '8px' }}>Model</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {customer.devices?.map((d, i) => (
-                        <tr key={i} style={{ borderTop: '1px solid var(--slate-50)' }}>
-                          <td style={{ padding: '8px 0' }}>{d.type}</td>
-                          <td style={{ padding: '8px 0' }}>{d.brand}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+      <div className="plans-page">
+        <header className="plans-header">
+          <div className="plans-header-left">
+            <button className="secondary-button" onClick={onBack} style={{ marginBottom: 12 }}>
+              <ArrowLeft size={16} /> Back to Inventory
+            </button>
+            <h1>AMC Agreement</h1>
+            <p>Select an AMC record to generate the agreement.</p>
           </div>
-        </div>
+        </header>
       </div>
     );
   }
-
-  // Preview Mode
   return (
-    <div className="document-view-container">
-      <div className="document-header no-print">
-        <button className="back-button" onClick={() => setMode('form')}>
-          <ArrowLeft size={20} /> Back to Settings
-        </button>
-        <div className="doc-actions">
-          <button className="secondary-button" onClick={() => setMode('form')}>
-            <Edit size={16} /> Edit Settings
+    <div className="plans-page">
+      <header className="plans-header">
+        <div className="plans-header-left">
+          <button className="secondary-button" onClick={onBack} style={{ marginBottom: 12 }}>
+            <ArrowLeft size={16} /> Back to Inventory
           </button>
-          <button className="primary-button" onClick={() => window.print()}>
-            <Printer size={16} /> Print Quotation
-          </button>
+          <h1>AMC Agreement</h1>
+          <p>For: <strong>{customer.name}</strong></p>
         </div>
-      </div>
+        <div className="plans-header-actions">
+          <button className="secondary-button" onClick={printAgreement}><Printer size={18} /> Print Agreement</button>
+          <button className="primary-button" onClick={saveAgreement} disabled={saving}><CheckCircle size={18} /> {saving ? 'Saving...' : 'Save Agreement'}</button>
+        </div>
+      </header>
 
-      <div className="document-paper">
-        <div className="paper-header">
-          <div className="company-info">
-            <h2 style={{ color: 'var(--secondary)', margin: 0 }}>RepairTech Solutions</h2>
-            <p>123 Service Hub, Tech Park, Bangalore</p>
-            <p>Email: support@repairtech.com | Phone: +91 98765 43210</p>
-          </div>
-          <div className="doc-type" style={{ textAlign: 'right' }}>
-            <h1 style={{ margin: 0, fontSize: '28px' }}>AMC QUOTATION</h1>
-            <div style={{ marginTop: '10px' }}>
-              <p><strong>Date:</strong> {quoteData.date}</p>
-              <p><strong>Quote #:</strong> {quoteData.number}</p>
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="table-card">
+            <div className="card-header"><div className="card-title-area"><h2>Agreement Details</h2><p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>Only agreement-specific terms are editable here.</p></div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, padding: '0 20px 24px' }}>
+              <div className="form-group"><label>Agreement No</label><input className="form-input" value={agreement.agreementNo} onChange={(e) => setAgreementField('agreementNo', e.target.value)} /></div>
+              <div className="form-group"><label>Agreement Date</label><input type="date" className="form-input" value={agreement.agreementDate} onChange={(e) => setAgreementField('agreementDate', e.target.value)} /></div>
+              <div className="form-group"><label>Termination Notice (Days)</label><input className="form-input" value={agreement.terminationNotice} onChange={(e) => setAgreementField('terminationNotice', e.target.value)} /></div>
+              <div className="form-group"><label>Renewal Notice (Days)</label><input className="form-input" value={agreement.renewalNotice} onChange={(e) => setAgreementField('renewalNotice', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Scope of Services</label><textarea className="form-input" style={{ height: 80 }} value={agreement.scope} onChange={(e) => setAgreementField('scope', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Exclusions</label><textarea className="form-input" style={{ height: 70 }} value={agreement.exclusions} onChange={(e) => setAgreementField('exclusions', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Payment Terms</label><textarea className="form-input" style={{ height: 70 }} value={agreement.paymentTerms} onChange={(e) => setAgreementField('paymentTerms', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Spare Parts Policy</label><textarea className="form-input" style={{ height: 70 }} value={agreement.sparePolicy} onChange={(e) => setAgreementField('sparePolicy', e.target.value)} /></div>
+              <div className="form-group"><label>Jurisdiction</label><input className="form-input" value={agreement.jurisdiction} onChange={(e) => setAgreementField('jurisdiction', e.target.value)} /></div>
+              <div className="form-group"><label>Special Terms</label><input className="form-input" value={agreement.specialTerms} onChange={(e) => setAgreementField('specialTerms', e.target.value)} /></div>
             </div>
           </div>
         </div>
 
-        <div className="paper-body">
-          <div className="info-grid">
-            <div className="info-block">
-              <strong>BILL TO:</strong>
-              <p className="client-name">{customer.name}</p>
-              <p>{customer.authorizedPerson1}</p>
-              <p>{customer.address}</p>
-              <p><strong>GSTIN:</strong> {customer.gstin}</p>
+        <div className="agreement-preview-container">
+          <div className="agreement-document" ref={agreeRef} style={{ fontFamily: '"Times New Roman", Times, serif', padding: 28, color: '#0f172a', lineHeight: 1.55 }}>
+            <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #333', paddingBottom: 20, marginBottom: 28 }}>
+              <div>
+                <h1 style={{ fontSize: 22, margin: '0 0 8px', textTransform: 'uppercase' }}>AMC Agreement</h1>
+                <p style={{ margin: 0, fontSize: 12, color: '#475569' }}>No: {agreement.agreementNo} | Date: {agreement.agreementDate}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <h2 style={{ fontSize: 16, margin: '0 0 4px', textTransform: 'uppercase' }}>RepairTech Solutions</h2>
+                <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>Authorized Service Center</p>
+              </div>
             </div>
-            <div className="info-block" style={{ textAlign: 'right' }}>
-              <strong>SLA DETAILS:</strong>
-              <p>Response: {quoteData.sla.response}</p>
-              <p>Resolution: {quoteData.sla.resolution}</p>
-              <p>Validity: {quoteData.validity}</p>
-            </div>
-          </div>
 
-          <div className="doc-section">
-            <h3 className="section-heading">💻 ASSET REGISTRY & COVERAGE</h3>
-            <table className="doc-table">
-              <thead>
-                <tr>
-                  <th>Device Type</th>
-                  <th>Brand / Model</th>
-                  <th>S/N</th>
-                  <th>Configuration</th>
-                  <th style={{ textAlign: 'right' }}>Unit Price</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(customer.devices || []).map((d, i) => (
-                  <tr key={i}>
-                    <td>{d.type}</td>
-                    <td>{d.brand}</td>
-                    <td>{d.sn || 'N/A'}</td>
-                    <td>{d.config || '-'}</td>
-                    <td style={{ textAlign: 'right' }}>₹{quoteData.unitPrice}</td>
+            <div className="agreement-section" style={{ marginBottom: 26 }}>
+              <h2 style={{ margin: '0 0 12px', fontSize: 16, textAlign: 'left', border: 0, padding: 0, textTransform: 'none' }}>Customer Details</h2>
+              <AgreementDetailRows rows={[
+                ['Customer Name', customer.name],
+                ['GSTIN Number', customer.gstin],
+                ['Primary Contact Name', customer.authorizedPerson1],
+                ['Mobile', customer.primaryMobile || customer.contact],
+                ['Email', customer.primaryEmail],
+                ['Secondary Name', customer.authorizedPerson2],
+                ['Mobile', customer.secondaryMobile],
+                ['Email', customer.secondaryEmail],
+              ]} />
+            </div>
+
+            <div className="agreement-section" style={{ marginBottom: 26 }}>
+              <h2 style={{ margin: '0 0 12px', fontSize: 16, textAlign: 'left', border: 0, padding: 0, textTransform: 'none' }}>Contract Details</h2>
+              <AgreementDetailRows rows={[
+                ['AMC ID', customer.contractId],
+                ['Agreement Number', agreement.agreementNo],
+                ['Agreement Date', agreement.agreementDate],
+                ['Agreement Period', `${customer.start || '-'} to ${customer.expiry || '-'}`],
+                ['AMC Plan', customer.plan],
+                ['Plan Type', planDetails.type],
+                ['Plan Price', planDetails.price],
+                ['Billing Cycle', planDetails.cycle],
+                ['Visits', planDetails.visits],
+                ['SLA', planDetails.sla],
+                ['Duration', planDetails.duration],
+                ['Plan Status', planDetails.status],
+              ]} />
+            </div>
+
+            <div className="agreement-section" style={{ marginBottom: 26 }}>
+              <h2 style={{ margin: '0 0 12px', fontSize: 16, textAlign: 'left', border: 0, padding: 0, textTransform: 'none' }}>Asset Registry</h2>
+              <table className="agreement-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th>Device</th>
+                    <th>Model</th>
+                    <th>Serial</th>
+                    <th>Qty</th>
+                    <th>AMC Value</th>
+                    <th>Total</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="total-row">
-                  <td colSpan="4" style={{ textAlign: 'right', fontWeight: 'bold' }}>Subtotal (Excl. GST)</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>₹{totalBase}</td>
-                </tr>
-                <tr>
-                  <td colSpan="4" style={{ textAlign: 'right' }}>GST (18%) - {quoteData.gstType}</td>
-                  <td style={{ textAlign: 'right' }}>₹{gstAmount}</td>
-                </tr>
-                <tr style={{ fontSize: '18px', color: 'var(--secondary)', borderTop: '2px solid #333' }}>
-                  <td colSpan="4" style={{ textAlign: 'right', fontWeight: 'bold', padding: '15px' }}>GRAND TOTAL</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold', padding: '15px' }}>₹{grandTotal}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {pricingRows.map((row, index) => (
+                    <tr key={row.id || index}>
+                      <td>{row.device || '-'}</td>
+                      <td>{row.model || '-'}</td>
+                      <td>{row.serial || '-'}</td>
+                      <td>{row.qty || 1}</td>
+                      <td>₹{Number(row.unitPrice || 0).toLocaleString('en-IN')}</td>
+                      <td>₹{(Number(row.qty || 0) * Number(row.unitPrice || 0)).toLocaleString('en-IN')}</td>
+                    </tr>
+                  ))}
+                  <tr><td colSpan={5} style={{ textAlign: 'right' }}><strong>Subtotal</strong></td><td><strong>₹{quotationSubtotal.toLocaleString('en-IN')}</strong></td></tr>
+                  <tr><td colSpan={5} style={{ textAlign: 'right' }}>GST ({quotationGstPercent}%)</td><td>₹{quotationGstAmount.toLocaleString('en-IN')}</td></tr>
+                  <tr style={{ background: '#f0fdf4' }}><td colSpan={5} style={{ textAlign: 'right' }}><strong>Grand Total</strong></td><td><strong>₹{quotationGrandTotal.toLocaleString('en-IN')}</strong></td></tr>
+                </tbody>
+              </table>
+            </div>
 
-          <div className="terms-grid">
-            <div className="terms-column">
-              <h3 className="section-heading">📌 SCOPE OF WORK</h3>
-              <ul className="terms-list">
-                {quoteData.scope.map((item, i) => <li key={i}>{item}</li>)}
+            <div className="agreement-section" style={{ marginBottom: 26 }}>
+              <h2 style={{ margin: '0 0 14px', fontSize: 16, textAlign: 'left', border: 0, padding: 0, textTransform: 'none' }}>Service Coverage & Policies</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 28 }}>
+                <div>
+                  <h3 style={{ margin: '0 0 8px', fontSize: 13, textTransform: 'uppercase' }}>Maintenance Coverage</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                    {scopeItems.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <h3 style={{ margin: '0 0 8px', fontSize: 13, textTransform: 'uppercase' }}>Exclusions</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                    {exclusionItems.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <h3 style={{ margin: '0 0 8px', fontSize: 13, textTransform: 'uppercase' }}>Payment Policy</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                    {paymentItems.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <h3 style={{ margin: '0 0 8px', fontSize: 13, textTransform: 'uppercase' }}>Support Policy</h3>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                    <li>Support available within SLA.</li>
+                    <li>{agreement.sparePolicy}</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="agreement-section" style={{ marginBottom: 32 }}>
+              <h2 style={{ margin: '0 0 12px', fontSize: 13, textTransform: 'uppercase', textAlign: 'left', border: 0, padding: 0 }}>Additional Clauses</h2>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12 }}>
+                <li>Either party may terminate this agreement with {agreement.terminationNotice} days notice.</li>
+                <li>Renewal notice should be issued {agreement.renewalNotice} days before expiry.</li>
+                <li>{agreement.specialTerms}</li>
               </ul>
             </div>
-            <div className="terms-column">
-              <h3 className="section-heading">❌ EXCLUSIONS</h3>
-              <ul className="terms-list">
-                {quoteData.exclusions.map((item, i) => <li key={i}>{item}</li>)}
-              </ul>
-            </div>
-          </div>
 
-          <div className="paper-footer" style={{ marginTop: '60px' }}>
-            <div className="signatures" style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-              <div className="sig-box">
-                <div className="sig-line"></div>
-                <p>Client Signature</p>
+            <div style={{ marginTop: 56, display: 'flex', justifyContent: 'space-between', gap: 24 }}>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <p style={{ fontSize: 11, margin: '0 0 14px', color: '#64748b' }}>{customer.name || '-'}</p>
+                <div style={{ borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Client)</div>
               </div>
-              <div className="sig-box">
-                <div className="sig-line"></div>
-                <p>For RepairTech Solutions</p>
+              <div style={{ flex: 1, textAlign: 'center' }}>
+                <p style={{ fontSize: 11, margin: '0 0 14px', color: '#64748b' }}>RepairTech Enterprise</p>
+                <div style={{ borderTop: '1px solid #333', paddingTop: 8, fontSize: 12, fontWeight: 700 }}>Authorized Signatory (Provider)</div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const AMCAgreementView = ({ customer, onBack, onEdit }) => {
-  if (!customer) return null;
-  return (
-    <div className="document-view-container">
-      <div className="document-header">
-        <button className="back-button" onClick={onBack}>
-          <ArrowLeft size={20} /> Back to Inventory
-        </button>
-        <div className="doc-actions">
-          <button className="secondary-button" onClick={onEdit}><Edit size={16} /> Edit Agreement</button>
-          <button className="primary-button" onClick={() => window.print()}><Printer size={16} /> Print Agreement</button>
-        </div>
-      </div>
-
-      <div className="document-paper agreement-paper">
-        <h1 style={{ textAlign: 'center', marginBottom: '40px', textDecoration: 'underline' }}>ANNUAL MAINTENANCE AGREEMENT</h1>
-        
-        <p>This Maintenance Agreement (the "Agreement") is entered into this {new Date().toLocaleDateString()} by and between:</p>
-        
-        <div style={{ margin: '20px 0' }}>
-          <strong>SERVICE PROVIDER:</strong>
-          <p>RepairTech Solutions, Bangalore (Hereinafter referred to as "The Company")</p>
-        </div>
-
-        <div style={{ margin: '20px 0' }}>
-          <strong>THE CLIENT:</strong>
-          <p>{customer.name}, {customer.address} (Hereinafter referred to as "The Client")</p>
-        </div>
-
-        <div className="agreement-section">
-          <h3>1. SCOPE OF SERVICES</h3>
-          <p>The Company agrees to provide maintenance services for the equipment listed in the Asset Registry below as per the <strong>{customer.plan}</strong>.</p>
-        </div>
-
-        <div className="agreement-section">
-          <h3>2. PERIOD OF AGREEMENT</h3>
-          <p>This agreement shall be valid from <strong>{customer.start}</strong> to <strong>{customer.expiry}</strong>.</p>
-        </div>
-
-        <div className="agreement-section">
-          <h3>3. ASSET REGISTRY</h3>
-          <table className="doc-table">
-            <thead>
-              <tr>
-                <th>Device Type</th>
-                <th>Brand / Model</th>
-                <th>Serial Number</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(customer.devices || []).map((d, i) => (
-                <tr key={i}>
-                  <td>{d.type}</td>
-                  <td>{d.brand}</td>
-                  <td>{d.sn}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="agreement-section">
-          <h3>4. PAYMENT TERMS</h3>
-          <p>The client agrees to pay a total sum of <strong>{customer.value || '₹0'}</strong> for the period mentioned above.</p>
-        </div>
-
-        <div className="agreement-signatures" style={{ marginTop: '80px', display: 'flex', justifyContent: 'space-between' }}>
-          <div className="sig-box">
-            <div className="sig-line"></div>
-            <p>For {customer.name}</p>
-          </div>
-          <div className="sig-box">
-            <div className="sig-line"></div>
-            <p>For RepairTech Solutions</p>
           </div>
         </div>
       </div>

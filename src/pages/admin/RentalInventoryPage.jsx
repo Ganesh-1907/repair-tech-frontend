@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../services/apiClient';
-import RepairModal from './RepairModal';
 import './PlansCustomers.css';
 
 const RentalInventoryPage = () => {
@@ -22,7 +21,6 @@ const RentalInventoryPage = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [activeMenu, setActiveMenu] = useState({ type: null, id: null });
-  const [repairContract, setRepairContract] = useState(null);
   const [toast, setToast] = useState('');
 
   const fetchContracts = useCallback(async () => {
@@ -262,7 +260,7 @@ const RentalInventoryPage = () => {
                         <button className="menu-item" onClick={() => { setEditingItem(c); setShowModal(true); setActiveMenu({type:null, id:null}); }}><Edit size={14} /> Edit</button>
                         <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu({type:null, id:null}); }}><FileEdit size={14} /> Rental Quotation</button>
                         <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu({type:null, id:null}); }}><FileText size={14} /> Rental Agreement</button>
-                        <button className="menu-item" onClick={() => { setRepairContract(c); setActiveMenu({type:null, id:null}); }}><Wrench size={14} /> Manage Repair</button>
+                        <button className="menu-item" onClick={() => { navigate(`/admin/rental/repair/${c.contractId || c.id}`); setActiveMenu({type:null, id:null}); }}><Wrench size={14} /> Manage Repair</button>
                         <button className="menu-item" onClick={() => { navigate('/admin/rental/maintenance-alerts'); setActiveMenu({type:null, id:null}); }}>
                           <Wrench size={14} /> Maintenance
                         </button>
@@ -302,16 +300,6 @@ const RentalInventoryPage = () => {
           onClose={() => setShowDetailModal(false)}
         />
       )}
-
-      {repairContract && (
-        <RepairModal
-          contract={repairContract}
-          collection="rentalMaintenanceLogs"
-          onClose={() => setRepairContract(null)}
-          showToast={(msg) => setToast(msg)}
-        />
-      )}
-
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
@@ -699,6 +687,7 @@ const CustomerDetailModal = ({ customer, onClose }) => {
 };
 
 const RentalQuotationView = ({ customer, onBack }) => {
+  const printRef = useRef(null);
   const [mode, setMode] = useState('form'); // 'form' or 'preview'
   const [quoteData, setQuoteData] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -899,13 +888,20 @@ const RentalQuotationView = ({ customer, onBack }) => {
           <button className="secondary-button" onClick={() => setMode('form')}>
             <Edit size={16} /> Edit Settings
           </button>
-          <button className="primary-button" onClick={() => window.print()}>
+          <button className="primary-button" onClick={() => {
+            const pw = window.open('', '_blank', 'width=900,height=1200');
+            const el = printRef.current;
+            if (!pw || !el) { window.print(); return; }
+            pw.document.open();
+            pw.document.write(`<!doctype html><html><head><title></title><style>@page{size:A4;margin:0}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{margin:0;padding:0;background:#fff;font-family:"Times New Roman",Times,serif;color:#0f172a}body{padding:1.5cm}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px;border:1px solid #ddd;text-align:left}th{background:#f1f5f9;font-weight:700}h1,h2,h3{margin:0 0 8px}p{font-size:12px;line-height:1.6}</style></head><body>${el.outerHTML}<script>window.onload=()=>{window.focus();window.print();window.onafterprint=()=>window.close();}<\/script></body></html>`);
+            pw.document.close();
+          }}>
             <Printer size={16} /> Print Quotation
           </button>
         </div>
       </div>
 
-      <div className="document-paper">
+      <div className="document-paper" ref={printRef}>
         <div className="paper-header">
           <div className="company-info">
             <h2 style={{ color: 'var(--secondary)', margin: 0 }}>RepairTech Solutions</h2>
@@ -1012,6 +1008,7 @@ const RentalQuotationView = ({ customer, onBack }) => {
 };
 
 const RentalAgreementView = ({ customer, onBack, onEdit }) => {
+  const agreeRef = useRef(null);
   if (!customer) return null;
   return (
     <div className="document-view-container">
@@ -1021,11 +1018,18 @@ const RentalAgreementView = ({ customer, onBack, onEdit }) => {
         </button>
         <div className="doc-actions">
           <button className="secondary-button" onClick={onEdit}><Edit size={16} /> Edit Agreement</button>
-          <button className="primary-button" onClick={() => window.print()}><Printer size={16} /> Print Agreement</button>
+          <button className="primary-button" onClick={() => {
+            const pw = window.open('', '_blank', 'width=900,height=1200');
+            const el = agreeRef.current;
+            if (!pw || !el) { window.print(); return; }
+            pw.document.open();
+            pw.document.write(`<!doctype html><html><head><title></title><style>@page{size:A4;margin:0}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}html,body{margin:0;padding:0;background:#fff;font-family:"Times New Roman",Times,serif;color:#0f172a}body{padding:1.5cm}table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px;border:1px solid #ddd;text-align:left}th{background:#f1f5f9;font-weight:700}h1,h2,h3{margin:0 0 8px}p{font-size:12px;line-height:1.6}.sig-line{border-bottom:1px solid #333;width:200px;margin:60px auto 8px}</style></head><body>${el.outerHTML}<script>window.onload=()=>{window.focus();window.print();window.onafterprint=()=>window.close();}<\/script></body></html>`);
+            pw.document.close();
+          }}><Printer size={16} /> Print Agreement</button>
         </div>
       </div>
 
-      <div className="document-paper agreement-paper">
+      <div className="document-paper agreement-paper" ref={agreeRef}>
         <h1 style={{ textAlign: 'center', marginBottom: '40px', textDecoration: 'underline' }}>RENTAL AGREEMENT</h1>
         
         <p>This Maintenance Agreement (the "Agreement") is entered into this {new Date().toLocaleDateString()} by and between:</p>
@@ -1093,4 +1097,3 @@ const RentalAgreementView = ({ customer, onBack, onEdit }) => {
 };
 
 export default RentalInventoryPage;
-

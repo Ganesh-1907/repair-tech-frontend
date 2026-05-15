@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Edit,
   Eye,
@@ -19,7 +19,7 @@ import {
 import { leadManagementService } from '../services/leadManagementService';
 import { staffManagementService } from '../services/staffManagementService';
 import { sendOutboundMessage } from '../services/communicationService';
-import RepairModal from './admin/RepairModal';
+import SendCredentialsModal from '../components/common/SendCredentialsModal';
 
 const initialLeadForm = {
   customerName: '',
@@ -996,6 +996,7 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
 };
 
 const Leads = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [leads, setLeads] = useState([]);
   const [technicians, setTechnicians] = useState([]);
@@ -1003,10 +1004,10 @@ const Leads = () => {
   const [assigningLead, setAssigningLead] = useState(null);
   const [trackingLead, setTrackingLead] = useState(null);
   const [messagingLead, setMessagingLead] = useState(null);
-  const [repairLead, setRepairLead] = useState(null);
   const [viewingLead, setViewingLead] = useState(null);
   const [editingLead, setEditingLead] = useState(null);
   const [activeLeadMenu, setActiveLeadMenu] = useState(null);
+  const [credentialsTarget, setCredentialsTarget] = useState(null);
   const [notice, setNotice] = useState('');
   const [creatingLead, setCreatingLead] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
@@ -1368,8 +1369,11 @@ const Leads = () => {
           <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setMessagingLead(activeMenuLead); }}>
             <MessageCircleMore size={14} className="icon-muted" /> Instant Message
           </button>
-          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setRepairLead(activeMenuLead); }}>
+          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/repair/${activeMenuLead.id}`); }}>
             <Wrench size={14} className="icon-muted" /> Manage Repair
+          </button>
+          <button type="button" className="account-menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(activeMenuLead); setActiveLeadMenu(null); }}>
+            <Wrench size={14} className="icon-muted" /> Send Portal Access
           </button>
           {activeMenuLead.assignedTechnician && (
             <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setTrackingLead(activeMenuLead); }}>
@@ -1413,18 +1417,6 @@ const Leads = () => {
         />
       )}
 
-      {repairLead && (
-        <RepairModal
-          contract={{
-            ...repairLead,
-            contractId: repairLead.id,
-          }}
-          collection="leadRepairs"
-          onClose={() => setRepairLead(null)}
-          showToast={(message) => setNotice(message)}
-        />
-      )}
-
       {viewingLead && (
         <ViewLeadModal
           lead={viewingLead}
@@ -1440,6 +1432,15 @@ const Leads = () => {
           submitting={savingLead}
           onClose={() => setEditingLead(null)}
           onUpdate={handleUpdateLead}
+        />
+      )}
+
+      {credentialsTarget && (
+        <SendCredentialsModal
+          contractId={credentialsTarget.id}
+          customerName={credentialsTarget.customerName || credentialsTarget.name || ''}
+          email={credentialsTarget.email || credentialsTarget.customerEmail || ''}
+          onClose={() => setCredentialsTarget(null)}
         />
       )}
     </div>

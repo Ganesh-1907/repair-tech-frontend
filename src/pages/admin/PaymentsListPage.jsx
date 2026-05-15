@@ -319,16 +319,16 @@ const PaymentsListPage = () => {
       {/* Add / Edit Modal */}
       {(modalMode === 'add' || modalMode === 'edit') && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-panel">
-            <div className="modal-header">
+          <div className="modal-panel" style={{ width: 'min(100%, 680px)', maxHeight: 'min(92vh, 800px)' }}>
+            <div className="modal-header" style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border-light)' }}>
               <div>
-                <h2>{modalMode === 'edit' ? 'Edit Payment' : 'Add Payment'}</h2>
-                <p>{modalMode === 'edit' ? 'Update payment record' : 'Record an income payment'}</p>
+                <h2 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800 }}>{modalMode === 'edit' ? 'Edit Payment' : 'Add Payment'}</h2>
+                <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.84rem' }}>{modalMode === 'edit' ? 'Update payment record' : 'Record an income payment'}</p>
               </div>
               <button className="icon-btn" onClick={closeModal}><X size={16} /></button>
             </div>
-            <div className="modal-form">
-              <div className="form-grid">
+            <div className="modal-form" style={{ padding: '20px 24px 24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 18px' }}>
                 <div className="form-group">
                   <label>Category</label>
                   <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
@@ -346,7 +346,7 @@ const PaymentsListPage = () => {
                 </div>
                 <div className="form-group">
                   <label>Amount (₹)</label>
-                  <input type="number" min="0" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+                  <input type="number" min="0" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} placeholder="0" />
                   {errors.amount && <span className="form-error">{errors.amount}</span>}
                 </div>
                 <div className="form-group">
@@ -357,7 +357,7 @@ const PaymentsListPage = () => {
                 </div>
                 <div className="form-group">
                   <label>Reference Number</label>
-                  <input value={form.referenceNumber} onChange={(e) => setForm((f) => ({ ...f, referenceNumber: e.target.value }))} />
+                  <input value={form.referenceNumber} onChange={(e) => setForm((f) => ({ ...f, referenceNumber: e.target.value }))} placeholder="e.g. TXN-001" />
                 </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label>Description</label>
@@ -365,13 +365,13 @@ const PaymentsListPage = () => {
                   {errors.description && <span className="form-error">{errors.description}</span>}
                 </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>Notes</label>
-                  <textarea rows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
+                  <label>Notes <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(optional)</span></label>
+                  <textarea rows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Any additional notes..." />
                 </div>
               </div>
-              <div className="modal-actions">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
                 <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-                <button className="btn btn-primary" onClick={savePayment}>{modalMode === 'edit' ? 'Update' : 'Save Payment'}</button>
+                <button className="btn btn-primary" onClick={savePayment}>{modalMode === 'edit' ? 'Update Payment' : 'Save Payment'}</button>
               </div>
             </div>
           </div>

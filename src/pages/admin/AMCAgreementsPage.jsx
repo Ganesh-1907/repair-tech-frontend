@@ -90,17 +90,17 @@ const AMCAgreementsPage = () => {
           </div>
         </header>
 
-        <div className="main-grid" style={{ gridTemplateColumns: '1fr 1.2fr' }}>
+        <div className="main-grid" style={{ gridTemplateColumns: '1fr 1.2fr', alignItems: 'start' }}>
           {/* FORM PANEL */}
-          <div className="table-card">
+          <div className="table-card" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 140px)', position: 'sticky', top: '24px' }}>
             <div className="card-header">
               <div className="card-title-area">
                 <h2>Agreement Details</h2>
                 <p>Fill in the specifics for {selectedCustomer?.name}</p>
               </div>
             </div>
-            
-            <div className="modal-body" style={{ padding: 0 }}>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
               <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
                   <label>Agreement Date</label>
@@ -206,7 +206,7 @@ const AMCAgreementsPage = () => {
           </div>
 
           {/* PREVIEW PANEL */}
-          <div className="agreement-preview-container">
+          <div className="agreement-preview-container" style={{ position: 'sticky', top: '24px', maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' }}>
             <div className="agreement-document">
               <div className="agreement-header">
                 <h1>{agreementType} AMC Agreement</h1>

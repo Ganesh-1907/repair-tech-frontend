@@ -25,6 +25,7 @@ import AMCQuotationPage from './pages/admin/AMCQuotationPage';
 import AMCInventoryPage from './pages/admin/AMCInventoryPage';
 import AMCNewContractPage from './pages/admin/AMCNewContractPage';
 import AMCViewPage from './pages/admin/AMCViewPage';
+import AMCRepairManagementPage from './pages/admin/AMCRepairManagementPage';
 
 // Admin Module Pages
 import ExpensesManagementPage from './pages/admin/ExpensesManagementPage';
@@ -68,11 +69,33 @@ import CMCReportsPage from './pages/admin/CMCReportsPage';
 
 import { adminRouteEntries } from './config/adminModules';
 import { ToastProvider } from './context/ToastContext';
+import CustomerLogin from './pages/customer/CustomerLogin';
+import CustomerLayout from './pages/customer/CustomerLayout';
+import CustomerDashboard from './pages/customer/CustomerDashboard';
+import CustomerContracts from './pages/customer/CustomerContracts';
+import CustomerRepairs from './pages/customer/CustomerRepairs';
+import CustomerPayments from './pages/customer/CustomerPayments';
+import CustomerServiceRequest from './pages/customer/CustomerServiceRequest';
+import { useAuth } from './context/AuthContext';
+import SetNewPassword from './pages/SetNewPassword';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import CustomerSetNewPassword from './pages/customer/CustomerSetNewPassword';
+import CustomerForgotPassword from './pages/customer/CustomerForgotPassword';
+import CustomerResetPassword from './pages/customer/CustomerResetPassword';
 import './App.css';
 
 const ExpenseLegacyViewRedirect = () => {
   const { expenseId } = useParams();
   return <Navigate to={`/admin/expenses/list?mode=view&expenseId=${expenseId}`} replace />;
+};
+
+const CustomerGuard = ({ children, allowForceChange = false }) => {
+  const { user, isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/customer/login" replace />;
+  if (user?.role !== 'customer') return <Navigate to="/login" replace />;
+  if (user?.forcePasswordChange && !allowForceChange) return <Navigate to="/customer/set-new-password" replace />;
+  return children;
 };
 
 const existingAdminRouteComponents = {
@@ -137,6 +160,25 @@ function App() {
             <Routes>
               {/* Auth Routes */}
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/set-new-password" element={<SetNewPassword />} />
+
+              {/* Customer Auth Routes */}
+              <Route path="/customer/login" element={<CustomerLogin />} />
+              <Route path="/customer/forgot-password" element={<CustomerForgotPassword />} />
+              <Route path="/customer/reset-password" element={<CustomerResetPassword />} />
+              <Route path="/customer/set-new-password" element={<CustomerGuard allowForceChange><CustomerSetNewPassword /></CustomerGuard>} />
+
+              {/* Customer Portal Routes */}
+              <Route path="/customer" element={<CustomerGuard><CustomerLayout /></CustomerGuard>}>
+                <Route index element={<Navigate to="/customer/dashboard" replace />} />
+                <Route path="dashboard" element={<CustomerDashboard />} />
+                <Route path="contracts" element={<CustomerContracts />} />
+                <Route path="repairs" element={<CustomerRepairs />} />
+                <Route path="payments" element={<CustomerPayments />} />
+                <Route path="service-request" element={<CustomerServiceRequest />} />
+              </Route>
               
               {/* Admin Redirects */}
               <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
@@ -158,6 +200,7 @@ function App() {
               <Route path="/admin/rental/maintenance-alerts" element={<Layout><RentalMaintenanceAlertsPage /></Layout>} />
               <Route path="/admin/rental/reports" element={<Navigate to="/admin/rental/customers" replace />} />
               <Route path="/admin/rental/new" element={<Layout><RentalNewCustomerPage /></Layout>} />
+              <Route path="/admin/rental/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="rental" /></Layout>} />
               <Route path="/admin/rental/customers/:customerId" element={<Layout><RentalCustomerDetailPage /></Layout>} />
               <Route path="/admin/rental/assets/:assetId" element={<Layout><RentalAssetDetailPage /></Layout>} />
               <Route path="/admin/rental/billing/generate" element={<Layout><RentalBillingGeneratePage /></Layout>} />
@@ -172,6 +215,7 @@ function App() {
               <Route path="/admin/amc/inventory" element={<Layout><AMCInventoryPage /></Layout>} />
               <Route path="/admin/amc/new" element={<Layout><AMCNewContractPage /></Layout>} />
               <Route path="/admin/amc/view/:id" element={<Layout><AMCViewPage /></Layout>} />
+              <Route path="/admin/amc/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="amc" /></Layout>} />
               <Route path="/admin/amc/reports" element={<Layout><AMCReportsPage /></Layout>} />
 
               {/* CMC Module Redirects & Explicit Routes */}
@@ -181,6 +225,7 @@ function App() {
               <Route path="/admin/cmc/inventory" element={<Layout><CMCInventoryPage /></Layout>} />
               <Route path="/admin/cmc/new" element={<Layout><CMCNewContractPage /></Layout>} />
               <Route path="/admin/cmc/view/:id" element={<Layout><CMCViewPage /></Layout>} />
+              <Route path="/admin/cmc/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="cmc" /></Layout>} />
               <Route path="/admin/cmc/reports" element={<Layout><CMCReportsPage /></Layout>} />
 
               {/* Discounts Module Routes */}
@@ -210,6 +255,7 @@ function App() {
               {/* Main Routes */}
               <Route path="/" element={<Layout><Dashboard /></Layout>} />
               <Route path="/leads" element={<Layout><Leads /></Layout>} />
+              <Route path="/admin/leads/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="leads" /></Layout>} />
               <Route path="/workflow" element={<Layout><Workflow /></Layout>} />
               <Route path="/billing" element={<Layout><Billing /></Layout>} />
               <Route path="/inventory" element={<Layout><Inventory /></Layout>} />
