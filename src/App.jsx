@@ -66,6 +66,8 @@ import CMCInventoryPage from './pages/admin/CMCInventoryPage';
 import CMCNewContractPage from './pages/admin/CMCNewContractPage';
 import CMCViewPage from './pages/admin/CMCViewPage';
 import CMCReportsPage from './pages/admin/CMCReportsPage';
+import CMCQuotationPage from './pages/admin/CMCQuotationPage';
+import CMCAgreementsPage from './pages/admin/CMCAgreementsPage';
 
 import { adminRouteEntries } from './config/adminModules';
 import { ToastProvider } from './context/ToastContext';
@@ -136,6 +138,8 @@ const existingAdminRouteComponents = {
   '/admin/amc/reports': AMCReportsPage,
   '/admin/cmc/dashboard': CMCDashboardPage,
   '/admin/cmc/plans': CMCPlansPage,
+  '/admin/cmc/quotations': CMCQuotationPage,
+  '/admin/cmc/agreements': CMCAgreementsPage,
   '/admin/cmc/inventory': CMCInventoryPage,
   '/admin/cmc/reports': CMCReportsPage,
   '/admin/cmc': CMCDashboardPage,
@@ -227,6 +231,8 @@ function App() {
               <Route path="/admin/cmc/view/:id" element={<Layout><CMCViewPage /></Layout>} />
               <Route path="/admin/cmc/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="cmc" /></Layout>} />
               <Route path="/admin/cmc/reports" element={<Layout><CMCReportsPage /></Layout>} />
+              <Route path="/admin/cmc/quotations" element={<Layout><CMCQuotationPage /></Layout>} />
+              <Route path="/admin/cmc/agreements" element={<Layout><CMCAgreementsPage /></Layout>} />
 
               {/* Discounts Module Routes */}
               <Route path="/admin/discounts" element={<Navigate to="/admin/discounts/dashboard" replace />} />

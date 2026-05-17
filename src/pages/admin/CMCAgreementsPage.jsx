@@ -1,8 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
-  FileText, Search, Printer, Download,
-  ChevronLeft, CheckCircle, AlertCircle,
-  Building, User, Calendar, ShieldCheck, Mail
+  FileText, Search, Printer,
+  ChevronLeft, ShieldCheck, Mail
 } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 import './PlansCustomers.css';
@@ -23,14 +22,14 @@ const generatePdfBase64 = async (element, filename) => {
   return dataUri.split(',')[1];
 };
 
-const AMCAgreementsPage = () => {
-  const [view, setView] = useState('list'); // 'list' or 'generator'
-  const [agreementType, setAgreementType] = useState('Corporate'); // 'Corporate' or 'Individual'
+const CMCAgreementsPage = () => {
+  const [view, setView] = useState('list');
+  const [agreementType, setAgreementType] = useState('Corporate');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const printRef = useRef(null);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
-  
+
   const [assets, setAssets] = useState([
     { id: 1, type: 'Desktop', brand: 'Dell OptiPlex', serial: 'SN-001', location: 'Main Office' },
   ]);
@@ -46,7 +45,7 @@ const AMCAgreementsPage = () => {
     clientGstin: '',
     startDate: '',
     endDate: '',
-    amcType: 'Comprehensive',
+    cmcType: 'Comprehensive',
     preventiveFrequency: 'Quarterly',
     criticalResponse: '4',
     normalResponse: '8',
@@ -59,16 +58,15 @@ const AMCAgreementsPage = () => {
     terminationNotice: '30',
     renewalNotice: '15',
     terms: 'General maintenance terms apply.',
-    policies: 'Standard company repair policies apply.',
     computerCount: '0',
     printerCount: '0',
-    otherDevices: 'None'
+    otherDevices: 'None',
   });
 
   const customers = [
-    { id: 1, name: 'Global Tech', gstin: '22BBBBB1111B1Z2', address: '789 Business Ave, NY', type: 'Corporate', email: '' },
-    { id: 2, name: 'Stellar Bank', gstin: '22CCCCC2222C1Z3', address: '456 Financial Plaza, SF', type: 'Corporate', email: '' },
-    { id: 3, name: 'Dinesh Kumar', gstin: 'N/A', address: '12-A Green Woods, Bangalore', type: 'Individual', email: '' },
+    { id: 1, name: 'TechCorp Ltd', gstin: '22BBBBB1111B1Z2', address: '789 Business Ave, NY', type: 'Corporate', email: '' },
+    { id: 2, name: 'Metro Bank', gstin: '22CCCCC2222C1Z3', address: '456 Financial Plaza, SF', type: 'Corporate', email: '' },
+    { id: 3, name: 'Anand Kumar', gstin: 'N/A', address: '12-A Green Woods, Bangalore', type: 'Individual', email: '' },
   ];
 
   const handleSelectCustomer = (cust) => {
@@ -85,7 +83,7 @@ const AMCAgreementsPage = () => {
     setView('generator');
   };
 
-  const agreementNo = `AGR-${selectedCustomer?.id || Date.now()}`;
+  const agreementNo = `CMCAGR-${selectedCustomer?.id || Date.now()}`;
 
   const handleEmail = async () => {
     if (emailSending || !formData.clientEmail) return;
@@ -94,9 +92,9 @@ const AMCAgreementsPage = () => {
     try {
       let pdfBase64 = null;
       if (printRef.current) {
-        pdfBase64 = await generatePdfBase64(printRef.current, `AMC-Agreement-${agreementNo}.pdf`);
+        pdfBase64 = await generatePdfBase64(printRef.current, `CMC-Agreement-${agreementNo}.pdf`);
       }
-      const res = await apiClient.post('/email/amc-agreement', {
+      const res = await apiClient.post('/email/cmc-agreement', {
         to: formData.clientEmail,
         customerName: formData.clientName,
         agreementNo,
@@ -129,7 +127,7 @@ const AMCAgreementsPage = () => {
             <button className="secondary-button" onClick={() => setView('list')} style={{ marginBottom: '12px' }}>
               <ChevronLeft size={16} /> Back to List
             </button>
-            <h1>Generate {agreementType} Agreement</h1>
+            <h1>Generate {agreementType} CMC Agreement</h1>
           </div>
           <div className="plans-header-actions">
             <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !formData.clientEmail} title={!formData.clientEmail ? 'Enter client email below to enable' : ''}>
@@ -167,8 +165,8 @@ const AMCAgreementsPage = () => {
                   <input type="date" className="form-input" value={formData.agreementDate} onChange={e => setFormData({...formData, agreementDate: e.target.value})} />
                 </div>
                 <div className="form-group">
-                  <label>AMC Type</label>
-                  <select className="form-select" value={formData.amcType} onChange={e => setFormData({...formData, amcType: e.target.value})}>
+                  <label>CMC Type</label>
+                  <select className="form-select" value={formData.cmcType} onChange={e => setFormData({...formData, cmcType: e.target.value})}>
                     <option>Comprehensive</option>
                     <option>Non-Comprehensive</option>
                   </select>
@@ -205,8 +203,8 @@ const AMCAgreementsPage = () => {
                   </div>
                   <div className="form-group">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                       <label style={{ margin: 0 }}>Covered Assets</label>
-                       <button className="secondary-button" style={{ height: '24px', fontSize: '11px', padding: '0 8px' }} onClick={handleAddAsset}>+ Add Row</button>
+                      <label style={{ margin: 0 }}>Covered Assets</label>
+                      <button className="secondary-button" style={{ height: '24px', fontSize: '11px', padding: '0 8px' }} onClick={handleAddAsset}>+ Add Row</button>
                     </div>
                     <div className="table-container" style={{ border: '1px solid var(--slate-100)', borderRadius: '8px' }}>
                       <table className="data-table" style={{ fontSize: '12px' }}>
@@ -274,7 +272,7 @@ const AMCAgreementsPage = () => {
           <div className="agreement-preview-container" style={{ position: 'sticky', top: '24px', maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' }}>
             <div className="agreement-document" ref={printRef}>
               <div className="agreement-header">
-                <h1>{agreementType} AMC Agreement</h1>
+                <h1>{agreementType} CMC Agreement</h1>
                 <p>This agreement is made on {formData.agreementDate}</p>
               </div>
 
@@ -299,8 +297,8 @@ const AMCAgreementsPage = () => {
               </div>
 
               <div className="agreement-section">
-                <h2>2. Asset Coverage & AMC Type</h2>
-                <p>Type: <strong>{formData.amcType}</strong></p>
+                <h2>2. Asset Coverage & CMC Type</h2>
+                <p>Type: <strong>{formData.cmcType}</strong></p>
                 {agreementType === 'Individual' ? (
                   <p>Devices Covered: Computers ({formData.computerCount}), Printers ({formData.printerCount}), Others ({formData.otherDevices}).</p>
                 ) : (
@@ -355,7 +353,7 @@ const AMCAgreementsPage = () => {
               </div>
 
               <div className="agreement-footer">
-                <p>Generated by RepairBoy Enterprise AMC Management System</p>
+                <p>Generated by RepairBoy Enterprise CMC Management System</p>
               </div>
             </div>
           </div>
@@ -368,11 +366,11 @@ const AMCAgreementsPage = () => {
     <div className="plans-page">
       <header className="plans-header">
         <div className="plans-header-left">
-          <h1>AMC Agreements</h1>
-          <p>Generate, view, and manage corporate and individual service contracts.</p>
+          <h1>CMC Agreements</h1>
+          <p>Generate, view, and manage corporate and individual comprehensive maintenance contracts.</p>
         </div>
         <div className="plans-header-actions">
-           <div className="plans-search">
+          <div className="plans-search">
             <Search size={18} />
             <input type="text" placeholder="Search agreements..." />
           </div>
@@ -384,7 +382,7 @@ const AMCAgreementsPage = () => {
           <div className="card-header">
             <div className="card-title-area">
               <h2>Select Customer to Generate Agreement</h2>
-              <p>Choose a customer from the list below to start generating their AMC contract.</p>
+              <p>Choose a customer from the list below to start generating their CMC contract.</p>
             </div>
           </div>
 
@@ -425,4 +423,4 @@ const AMCAgreementsPage = () => {
   );
 };
 
-export default AMCAgreementsPage;
+export default CMCAgreementsPage;

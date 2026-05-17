@@ -176,6 +176,20 @@ const adminModules = [
         actions: ['Add', 'View List', 'Manage'],
       },
       {
+        id: 'amc-quotations',
+        label: 'AMC Quotations',
+        path: '/admin/amc/quotations',
+        description: 'Create and manage AMC sales quotations.',
+        actions: ['Add', 'View List'],
+      },
+      {
+        id: 'amc-agreements',
+        label: 'AMC Agreements',
+        path: '/admin/amc/agreements',
+        description: 'Generate and manage AMC service agreements.',
+        actions: ['Add', 'View List'],
+      },
+      {
         id: 'amc-inventory',
         label: 'AMC Inventory',
         path: '/admin/amc/inventory',
@@ -196,6 +210,20 @@ const adminModules = [
         path: '/admin/cmc/plans',
         description: 'Define and manage CMC service packages.',
         actions: ['Add', 'View List', 'Manage'],
+      },
+      {
+        id: 'cmc-quotations',
+        label: 'CMC Quotations',
+        path: '/admin/cmc/quotations',
+        description: 'Create and manage CMC sales quotations.',
+        actions: ['Add', 'View List'],
+      },
+      {
+        id: 'cmc-agreements',
+        label: 'CMC Agreements',
+        path: '/admin/cmc/agreements',
+        description: 'Generate and manage CMC service agreements.',
+        actions: ['Add', 'View List'],
       },
       {
         id: 'cmc-inventory',

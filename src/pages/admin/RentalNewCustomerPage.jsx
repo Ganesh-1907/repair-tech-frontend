@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Trash2, ChevronDown, ChevronUp, ArrowLeft, Save } from 'lucide-react';
 import { api } from '../../services/apiClient';
@@ -464,6 +464,7 @@ const RentalNewCustomerPage = () => {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [openDevices, setOpenDevices] = useState(new Set([0]));
+  const errorBannerRef = useRef(null);
   const [plans, setPlans] = useState([]);
 
   const [form, setForm] = useState({
@@ -483,9 +484,13 @@ const RentalNewCustomerPage = () => {
 
   useEffect(() => {
     api.list('rentalPricingPlans')
-      .then((data) => setPlans(Array.isArray(data) ? data.filter((p) => p.status !== 'Inactive') : []))
+      .then((data) => {
+        const all = Array.isArray(data) ? data : [];
+        // In edit mode show all plans (including inactive) so the currently assigned plan always appears
+        setPlans(editId ? all : all.filter((p) => p.status !== 'Inactive'));
+      })
       .catch(() => {});
-  }, []);
+  }, [editId]);
 
   useEffect(() => {
     if (!editId) return;
@@ -514,7 +519,7 @@ const RentalNewCustomerPage = () => {
             planName: existing.planName || '',
             planDetails: existing.planDetails || null,
             devices: Array.isArray(existing.devices) && existing.devices.length > 0
-              ? existing.devices
+              ? existing.devices.map((d) => ({ ...d, _existingDevice: true }))
               : [createBlankDevice('Laptop')],
           });
           if (existing.devices) {
@@ -543,6 +548,13 @@ const RentalNewCustomerPage = () => {
       const devices = [...current.devices];
       devices[index] = updated;
       return { ...current, devices };
+    });
+    // clear validation errors for this device the moment the user edits any field
+    setErrors((current) => {
+      if (!current.devices) return current;
+      const nextDeviceErrors = [...current.devices];
+      nextDeviceErrors[index] = {};
+      return { ...current, devices: nextDeviceErrors };
     });
   };
 
@@ -622,7 +634,7 @@ const RentalNewCustomerPage = () => {
   const handleSave = async () => {
     const nextErrors = validate();
     if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors);
+      setErrors({ ...nextErrors, general: 'Please fill in all required fields marked below.' });
       if (nextErrors.devices) {
         setOpenDevices((prev) => {
           const next = new Set(prev);
@@ -630,9 +642,11 @@ const RentalNewCustomerPage = () => {
           return next;
         });
       }
+      setTimeout(() => errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
       return;
     }
 
+    setErrors({});
     setSaving(true);
     try {
       const registeredAddress = trimText(form.registeredAddress);
@@ -679,7 +693,7 @@ const RentalNewCustomerPage = () => {
         notes: trimText(form.notes),
         status: 'Active',
         locations,
-        devices: form.devices,
+        devices: form.devices.map(({ _existingDevice, ...rest }) => rest),
         planId: form.planId,
         planName: form.planName,
         planDetails: form.planDetails,
@@ -687,6 +701,17 @@ const RentalNewCustomerPage = () => {
 
       if (editId) {
         await api.update(COLLECTION, editId, customerPayload);
+        const newDevices = form.devices.filter((d) => !d._existingDevice);
+        if (newDevices.length > 0) {
+          const customerForAssets = {
+            id: editId,
+            companyName: form.companyName,
+            customerName: form.primaryContact.name || form.companyName,
+            address: form.registeredAddress,
+          };
+          const assetPayloads = buildRentalAssetPayloads(newDevices, customerForAssets);
+          await Promise.all(assetPayloads.map((asset) => api.create('rentalAssets', asset)));
+        }
       } else {
         const savedCustomer = await api.create(COLLECTION, customerPayload);
         const assetPayloads = buildRentalAssetPayloads(form.devices, savedCustomer);
@@ -719,7 +744,11 @@ const RentalNewCustomerPage = () => {
         </div>
       </div>
 
-      {errors.save && <div className="form-error-banner">{errors.save}</div>}
+      <div ref={errorBannerRef}>
+        {(errors.save || errors.general) && (
+          <div className="form-error-banner">{errors.save || errors.general}</div>
+        )}
+      </div>
 
       <div className="amc-new-page-body">
         <div className="amc-form-card card-customer">

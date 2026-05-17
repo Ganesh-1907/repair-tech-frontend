@@ -1,8 +1,7 @@
 import React, { useState, useRef } from 'react';
 import {
   FileEdit, Search, Plus, Trash2,
-  Printer, Download, ChevronLeft,
-  IndianRupee, Laptop, Printer as PrinterIcon,
+  Printer, ChevronLeft,
   Network, CheckCircle2, Mail
 } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
@@ -24,34 +23,33 @@ const generatePdfBase64 = async (element, filename) => {
   return dataUri.split(',')[1];
 };
 
-const AMCQuotationPage = () => {
-  const [view, setView] = useState('list'); // 'list' or 'creator'
+const CMCQuotationPage = () => {
+  const [view, setView] = useState('list');
   const printRef = useRef(null);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
   const [assets, setAssets] = useState([
-    { id: 1, type: 'Desktop', config: 'i5, 8GB, 256GB SSD', count: 10, price: 1500 },
-    { id: 2, type: 'Laptop', config: 'i7, 16GB, 512GB SSD', count: 5, price: 2000 },
-    { id: 3, type: 'Printer', config: 'HP LaserJet Pro', count: 2, price: 1200 },
+    { id: 1, type: 'Desktop', config: 'i5, 8GB, 256GB SSD', count: 10, price: 1200 },
+    { id: 2, type: 'Laptop', config: 'i7, 16GB, 512GB SSD', count: 5, price: 1600 },
+    { id: 3, type: 'Printer', config: 'HP LaserJet Pro', count: 2, price: 1000 },
   ]);
 
   const [quoteData, setQuoteData] = useState({
-    quoteNo: `QTN-${new Date().getFullYear()}-0021`,
+    quoteNo: `CMCQ-${new Date().getFullYear()}-0001`,
     date: new Date().toISOString().split('T')[0],
     validity: '30 Days',
     customerName: '',
     customerEmail: '',
     customerAddress: '',
     contactPerson: '',
-    scope: 'Preventive maintenance, Breakdown support, Remote support, OS installation, Printer servicing',
-    exclusions: 'Spare parts (if non-comprehensive), Consumables (ink, toner, cables)',
+    scope: 'Comprehensive maintenance covering hardware, software, OS, drivers, and periodic servicing',
+    exclusions: 'Physical damage, theft, consumables (ink, toner, cables)',
     sla: '4-8 Hours Response Time',
-    gstIncluded: true
+    gstIncluded: true,
   });
 
   const handleAddAsset = () => {
-    const newAsset = { id: Date.now(), type: 'Desktop', config: '', count: 1, price: 0 };
-    setAssets([...assets, newAsset]);
+    setAssets([...assets, { id: Date.now(), type: 'Desktop', config: '', count: 1, price: 0 }]);
   };
 
   const updateAsset = (id, field, value) => {
@@ -73,9 +71,9 @@ const AMCQuotationPage = () => {
     try {
       let pdfBase64 = null;
       if (printRef.current) {
-        pdfBase64 = await generatePdfBase64(printRef.current, `AMC-Quotation-${quoteData.quoteNo}.pdf`);
+        pdfBase64 = await generatePdfBase64(printRef.current, `CMC-Quotation-${quoteData.quoteNo}.pdf`);
       }
-      const res = await apiClient.post('/email/amc-quotation', {
+      const res = await apiClient.post('/email/cmc-quotation', {
         to: quoteData.customerEmail,
         customerName: quoteData.customerName,
         contactPerson: quoteData.contactPerson,
@@ -101,7 +99,7 @@ const AMCQuotationPage = () => {
             <button className="secondary-button" onClick={() => setView('list')} style={{ marginBottom: '12px' }}>
               <ChevronLeft size={16} /> Back to Quotes
             </button>
-            <h1>Create AMC Quotation</h1>
+            <h1>Create CMC Quotation</h1>
           </div>
           <div className="plans-header-actions">
             <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !quoteData.customerEmail} title={!quoteData.customerEmail ? 'Enter customer email below to enable' : ''}>
@@ -231,7 +229,7 @@ const AMCQuotationPage = () => {
               <div className="agreement-header">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ textAlign: 'left' }}>
-                    <h1>QUOTATION</h1>
+                    <h1>CMC QUOTATION</h1>
                     <p>No: {quoteData.quoteNo}</p>
                     <p>Date: {quoteData.date}</p>
                   </div>
@@ -318,8 +316,8 @@ const AMCQuotationPage = () => {
     <div className="plans-page">
       <header className="plans-header">
         <div className="plans-header-left">
-          <h1>AMC Quotations</h1>
-          <p>Create and manage professional sales quotes for maintenance contracts.</p>
+          <h1>CMC Quotations</h1>
+          <p>Create and manage professional sales quotes for comprehensive maintenance contracts.</p>
         </div>
         <div className="plans-header-actions">
           <button className="primary-button" onClick={() => setView('creator')}>
@@ -349,9 +347,9 @@ const AMCQuotationPage = () => {
               </thead>
               <tbody>
                 {[
-                  { id: 1, no: 'QTN-2026-0015', customer: 'BlueChip IT', date: '2026-04-20', total: '₹45,000', status: 'Sent' },
-                  { id: 2, no: 'QTN-2026-0018', customer: 'Global Tech', date: '2026-04-28', total: '₹1,25,000', status: 'Accepted' },
-                  { id: 3, no: 'QTN-2026-0020', customer: 'Stellar Bank', date: '2026-05-01', total: '₹85,000', status: 'Draft' },
+                  { id: 1, no: 'CMCQ-2026-0001', customer: 'TechCorp Ltd', date: '2026-04-20', total: '₹38,000', status: 'Sent' },
+                  { id: 2, no: 'CMCQ-2026-0002', customer: 'Metro Bank', date: '2026-04-28', total: '₹95,000', status: 'Accepted' },
+                  { id: 3, no: 'CMCQ-2026-0003', customer: 'Anand Traders', date: '2026-05-01', total: '₹62,000', status: 'Draft' },
                 ].map(q => (
                   <tr key={q.id}>
                     <td><strong>{q.no}</strong></td>
@@ -373,4 +371,4 @@ const AMCQuotationPage = () => {
   );
 };
 
-export default AMCQuotationPage;
+export default CMCQuotationPage;

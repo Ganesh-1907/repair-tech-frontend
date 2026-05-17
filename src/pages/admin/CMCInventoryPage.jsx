@@ -14,8 +14,25 @@ import {
   Trash2,
   Wrench,
   X,
+  Mail,
 } from 'lucide-react';
-import { api } from '../../services/apiClient';
+import { api, apiClient } from '../../services/apiClient';
+
+const generatePdfBase64 = async (element, filename) => {
+  const html2pdf = (await import('html2pdf.js')).default;
+  const styleBlock = `<style>* { box-sizing: border-box; -webkit-print-color-adjust: exact; } body { margin: 0; padding: 0; background: #fff; font-family: "Times New Roman", Times, serif; color: #0f172a; }</style>`;
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;top:0;left:-9999px;width:794px;background:#fff;';
+  probe.innerHTML = styleBlock + element.outerHTML;
+  document.body.appendChild(probe);
+  const fullHeight = probe.scrollHeight;
+  document.body.removeChild(probe);
+  const dataUri = await html2pdf()
+    .set({ margin: [10, 12, 10, 12], filename, html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794, windowHeight: fullHeight, height: fullHeight, width: 794 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } })
+    .from(styleBlock + element.outerHTML, 'string')
+    .outputPdf('datauristring');
+  return dataUri.split(',')[1];
+};
 import SendCredentialsModal from '../../components/common/SendCredentialsModal';
 import './PlansCustomers.css';
 
@@ -499,11 +516,41 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
     monthlyRent: Number(saved.devices?.[index]?.monthlyRent ?? 0),
   })));
   const [saving, setSaving] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailStatus, setEmailStatus] = useState('');
   const set = (field, val) => setQuote((prev) => ({ ...prev, [field]: val }));
   const updateDevice = (id, value) => setDevices((prev) => prev.map((row) => (row.id === id ? { ...row, monthlyRent: value } : row)));
   const subtotal = () => devices.reduce((sum, row) => sum + Number(row.qty || 0) * Number(row.monthlyRent || 0), 0);
   const gstAmount = () => Math.round(subtotal() * (Number(quote.gstPercent || 0) / 100));
   const grandTotal = () => subtotal() + gstAmount();
+  const customerEmail = currentCustomer.primaryEmail || currentCustomer.email || '';
+
+  const handleEmail = async () => {
+    if (emailSending || !customerEmail) return;
+    setEmailSending(true);
+    setEmailStatus('');
+    try {
+      let pdfBase64 = null;
+      if (printRef.current) {
+        pdfBase64 = await generatePdfBase64(printRef.current, `CMC-Quotation-${quote.quoteNo}.pdf`);
+      }
+      const res = await apiClient.post('/email/cmc-quotation', {
+        to: customerEmail,
+        customerName: currentCustomer.name,
+        quoteNo: quote.quoteNo,
+        date: quote.date,
+        validity: quote.validity,
+        grandTotal: grandTotal(),
+        pdfBase64,
+      });
+      setEmailStatus(res.data?.message || `Quotation sent to ${customerEmail}`);
+    } catch (err) {
+      setEmailStatus(err?.response?.data?.message || 'Failed to send email. Please try again.');
+    } finally {
+      setEmailSending(false);
+    }
+  };
+
   const save = async () => {
     if (!customer) return;
     setSaving(true);
@@ -559,10 +606,19 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !customerEmail} title={!customerEmail ? 'No email on file for this customer' : ''}>
+            <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
+          </button>
           <button className="secondary-button" onClick={handlePrint}><Printer size={18} /> Print Quote</button>
           <button className="primary-button" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Quotation'}</button>
         </div>
       </header>
+
+      {emailStatus && (
+        <div style={{ background: emailStatus.toLowerCase().includes('fail') || emailStatus.toLowerCase().includes('error') ? '#fef2f2' : '#f0fdf4', border: `1px solid ${emailStatus.toLowerCase().includes('fail') || emailStatus.toLowerCase().includes('error') ? '#fca5a5' : '#86efac'}`, borderRadius: 10, padding: '12px 16px', color: emailStatus.toLowerCase().includes('fail') || emailStatus.toLowerCase().includes('error') ? '#b91c1c' : '#15803d', fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
+          {emailStatus}
+        </div>
+      )}
 
       <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -723,6 +779,9 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
   const agreeRef = useRef(null);
   const [form, setForm] = useState(initialData || createDefaultAgreement(customer));
   const [saving, setSaving] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailStatus, setEmailStatus] = useState('');
+  const customerEmail = customer?.primaryEmail || customer?.email || '';
 
   useEffect(() => {
     setForm(initialData || createDefaultAgreement(customer));
@@ -735,6 +794,32 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
   const handleSave = () => {
     setSaving(true);
     try { onSave(form); } finally { setSaving(false); }
+  };
+
+  const handleEmail = async () => {
+    if (emailSending || !customerEmail) return;
+    setEmailSending(true);
+    setEmailStatus('');
+    try {
+      let pdfBase64 = null;
+      if (agreeRef.current) {
+        pdfBase64 = await generatePdfBase64(agreeRef.current, `CMC-Agreement-${form.agreementNumber || form.agreementNo}.pdf`);
+      }
+      const res = await apiClient.post('/email/cmc-agreement', {
+        to: customerEmail,
+        customerName: customer.name,
+        agreementNo: form.agreementNumber || form.agreementNo,
+        startDate: form.startDate || customer.start,
+        endDate: form.endDate || customer.expiry,
+        grandTotal: form.totalValue || form.grandTotal,
+        pdfBase64,
+      });
+      setEmailStatus(res.data?.message || `Agreement sent to ${customerEmail}`);
+    } catch (err) {
+      setEmailStatus(err?.response?.data?.message || 'Failed to send email. Please try again.');
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   const handlePrintAgreement = () => {
@@ -755,10 +840,19 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !customerEmail} title={!customerEmail ? 'No email on file for this customer' : ''}>
+            <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
+          </button>
           <button className="secondary-button" onClick={handlePrintAgreement}><Printer size={18} /> Print Agreement</button>
           <button className="primary-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Agreement'}</button>
         </div>
       </header>
+
+      {emailStatus && (
+        <div style={{ background: emailStatus.toLowerCase().includes('fail') || emailStatus.toLowerCase().includes('error') ? '#fef2f2' : '#f0fdf4', border: `1px solid ${emailStatus.toLowerCase().includes('fail') || emailStatus.toLowerCase().includes('error') ? '#fca5a5' : '#86efac'}`, borderRadius: 10, padding: '12px 16px', color: emailStatus.toLowerCase().includes('fail') || emailStatus.toLowerCase().includes('error') ? '#b91c1c' : '#15803d', fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
+          {emailStatus}
+        </div>
+      )}
 
       <div className="main-grid" style={{ gridTemplateColumns: '1fr 1.2fr', gap: 24 }}>
         {/* ── LEFT: EDIT FORM ── */}

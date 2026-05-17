@@ -22,10 +22,55 @@ import { useNavigate } from 'react-router-dom';
 import './RentalCustomerManagement.css';
 import './RentalDocuments.css';
 import './PlansCustomers.css';
-import { api } from '../../services/apiClient';
+import { api, apiClient } from '../../services/apiClient';
 import SendCredentialsModal from '../../components/common/SendCredentialsModal';
 
 /* ── Helpers ──────────────────────────────────────────────────── */
+
+// Converts an element's outerHTML + print styles into a PDF base64 string.
+// Uses html2pdf's string mode so the content is rendered in an unconstrained
+// temporary div — no scroll clipping, no inherited overflow from the live DOM.
+const generatePdfBase64 = async (element, filename, printCss) => {
+  const html2pdf = (await import('html2pdf.js')).default;
+
+  const styleBlock = `
+    <style>
+      * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { margin: 0; padding: 0; background: #fff; font-family: "Times New Roman", Times, serif; color: #0f172a; }
+      ${printCss || ''}
+    </style>
+  `;
+
+  // Attach a temp div to body so we can measure the real full scrollHeight
+  // (off-screen via left:-9999px so the user never sees it flash)
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;top:0;left:-9999px;width:794px;background:#fff;';
+  probe.innerHTML = styleBlock + element.outerHTML;
+  document.body.appendChild(probe);
+  const fullHeight = probe.scrollHeight;
+  document.body.removeChild(probe);
+
+  const dataUri = await html2pdf()
+    .set({
+      margin: [10, 12, 10, 12],
+      filename,
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        // force html2canvas to render the full content height, not just the viewport
+        windowWidth: 794,
+        windowHeight: fullHeight,
+        height: fullHeight,
+        width: 794,
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    })
+    .from(styleBlock + element.outerHTML, 'string')
+    .outputPdf('datauristring');
+
+  return dataUri.split(',')[1];
+};
 
 const DEVICE_OPTIONS = ['Desktop', 'Laptop', 'Printer', 'CCTV', 'Server', 'Network Equipment'];
 
@@ -348,30 +393,65 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
   const gstAmount = () => Math.round(deviceTotal() * (Number(quote.gstPercent) / 100));
   const grandTotal = () => deviceTotal() + gstAmount() + Number(quote.installationCharges || 0) + Number(quote.deliveryCharges || 0);
 
-  const [saveError, setSaveError] = useState('');
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const addToast = (message, type = 'success') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  };
 
   const handleSave = async () => {
     setSaving(true);
-    setSaveError('');
-    setSaveSuccess(false);
     try {
       const savedRow = await api.patch('rentalCustomers', customer.id, {
         quotation: { ...quote, devices },
       });
       onSaved?.(savedRow);
-      setSaveSuccess(true);
+      addToast('Quotation saved successfully.');
     } catch (err) {
-      setSaveError(err?.response?.data?.message || 'Failed to save quotation. Please try again.');
+      addToast(err?.response?.data?.message || 'Failed to save quotation. Please try again.', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEmail = () => {
-    const subject = encodeURIComponent(`Rental Quotation ${quote.quoteNo} - RepairBoy Enterprise`);
-    const body = encodeURIComponent(`Dear ${quote.contactPerson || quote.customerName},\n\nPlease find attached the rental quotation ${quote.quoteNo} for your reference.\n\nTotal: ₹${fmt(grandTotal())}/month\n\nRegards,\nRepairBoy Enterprise`);
-    window.open(`mailto:${quote.email}?subject=${subject}&body=${body}`);
+  const handleEmail = async () => {
+    if (emailSending) return;
+    setEmailSending(true);
+    try {
+      let pdfBase64 = null;
+      if (printRef.current) {
+        const printCss = `
+          .agreement-document { width: 100% !important; max-width: none !important; max-height: none !important; height: auto !important; overflow: visible !important; padding: 0 !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; background: #fff !important; line-height: 1.6; }
+          .agreement-header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
+          .agreement-section { margin-bottom: 18px; }
+          .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 16px; line-height: 1.3; }
+          table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
+          th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+          th { background: #f1f5f9; font-weight: 700; }
+          p, li { font-size: 12px; line-height: 1.6; }
+          .agreement-footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; color: #64748b; font-size: 11px; }
+        `;
+        pdfBase64 = await generatePdfBase64(printRef.current, `Quotation-${quote.quoteNo}.pdf`, printCss);
+      }
+
+      const res = await apiClient.post('/email/rental-quotation', {
+        to: quote.email,
+        customerName: quote.customerName,
+        contactPerson: quote.contactPerson,
+        quoteNo: quote.quoteNo,
+        date: quote.date,
+        validity: quote.validity,
+        grandTotal: grandTotal(),
+        pdfBase64,
+      });
+      addToast(res.data?.message || `Quotation sent to ${quote.email}`);
+    } catch (err) {
+      addToast(err?.response?.data?.message || 'Failed to send email. Please try again.', 'error');
+    } finally {
+      setEmailSending(false);
+    }
   };
 
   const handlePrint = () => {
@@ -436,8 +516,8 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
         </div>
         <div className="plans-header-actions">
           {quote.email && (
-            <button className="secondary-button" onClick={handleEmail}>
-              <Mail size={18} /> Send to Email
+            <button className="secondary-button" onClick={handleEmail} disabled={emailSending}>
+              <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
             </button>
           )}
           <button className="secondary-button" onClick={handlePrint}>
@@ -448,17 +528,6 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
           </button>
         </div>
       </header>
-
-      {saveSuccess && (
-        <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '12px 16px', color: '#15803d', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-          Quotation saved successfully.
-        </div>
-      )}
-      {saveError && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', color: '#b91c1c', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-          {saveError}
-        </div>
-      )}
 
       <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
         {/* ── LEFT: EDITOR ── */}
@@ -626,6 +695,14 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
           </div>
         </div>
       </div>
+
+      <div className="fixed bottom-6 right-6 z-[2000] flex flex-col gap-3">
+        <AnimatePresence>{toasts.map(t => (
+          <Motion.div key={t.id} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }} className="toast">
+            {t.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-400" /> : <AlertCircle size={18} className="text-sky-400" />} {t.message}
+          </Motion.div>
+        ))}</AnimatePresence>
+      </div>
     </div>
   );
 };
@@ -701,6 +778,13 @@ const RentalAgreementView = ({ customer, onBack }) => {
 
   const [form, setForm] = useState(buildForm);
   const [devices] = useState(buildDevices);
+  const [agrEmailSending, setAgrEmailSending] = useState(false);
+  const [agrToasts, setAgrToasts] = useState([]);
+  const addAgrToast = (message, type = 'success') => {
+    const id = Date.now();
+    setAgrToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setAgrToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  };
 
   const set = (field, val) => setForm((f) => ({ ...f, [field]: val }));
 
@@ -708,10 +792,42 @@ const RentalAgreementView = ({ customer, onBack }) => {
   const gstAmount = () => Math.round(monthlyTotal() * (Number(form.gstPercent || 0) / 100));
   const grandTotal = () => monthlyTotal() + gstAmount() + Number(form.installationCharges || 0) + Number(form.deliveryCharges || 0);
 
-  const handleEmail = () => {
-    const subject = encodeURIComponent(`Rental Agreement ${form.agreementNo} - RepairBoy Enterprise`);
-    const body = encodeURIComponent(`Dear ${form.contactPerson || form.customerName},\n\nPlease find the rental agreement ${form.agreementNo} for your review and signature.\n\nAgreement Period: ${form.startDate} to ${form.endDate}\nMonthly Total: ₹${fmt(monthlyTotal())}\n\nRegards,\nRepairBoy Enterprise`);
-    window.open(`mailto:${form.email}?subject=${subject}&body=${body}`);
+  const handleEmail = async () => {
+    if (agrEmailSending) return;
+    setAgrEmailSending(true);
+    setAgrEmailStatus('');
+    try {
+      let pdfBase64 = null;
+      if (agreementRef.current) {
+        const printCss = `
+          .agreement-document { width: 100% !important; max-width: none !important; max-height: none !important; height: auto !important; overflow: visible !important; padding: 0 !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; background: #fff !important; line-height: 1.6; }
+          .agreement-header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
+          .agreement-section { margin-bottom: 18px; }
+          .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 16px; line-height: 1.3; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; }
+          th { background: #f1f5f9; font-weight: 700; }
+          p, li { font-size: 12px; line-height: 1.6; }
+        `;
+        pdfBase64 = await generatePdfBase64(agreementRef.current, `Agreement-${form.agreementNo}.pdf`, printCss);
+      }
+
+      const res = await apiClient.post('/email/rental-agreement', {
+        to: form.email,
+        customerName: form.customerName,
+        contactPerson: form.contactPerson,
+        agreementNo: form.agreementNo,
+        startDate: form.startDate,
+        endDate: form.endDate,
+        grandTotal: grandTotal(),
+        pdfBase64,
+      });
+      addAgrToast(res.data?.message || `Agreement sent to ${form.email}`);
+    } catch (err) {
+      addAgrToast(err?.response?.data?.message || 'Failed to send email. Please try again.', 'error');
+    } finally {
+      setAgrEmailSending(false);
+    }
   };
 
   const handleAgreementPrint = () => {
@@ -756,8 +872,8 @@ const RentalAgreementView = ({ customer, onBack }) => {
         </div>
         <div className="plans-header-actions">
           {form.email && (
-            <button className="secondary-button" onClick={handleEmail}>
-              <Mail size={18} /> Send to Email
+            <button className="secondary-button" onClick={handleEmail} disabled={agrEmailSending}>
+              <Mail size={18} /> {agrEmailSending ? 'Sending...' : 'Send to Email'}
             </button>
           )}
           <button className="secondary-button" onClick={handleAgreementPrint}>
@@ -935,6 +1051,14 @@ const RentalAgreementView = ({ customer, onBack }) => {
             <div className="agreement-footer"><p>Generated by RepairBoy Enterprise — Rental Management System</p></div>
           </div>
         </div>
+      </div>
+
+      <div className="fixed bottom-6 right-6 z-[2000] flex flex-col gap-3">
+        <AnimatePresence>{agrToasts.map(t => (
+          <Motion.div key={t.id} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }} className="toast">
+            {t.type === 'success' ? <CheckCircle2 size={18} className="text-emerald-400" /> : <AlertCircle size={18} className="text-sky-400" />} {t.message}
+          </Motion.div>
+        ))}</AnimatePresence>
       </div>
     </div>
   );
