@@ -518,15 +518,16 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
   const [saving, setSaving] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState(currentCustomer.primaryEmail || currentCustomer.email || '');
   const set = (field, val) => setQuote((prev) => ({ ...prev, [field]: val }));
   const updateDevice = (id, value) => setDevices((prev) => prev.map((row) => (row.id === id ? { ...row, monthlyRent: value } : row)));
   const subtotal = () => devices.reduce((sum, row) => sum + Number(row.qty || 0) * Number(row.monthlyRent || 0), 0);
   const gstAmount = () => Math.round(subtotal() * (Number(quote.gstPercent || 0) / 100));
   const grandTotal = () => subtotal() + gstAmount();
-  const customerEmail = currentCustomer.primaryEmail || currentCustomer.email || '';
 
   const handleEmail = async () => {
-    if (emailSending || !customerEmail) return;
+    if (emailSending) return;
+    if (!recipientEmail) { setEmailStatus('Please enter a recipient email address in the "Send to Email" field below.'); return; }
     setEmailSending(true);
     setEmailStatus('');
     try {
@@ -535,7 +536,7 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
         pdfBase64 = await generatePdfBase64(printRef.current, `CMC-Quotation-${quote.quoteNo}.pdf`);
       }
       const res = await apiClient.post('/email/cmc-quotation', {
-        to: customerEmail,
+        to: recipientEmail,
         customerName: currentCustomer.name,
         quoteNo: quote.quoteNo,
         date: quote.date,
@@ -543,7 +544,7 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
         grandTotal: grandTotal(),
         pdfBase64,
       });
-      setEmailStatus(res.data?.message || `Quotation sent to ${customerEmail}`);
+      setEmailStatus(res.data?.message || `Quotation sent to ${recipientEmail}`);
     } catch (err) {
       setEmailStatus(err?.response?.data?.message || 'Failed to send email. Please try again.');
     } finally {
@@ -606,7 +607,7 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
-          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !customerEmail} title={!customerEmail ? 'No email on file for this customer' : ''}>
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending}>
             <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
           </button>
           <button className="secondary-button" onClick={handlePrint}><Printer size={18} /> Print Quote</button>
@@ -657,6 +658,7 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>SLA Response</label><input className="form-input" value={quote.slaResponse} onChange={(e) => set('slaResponse', e.target.value)} /></div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Scope of Work</label><textarea className="form-input" style={{ height: 80 }} value={quote.scope} onChange={(e) => set('scope', e.target.value)} /></div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Exclusions</label><textarea className="form-input" style={{ height: 64 }} value={quote.exclusions} onChange={(e) => set('exclusions', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Send to Email</label><input type="email" className="form-input" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="customer@company.com" /></div>
             </div>
           </div>
         </div>
@@ -781,7 +783,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
   const [saving, setSaving] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
-  const customerEmail = customer?.primaryEmail || customer?.email || '';
+  const [recipientEmail, setRecipientEmail] = useState(customer?.primaryEmail || customer?.email || '');
 
   useEffect(() => {
     setForm(initialData || createDefaultAgreement(customer));
@@ -797,7 +799,8 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
   };
 
   const handleEmail = async () => {
-    if (emailSending || !customerEmail) return;
+    if (emailSending) return;
+    if (!recipientEmail) { setEmailStatus('Please enter a recipient email address in the "Send to Email" field below.'); return; }
     setEmailSending(true);
     setEmailStatus('');
     try {
@@ -806,7 +809,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
         pdfBase64 = await generatePdfBase64(agreeRef.current, `CMC-Agreement-${form.agreementNumber || form.agreementNo}.pdf`);
       }
       const res = await apiClient.post('/email/cmc-agreement', {
-        to: customerEmail,
+        to: recipientEmail,
         customerName: customer.name,
         agreementNo: form.agreementNumber || form.agreementNo,
         startDate: form.startDate || customer.start,
@@ -814,7 +817,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
         grandTotal: form.totalValue || form.grandTotal,
         pdfBase64,
       });
-      setEmailStatus(res.data?.message || `Agreement sent to ${customerEmail}`);
+      setEmailStatus(res.data?.message || `Agreement sent to ${recipientEmail}`);
     } catch (err) {
       setEmailStatus(err?.response?.data?.message || 'Failed to send email. Please try again.');
     } finally {
@@ -840,7 +843,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
-          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !customerEmail} title={!customerEmail ? 'No email on file for this customer' : ''}>
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending}>
             <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
           </button>
           <button className="secondary-button" onClick={handlePrintAgreement}><Printer size={18} /> Print Agreement</button>
@@ -910,6 +913,10 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
               <div className="form-group">
                 <label>Additional Clauses</label>
                 <textarea className="form-input" style={{ height: 80, resize: 'vertical' }} value={form.clauses ?? ''} onChange={(e) => set('clauses', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label>Send to Email</label>
+                <input type="email" className="form-input" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="customer@company.com" />
               </div>
             </div>
           </div>

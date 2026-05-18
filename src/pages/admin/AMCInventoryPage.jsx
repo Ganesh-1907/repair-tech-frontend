@@ -347,15 +347,16 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
   const [saving, setSaving] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState(currentCustomer.primaryEmail || currentCustomer.email || '');
   const set = (field, val) => setQuote((prev) => ({ ...prev, [field]: val }));
   const updateDevice = (id, value) => setQuoteDevices((prev) => prev.map((row) => (row.id === id ? { ...row, unitPrice: value } : row)));
   const subtotal = () => quoteDevices.reduce((sum, row) => sum + Number(row.qty || 0) * Number(row.unitPrice || 0), 0);
   const gstAmount = () => Math.round(subtotal() * (Number(quote.gstPercent || 0) / 100));
   const grandTotal = () => subtotal() + gstAmount();
-  const customerEmail = currentCustomer.primaryEmail || currentCustomer.email || '';
 
   const handleEmail = async () => {
-    if (emailSending || !customerEmail) return;
+    if (emailSending) return;
+    if (!recipientEmail) { setEmailStatus('Please enter a recipient email address in the "Send to Email" field below.'); return; }
     setEmailSending(true);
     setEmailStatus('');
     try {
@@ -364,7 +365,7 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
         pdfBase64 = await generatePdfBase64(printRef.current, `AMC-Quotation-${quote.quoteNo}.pdf`);
       }
       const res = await apiClient.post('/email/amc-quotation', {
-        to: customerEmail,
+        to: recipientEmail,
         customerName: currentCustomer.name,
         contactPerson: currentCustomer.authorizedPerson1,
         quoteNo: quote.quoteNo,
@@ -373,7 +374,7 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
         grandTotal: grandTotal(),
         pdfBase64,
       });
-      setEmailStatus(res.data?.message || `Quotation sent to ${customerEmail}`);
+      setEmailStatus(res.data?.message || `Quotation sent to ${recipientEmail}`);
     } catch (err) {
       setEmailStatus(err?.response?.data?.message || 'Failed to send email. Please try again.');
     } finally {
@@ -436,7 +437,7 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
-          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !customerEmail} title={!customerEmail ? 'No email on file for this customer' : ''}>
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending}>
             <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
           </button>
           <button className="secondary-button" onClick={handlePrint}><Printer size={18} /> Print Quote</button>
@@ -473,6 +474,7 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
               <div className="form-group"><label>SLA Resolution</label><input className="form-input" value={quote.slaResolution} onChange={(e) => set('slaResolution', e.target.value)} /></div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Scope of Work</label><textarea className="form-input" style={{ height: 80 }} value={quote.scope} onChange={(e) => set('scope', e.target.value)} /></div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Exclusions</label><textarea className="form-input" style={{ height: 64 }} value={quote.exclusions} onChange={(e) => set('exclusions', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Send to Email</label><input type="email" className="form-input" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="customer@company.com" /></div>
             </div>
           </div>
         </div>
@@ -581,11 +583,12 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
   const [saving, setSaving] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState(currentCustomer.primaryEmail || currentCustomer.email || '');
   const setAgreementField = (field, value) => setAgreement((prev) => ({ ...prev, [field]: value }));
-  const customerEmail = currentCustomer.primaryEmail || currentCustomer.email || '';
 
   const handleEmail = async () => {
-    if (emailSending || !customerEmail) return;
+    if (emailSending) return;
+    if (!recipientEmail) { setEmailStatus('Please enter a recipient email address in the "Send to Email" field below.'); return; }
     setEmailSending(true);
     setEmailStatus('');
     try {
@@ -594,7 +597,7 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
         pdfBase64 = await generatePdfBase64(agreeRef.current, `AMC-Agreement-${agreement.agreementNo}.pdf`);
       }
       const res = await apiClient.post('/email/amc-agreement', {
-        to: customerEmail,
+        to: recipientEmail,
         customerName: currentCustomer.name,
         contactPerson: currentCustomer.authorizedPerson1,
         agreementNo: agreement.agreementNo,
@@ -603,7 +606,7 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
         grandTotal: quotationGrandTotal,
         pdfBase64,
       });
-      setEmailStatus(res.data?.message || `Agreement sent to ${customerEmail}`);
+      setEmailStatus(res.data?.message || `Agreement sent to ${recipientEmail}`);
     } catch (err) {
       setEmailStatus(err?.response?.data?.message || 'Failed to send email. Please try again.');
     } finally {
@@ -659,7 +662,7 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
-          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !customerEmail} title={!customerEmail ? 'No email on file for this customer' : ''}>
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending}>
             <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
           </button>
           <button className="secondary-button" onClick={printAgreement}><Printer size={18} /> Print Agreement</button>
@@ -688,6 +691,7 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Spare Parts Policy</label><textarea className="form-input" style={{ height: 70 }} value={agreement.sparePolicy} onChange={(e) => setAgreementField('sparePolicy', e.target.value)} /></div>
               <div className="form-group"><label>Jurisdiction</label><input className="form-input" value={agreement.jurisdiction} onChange={(e) => setAgreementField('jurisdiction', e.target.value)} /></div>
               <div className="form-group"><label>Special Terms</label><input className="form-input" value={agreement.specialTerms} onChange={(e) => setAgreementField('specialTerms', e.target.value)} /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Send to Email</label><input type="email" className="form-input" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="customer@company.com" /></div>
             </div>
           </div>
         </div>

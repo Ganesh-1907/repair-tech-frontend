@@ -20,8 +20,6 @@ import AMCReport from './pages/AMCReport';
 import AMCDashboardPage from './pages/admin/AMCDashboardPage';
 import AMCPlansPage from './pages/admin/AMCPlansPage';
 import AMCReportsPage from './pages/admin/AMCReportsPage';
-import AMCAgreementsPage from './pages/admin/AMCAgreementsPage';
-import AMCQuotationPage from './pages/admin/AMCQuotationPage';
 import AMCInventoryPage from './pages/admin/AMCInventoryPage';
 import AMCNewContractPage from './pages/admin/AMCNewContractPage';
 import AMCViewPage from './pages/admin/AMCViewPage';
@@ -66,8 +64,6 @@ import CMCInventoryPage from './pages/admin/CMCInventoryPage';
 import CMCNewContractPage from './pages/admin/CMCNewContractPage';
 import CMCViewPage from './pages/admin/CMCViewPage';
 import CMCReportsPage from './pages/admin/CMCReportsPage';
-import CMCQuotationPage from './pages/admin/CMCQuotationPage';
-import CMCAgreementsPage from './pages/admin/CMCAgreementsPage';
 
 import { adminRouteEntries } from './config/adminModules';
 import { ToastProvider } from './context/ToastContext';
@@ -132,14 +128,10 @@ const existingAdminRouteComponents = {
   '/admin/rental/reports': RentalCustomersPage,
   '/admin/amc/dashboard': AMCDashboardPage,
   '/admin/amc/plans': AMCPlansPage,
-  '/admin/amc/quotations': AMCQuotationPage,
-  '/admin/amc/agreements': AMCAgreementsPage,
   '/admin/amc/inventory': AMCInventoryPage,
   '/admin/amc/reports': AMCReportsPage,
   '/admin/cmc/dashboard': CMCDashboardPage,
   '/admin/cmc/plans': CMCPlansPage,
-  '/admin/cmc/quotations': CMCQuotationPage,
-  '/admin/cmc/agreements': CMCAgreementsPage,
   '/admin/cmc/inventory': CMCInventoryPage,
   '/admin/cmc/reports': CMCReportsPage,
   '/admin/cmc': CMCDashboardPage,
@@ -231,8 +223,6 @@ function App() {
               <Route path="/admin/cmc/view/:id" element={<Layout><CMCViewPage /></Layout>} />
               <Route path="/admin/cmc/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="cmc" /></Layout>} />
               <Route path="/admin/cmc/reports" element={<Layout><CMCReportsPage /></Layout>} />
-              <Route path="/admin/cmc/quotations" element={<Layout><CMCQuotationPage /></Layout>} />
-              <Route path="/admin/cmc/agreements" element={<Layout><CMCAgreementsPage /></Layout>} />
 
               {/* Discounts Module Routes */}
               <Route path="/admin/discounts" element={<Navigate to="/admin/discounts/dashboard" replace />} />
