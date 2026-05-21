@@ -14,10 +14,13 @@ import {
   MessageCircleMore,
   Send,
   Smartphone,
-  Wrench
+  Wrench,
+  FileText,
+  ChevronRight,
 } from 'lucide-react';
 import { leadManagementService } from '../services/leadManagementService';
 import { staffManagementService } from '../services/staffManagementService';
+import { useLeadSettings } from '../hooks/useLeadSettings';
 import { sendOutboundMessage } from '../services/communicationService';
 import SendCredentialsModal from '../components/common/SendCredentialsModal';
 
@@ -25,10 +28,11 @@ const initialLeadForm = {
   customerName: '',
   company: '',
   mobileNumber: '',
-  serviceType: 'Walk-in',
-  source: 'Google',
+  email: '',
+  serviceType: '',
+  source: '',
   assignedTechnicianId: '',
-  device: 'Laptop',
+  device: '',
   locationLink: '',
   problemInwardNote: '',
   deviceCheckNote: '',
@@ -44,9 +48,6 @@ const initialLeadForm = {
 };
 
 const categories = ['All', 'Pending', 'Completed', 'Assigned', 'Missed'];
-const serviceTypeOptions = ['Walk-in', 'Onsite service'];
-const sourceOptions = ['Google', 'FB', 'Insta', 'Walkin'];
-const deviceOptions = ['Laptop', 'Desktop', 'CCTV'];
 
 const ADMIN_TRACKER_STEPS = ['Lead Captured', 'Assign to Technician'];
 
@@ -58,6 +59,25 @@ const STAFF_PROGRESS_STEPS = [
   'Ready for Collection',
   'Delivered & Closed',
 ];
+
+const ALL_LEAD_STEPS = [...ADMIN_TRACKER_STEPS, ...STAFF_PROGRESS_STEPS];
+
+const normalizeStatus = (v) => String(v || '').trim().toLowerCase();
+
+const getCurrentStepIndex = (lead) => {
+  if (lead.tracker?.some((s) => s.status === 'cancelled')) return -1;
+  if (lead.category && lead.category !== 'Missed') {
+    const staffIdx = STAFF_PROGRESS_STEPS.findIndex((s) =>
+      normalizeStatus(s) === normalizeStatus(lead.category) ||
+      normalizeStatus(lead.category).includes(normalizeStatus(s)) ||
+      normalizeStatus(s).includes(normalizeStatus(lead.category))
+    );
+    if (staffIdx >= 0) return staffIdx + ADMIN_TRACKER_STEPS.length;
+  }
+  const tracker = lead.tracker || [];
+  const lastCompleted = tracker.reduce((max, s, i) => (s.status === 'completed' ? i : max), -1);
+  return lastCompleted;
+};
 
 const normalizeServiceType = (value = '') => String(value).toLowerCase().includes('onsite') ? 'Onsite service' : 'Walk-in';
 
@@ -120,7 +140,7 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
-const LeadFormModal = ({ technicians, submitting, onClose, onCreate }) => {
+const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceTypeOptions, sourceOptions, deviceOptions }) => {
   const [form, setForm] = useState(initialLeadForm);
   const [errors, setErrors] = useState({});
 
@@ -150,6 +170,11 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate }) => {
     } else if (!/^\d{10}$/.test(form.mobileNumber.trim())) {
       nextErrors.mobileNumber = 'Enter a valid 10 digit mobile number.';
     }
+    if (!form.email.trim()) {
+      nextErrors.email = 'Email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      nextErrors.email = 'Enter a valid email address.';
+    }
     if (!form.serviceType.trim()) nextErrors.serviceType = 'Service type is required.';
     if (!form.source.trim()) nextErrors.source = 'Source is required.';
     if (selectedServiceType === 'Onsite service' && form.onsiteImages.length < 3) {
@@ -166,6 +191,7 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate }) => {
       customerName: form.customerName.trim(),
       company: form.company.trim(),
       mobileNumber: form.mobileNumber.trim(),
+      email: form.email.trim(),
       serviceType: selectedServiceType,
       source: form.source.trim(),
       device: form.device.trim(),
@@ -240,6 +266,19 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate }) => {
                 aria-invalid={Boolean(errors.mobileNumber)}
               />
               {errors.mobileNumber && <span className="form-error">{errors.mobileNumber}</span>}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="lead-email">Email <span style={{ color: '#ef4444' }}>*</span></label>
+              <input
+                id="lead-email"
+                type="email"
+                placeholder="Enter email address"
+                value={form.email}
+                onChange={(event) => updateForm('email', event.target.value)}
+                aria-invalid={Boolean(errors.email)}
+              />
+              {errors.email && <span className="form-error">{errors.email}</span>}
             </div>
 
             <div className="form-group">
@@ -616,11 +655,12 @@ const ViewLeadModal = ({ lead, onClose, onEdit }) => {
   );
 };
 
-const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate }) => {
+const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate, serviceTypeOptions, sourceOptions, deviceOptions }) => {
   const [form, setForm] = useState({
     customerName: lead.customerName || '',
     company: lead.company || '',
     mobileNumber: lead.mobileNumber || '',
+    email: lead.email || '',
     serviceType: lead.serviceType || 'Walk-in',
     source: lead.source || 'Google',
     assignedTechnicianId: lead.assignedTechnicianId || '',
@@ -657,6 +697,11 @@ const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate }) => 
     } else if (!/^\d{10}$/.test(form.mobileNumber.trim())) {
       nextErrors.mobileNumber = 'Enter a valid 10 digit mobile number.';
     }
+    if (!form.email.trim()) {
+      nextErrors.email = 'Email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      nextErrors.email = 'Enter a valid email address.';
+    }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
@@ -667,6 +712,7 @@ const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate }) => 
       customerName: form.customerName.trim(),
       company: form.company.trim(),
       mobileNumber: form.mobileNumber.trim(),
+      email: form.email.trim(),
       serviceType: selectedServiceType,
       source: form.source.trim(),
       device: form.device.trim(),
@@ -713,6 +759,12 @@ const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate }) => 
               <label htmlFor="edit-lead-mobile">Mobile Number</label>
               <input id="edit-lead-mobile" type="tel" inputMode="numeric" placeholder="Enter mobile number" value={form.mobileNumber} onChange={(e) => updateForm('mobileNumber', e.target.value.replace(/\D/g, '').slice(0, 10))} aria-invalid={Boolean(errors.mobileNumber)} />
               {errors.mobileNumber && <span className="form-error">{errors.mobileNumber}</span>}
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="edit-lead-email">Email <span style={{ color: '#ef4444' }}>*</span></label>
+              <input id="edit-lead-email" type="email" placeholder="Enter email address" value={form.email} onChange={(e) => updateForm('email', e.target.value)} aria-invalid={Boolean(errors.email)} />
+              {errors.email && <span className="form-error">{errors.email}</span>}
             </div>
 
             <div className="form-group">
@@ -810,125 +862,96 @@ const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate }) => 
   );
 };
 
-const stepDotStyle = (status) => {
-  if (status === 'completed') return { bg: '#10b981', color: '#fff', border: '#10b981' };
-  if (status === 'current')   return { bg: '#6366f1', color: '#fff', border: '#6366f1' };
-  if (status === 'cancelled') return { bg: '#ef4444', color: '#fff', border: '#ef4444' };
-  return { bg: '#f1f5f9', color: '#94a3b8', border: '#e2e8f0' };
-};
 
-const LeadTrackerModal = ({ lead, onClose, onUpdateStep, onCancelLead }) => {
-  const tracker = lead.tracker?.length ? lead.tracker : buildLeadTracker(lead.serviceType, Boolean(lead.assignedTechnician));
-  const isCancelled = tracker.some(s => s.status === 'cancelled');
-  const isAssigned = tracker.every(s => s.status === 'completed') && !isCancelled;
-  const completedCount = tracker.filter(s => s.status === 'completed').length;
-  const totalCount = tracker.length;
+const LeadTrackerModal = ({ lead, onClose, onSetStep, onCancelLead, updating }) => {
+  const isCancelled = lead.tracker?.some((s) => s.status === 'cancelled') || lead.category === 'Missed';
+  const currentIndex = isCancelled ? -1 : getCurrentStepIndex(lead);
+  const nextIndex = Math.min(currentIndex + 1, ALL_LEAD_STEPS.length - 1);
+  const progress = isCancelled ? 0 : Math.round(((currentIndex + 1) / ALL_LEAD_STEPS.length) * 100);
 
   return (
     <div className="modal-overlay" role="presentation">
       <div className="modal-panel" role="dialog" aria-modal="true" style={{ padding: 0, overflow: 'hidden' }}>
 
         {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', padding: '24px 28px 20px', position: 'relative' }}>
+        <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', padding: '20px 24px 18px', position: 'relative' }}>
           <button className="icon-btn" onClick={onClose} aria-label="Close tracker modal" style={{ position: 'absolute', top: 14, right: 14, color: '#94a3b8', background: 'rgba(255,255,255,0.08)' }}><X size={18} /></button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.15rem', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
               {(lead.customerName || 'L')[0].toUpperCase()}
             </div>
             <div>
-              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#fff' }}>Service Tracker</h2>
-              <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#94a3b8' }}>{lead.customerName} · {lead.serviceType || 'Walk-in'}</p>
+              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#fff' }}>Service Tracker</h2>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>{lead.customerName} · {lead.serviceType || 'Walk-in'}</p>
             </div>
           </div>
+        </div>
+
+        <div style={{ padding: '20px 24px' }}>
+          {/* Status overview */}
+          <div className="staff-status-overview">
+            <div>
+              <span>Current Status</span>
+              <strong>{isCancelled ? 'Cancelled' : (ALL_LEAD_STEPS[currentIndex] || 'Not started')}</strong>
+            </div>
+            <div>
+              <span>Progress</span>
+              <strong>{isCancelled ? '—' : `${progress}%`}</strong>
+            </div>
+            <div>
+              <span>Next Step</span>
+              <strong>{isCancelled ? '—' : (currentIndex >= ALL_LEAD_STEPS.length - 1 ? 'Completed' : ALL_LEAD_STEPS[nextIndex])}</strong>
+            </div>
+          </div>
+
           {/* Progress bar */}
-          <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.12)', borderRadius: 99, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.round((completedCount / totalCount) * 100)}%`, background: isCancelled ? '#ef4444' : '#10b981', borderRadius: 99, transition: 'width 0.4s' }} />
-            </div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isCancelled ? '#fca5a5' : '#6ee7b7', whiteSpace: 'nowrap' }}>
-              {isCancelled ? 'Cancelled' : `${completedCount} / ${totalCount} done`}
-            </span>
+          <div className="staff-status-progress">
+            <div style={{ width: `${progress}%` }} />
           </div>
-        </div>
 
-        {/* Admin Steps */}
-        <div style={{ padding: '20px 28px 16px' }}>
-          <p style={{ margin: '0 0 14px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748b' }}>Admin Actions</p>
-          {tracker.map((item, index, array) => {
-            const dot = stepDotStyle(item.status);
-            const isLast = index === array.length - 1;
-            const isCurrent = item.status === 'current';
-            return (
-              <div key={item.step} style={{ display: 'flex', gap: 16, position: 'relative' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 36 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: dot.bg, border: `2px solid ${dot.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: dot.color, fontSize: '0.8rem', fontWeight: 800, zIndex: 1 }}>
-                    {item.status === 'completed' ? '✓' : item.status === 'cancelled' ? '✕' : index + 1}
-                  </div>
-                  {!isLast && <div style={{ width: 2, flex: 1, minHeight: 18, background: item.status === 'completed' ? '#10b981' : '#e2e8f0', margin: '4px 0' }} />}
-                </div>
-                <div style={{ flex: 1, paddingBottom: isLast ? 0 : 18, paddingTop: 7 }}>
-                  <span style={{ fontSize: '0.92rem', fontWeight: 700, color: item.status === 'cancelled' ? '#ef4444' : item.status === 'pending' ? '#94a3b8' : '#0f172a', display: 'block', marginBottom: isCurrent ? 10 : 0 }}>
-                    {item.step}
-                    {item.status === 'cancelled' && <span style={{ marginLeft: 8, fontSize: '0.7rem', fontWeight: 700, background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: 20 }}>Cancelled</span>}
-                  </span>
-                  {isCurrent && (
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button onClick={() => onUpdateStep(lead, index)} style={{ padding: '6px 18px', borderRadius: 8, background: '#6366f1', color: '#fff', border: 'none', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
-                        Assign Technician
-                      </button>
-                      <button onClick={() => onCancelLead(lead, index)} style={{ padding: '6px 16px', borderRadius: 8, background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}>
-                        ✕ Cancel Lead
-                      </button>
-                    </div>
-                  )}
-                  {item.date && (
-                    <p style={{ margin: '5px 0 0', fontSize: '0.72rem', color: item.status === 'cancelled' ? '#ef4444' : '#64748b' }}>
-                      {item.status === 'cancelled' ? 'Cancelled on' : 'Done on'} {new Date(item.date).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+          {/* All steps — clickable */}
+          <div className="staff-status-flow">
+            {ALL_LEAD_STEPS.map((step, index) => {
+              const state = isCancelled ? 'pending' : index < currentIndex ? 'completed' : index === currentIndex ? 'active' : 'pending';
+              return (
+                <button
+                  type="button"
+                  key={step}
+                  className={`staff-status-flow-card ${state}`}
+                  onClick={() => !isCancelled && updating !== lead.id && onSetStep(lead, index)}
+                  disabled={isCancelled || updating === lead.id}
+                >
+                  <span className="staff-status-flow-index">{index + 1}</span>
+                  <strong>{step}</strong>
+                </button>
+              );
+            })}
+          </div>
 
-        {/* Staff Progress — read-only with current step highlighted */}
-        {(() => {
-          const staffIdx = STAFF_PROGRESS_STEPS.findIndex(s => s.toLowerCase() === (lead.category || '').toLowerCase());
-          const isDone = lead.category === 'Completed' || lead.category === 'Delivered & Closed';
-          return (
-            <div style={{ margin: '0 28px 20px', padding: '16px', background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
-              <p style={{ margin: '0 0 14px', fontSize: '0.7rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#64748b' }}>
-                {isAssigned ? `Staff Progress — ${lead.assignedTechnician}` : 'Staff Progress (visible after assignment)'}
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {STAFF_PROGRESS_STEPS.map((step, i) => {
-                  const isStepDone    = isDone || i < staffIdx;
-                  const isStepCurrent = !isDone && i === staffIdx && isAssigned;
-
-                  let dotBg = '#e2e8f0', dotColor = '#94a3b8', chipBg = '#f1f5f9', chipBorder = '#e2e8f0', textColor = '#94a3b8';
-                  if (!isAssigned) { /* keep gray */ }
-                  else if (isStepDone)    { dotBg = '#10b981'; dotColor = '#fff'; chipBg = '#dcfce7'; chipBorder = '#86efac'; textColor = '#15803d'; }
-                  else if (isStepCurrent) { dotBg = '#6366f1'; dotColor = '#fff'; chipBg = '#eef2ff'; chipBorder = '#a5b4fc'; textColor = '#4338ca'; }
-
-                  return (
-                    <div key={step} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20, background: chipBg, border: `1px solid ${chipBorder}` }}>
-                      <span style={{ width: 20, height: 20, borderRadius: '50%', background: dotBg, color: dotColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', fontWeight: 800, flexShrink: 0 }}>
-                        {isStepDone ? '✓' : i + 1}
-                      </span>
-                      <span style={{ fontSize: '0.78rem', fontWeight: isStepCurrent ? 800 : 600, color: textColor, whiteSpace: 'nowrap' }}>{step}</span>
-                    </div>
-                  );
-                })}
-              </div>
-              {isAssigned && <p style={{ margin: '12px 0 0', fontSize: '0.72rem', color: '#64748b' }}>Staff updates these steps from their portal. View in <strong>Staff Portal → Staff Tasks</strong>.</p>}
-              {!isAssigned && <p style={{ margin: '12px 0 0', fontSize: '0.72rem', color: '#94a3b8' }}>Steps become active once a technician is assigned.</p>}
+          {/* Actions */}
+          {!isCancelled && (
+            <div className="staff-status-actions" style={{ display: 'flex', gap: 10, justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                className="btn btn-secondary"
+                style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }}
+                onClick={() => {
+                  const trackerIdx = lead.tracker?.findIndex((s) => s.status === 'current') ?? 1;
+                  onCancelLead(lead, trackerIdx >= 0 ? trackerIdx : 1);
+                }}
+                disabled={updating === lead.id}
+              >
+                ✕ Cancel Lead
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={currentIndex >= ALL_LEAD_STEPS.length - 1 || updating === lead.id}
+                onClick={() => onSetStep(lead, nextIndex)}
+              >
+                {updating === lead.id ? 'Updating...' : 'Mark Done / Next Step'}
+                <ChevronRight size={16} style={{ marginLeft: 4 }} />
+              </button>
             </div>
-          );
-        })()}
-
-        <div className="modal-actions" style={{ padding: '14px 28px', borderTop: '1px solid var(--border-light, #e2e8f0)', margin: 0 }}>
-          <button className="btn btn-secondary" onClick={onClose}>Close</button>
+          )}
         </div>
       </div>
     </div>
@@ -1067,11 +1090,16 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
 const Leads = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { settings } = useLeadSettings();
+  const serviceTypeOptions = settings.serviceTypes;
+  const sourceOptions = settings.sources;
+  const deviceOptions = settings.devices;
   const [leads, setLeads] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [assigningLead, setAssigningLead] = useState(null);
   const [trackingLead, setTrackingLead] = useState(null);
+  const [updatingTracker, setUpdatingTracker] = useState(null);
   const [messagingLead, setMessagingLead] = useState(null);
   const [viewingLead, setViewingLead] = useState(null);
   const [editingLead, setEditingLead] = useState(null);
@@ -1225,28 +1253,40 @@ const Leads = () => {
     }
   };
 
-  const handleUpdateTrackerStep = async (lead, stepIndex) => {
+
+  const handleSetLeadStep = async (lead, stepIndex) => {
+    setUpdatingTracker(lead.id);
     try {
-      const nextTracker = [...(lead.tracker || [])];
-      nextTracker[stepIndex] = {
-        ...nextTracker[stepIndex],
+      const completedTracker = ADMIN_TRACKER_STEPS.map((step) => ({
+        step,
         status: 'completed',
         date: new Date().toISOString(),
-      };
+      }));
 
-      if (stepIndex + 1 < nextTracker.length && nextTracker[stepIndex + 1].status === 'pending') {
-        nextTracker[stepIndex + 1] = {
-          ...nextTracker[stepIndex + 1],
-          status: 'current',
-        };
+      const updates = { tracker: completedTracker };
+
+      if (stepIndex < ADMIN_TRACKER_STEPS.length) {
+        // Admin-only steps: only update tracker, clear staff category
+        updates.tracker = ADMIN_TRACKER_STEPS.map((step, i) => ({
+          step,
+          status: i <= stepIndex ? 'completed' : 'current',
+          date: i <= stepIndex ? new Date().toISOString() : null,
+        }));
+        updates.category = 'Pending';
+      } else {
+        // Staff steps: mark all admin steps done + set staff category
+        updates.category = ALL_LEAD_STEPS[stepIndex];
       }
 
-      await leadManagementService.updateLead(lead.id, { tracker: nextTracker });
-      setNotice(`Step "${nextTracker[stepIndex].step}" completed.`);
+      await leadManagementService.updateLead(lead.id, updates);
+      setNotice(`Status updated to "${ALL_LEAD_STEPS[stepIndex]}".`);
+      const updatedLead = { ...lead, ...updates };
+      setTrackingLead(updatedLead);
       loadLeads();
-      setTrackingLead({ ...lead, tracker: nextTracker });
     } catch (error) {
-      setNotice(error.response?.data?.message || error.message || 'Failed to update tracker.');
+      setNotice(error.response?.data?.message || error.message || 'Failed to update status.');
+    } finally {
+      setUpdatingTracker(null);
     }
   };
 
@@ -1460,10 +1500,13 @@ const Leads = () => {
           <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setMessagingLead(activeMenuLead); }}>
             <MessageCircleMore size={14} className="icon-muted" /> Instant Message
           </button>
+          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/quotation/${activeMenuLead.id}`, { state: { lead: activeMenuLead } }); }}>
+            <FileText size={14} className="icon-muted" /> Create Quotation
+          </button>
           <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/repair/${activeMenuLead.id}`); }}>
             <Wrench size={14} className="icon-muted" /> Manage Repair
           </button>
-          <button type="button" className="account-menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(activeMenuLead); setActiveLeadMenu(null); }}>
+          <button type="button" className="account-menu-item" onClick={() => { setCredentialsTarget(activeMenuLead); setActiveLeadMenu(null); }}>
             <Wrench size={14} className="icon-muted" /> Send Portal Access
           </button>
           {activeMenuLead.assignedTechnician && (
@@ -1480,6 +1523,9 @@ const Leads = () => {
           submitting={creatingLead}
           onClose={closeLeadModal}
           onCreate={handleCreateLead}
+          serviceTypeOptions={serviceTypeOptions}
+          sourceOptions={sourceOptions}
+          deviceOptions={deviceOptions}
         />
       )}
 
@@ -1496,8 +1542,9 @@ const Leads = () => {
         <LeadTrackerModal
           lead={trackingLead}
           onClose={() => setTrackingLead(null)}
-          onUpdateStep={handleUpdateTrackerStep}
+          onSetStep={handleSetLeadStep}
           onCancelLead={handleCancelLead}
+          updating={updatingTracker}
         />
       )}
 
@@ -1524,6 +1571,9 @@ const Leads = () => {
           submitting={savingLead}
           onClose={() => setEditingLead(null)}
           onUpdate={handleUpdateLead}
+          serviceTypeOptions={serviceTypeOptions}
+          sourceOptions={sourceOptions}
+          deviceOptions={deviceOptions}
         />
       )}
 
@@ -1535,6 +1585,7 @@ const Leads = () => {
           onClose={() => setCredentialsTarget(null)}
         />
       )}
+
     </div>
   );
 };

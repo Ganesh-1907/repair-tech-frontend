@@ -263,14 +263,6 @@ const adminModules = [
       },
     ],
   },
-  {
-    id: 'customer-portal',
-    label: 'Customer Portal',
-    icon: 'UserCircle',
-    path: '/admin/customer-portal',
-    description: 'Customer portal placeholder for external self-service and status visibility.',
-    actions: ['View List', 'Manage'],
-  },
 ];
 
 const isArrayWithValues = (value) => Array.isArray(value) && value.length > 0;

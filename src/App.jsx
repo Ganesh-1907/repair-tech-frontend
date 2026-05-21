@@ -16,6 +16,10 @@ import CAPortal from './pages/CAPortal';
 import Login from './pages/Login';
 import CMCReport from './pages/CMCReport';
 import AMCReport from './pages/AMCReport';
+// Lead Quotation Page
+import LeadQuotationPage from './pages/admin/LeadQuotationPage';
+import SettingsPage from './pages/admin/SettingsPage';
+
 // AMC Module Pages
 import AMCDashboardPage from './pages/admin/AMCDashboardPage';
 import AMCPlansPage from './pages/admin/AMCPlansPage';
@@ -252,6 +256,8 @@ function App() {
               <Route path="/" element={<Layout><Dashboard /></Layout>} />
               <Route path="/leads" element={<Layout><Leads /></Layout>} />
               <Route path="/admin/leads/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="leads" /></Layout>} />
+              <Route path="/admin/leads/quotation/:id" element={<Layout><LeadQuotationPage /></Layout>} />
+              <Route path="/admin/settings" element={<Layout><SettingsPage /></Layout>} />
               <Route path="/workflow" element={<Layout><Workflow /></Layout>} />
               <Route path="/billing" element={<Layout><Billing /></Layout>} />
               <Route path="/inventory" element={<Layout><Inventory /></Layout>} />

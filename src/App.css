@@ -635,8 +635,8 @@ textarea {
 }
 
 .account-menu-item:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--danger);
+  background: rgba(99, 102, 241, 0.08);
+  color: #4f46e5;
 }
 
 /* Cards and controls */

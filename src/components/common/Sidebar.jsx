@@ -8,6 +8,7 @@ import {
   Key,
   LayoutDashboard,
   LogOut,
+  Settings,
   ShieldCheck,
   TicketPercent,
   UserCircle,
@@ -198,6 +199,11 @@ const Sidebar = ({ isOpen = false, onClose }) => {
       </nav>
 
       <div className="sidebar-footer">
+        <NavLink to="/admin/settings" className={({ isActive }) => `sidebar-btn${isActive ? ' active' : ''}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Settings size={18} />
+          <span>Settings</span>
+        </NavLink>
+
         <button
           onClick={togglePrivacy}
           className={`sidebar-btn privacy-toggle ${isPrivacyOn ? 'active' : ''}`}
