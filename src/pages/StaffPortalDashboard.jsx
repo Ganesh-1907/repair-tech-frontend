@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Briefcase,
@@ -100,6 +100,18 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
+const captureLocation = () =>
+  new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy }),
+      () => resolve(null),
+      { timeout: 8000, maximumAge: 30000 }
+    );
+  });
+
+const LOCATION_PING_INTERVAL_MS = 5 * 60 * 1000;
+
 const StaffPortalDashboard = () => {
   const [summary, setSummary] = useState(emptySummary);
   const [activeTask, setActiveTask] = useState(null);
@@ -107,6 +119,8 @@ const StaffPortalDashboard = () => {
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const locationIntervalRef = useRef(null);
+  const lastLocationPingAtRef = useRef(0);
 
   const loadSummary = async (nextActiveTaskId) => {
     try {
@@ -123,6 +137,32 @@ const StaffPortalDashboard = () => {
     }
   };
 
+  const sendLocationPing = useCallback(async ({ force = false } = {}) => {
+    const now = Date.now();
+    if (!force && now - lastLocationPingAtRef.current < LOCATION_PING_INTERVAL_MS) return;
+
+    const loc = await captureLocation();
+    if (!loc) return;
+
+    lastLocationPingAtRef.current = now;
+    staffManagementService.sendLocationPing(loc).catch(() => null);
+  }, []);
+
+  const startLocationTracking = useCallback(({ sendNow = false } = {}) => {
+    if (locationIntervalRef.current) return;
+    if (sendNow) sendLocationPing({ force: true });
+    locationIntervalRef.current = setInterval(async () => {
+      sendLocationPing();
+    }, LOCATION_PING_INTERVAL_MS);
+  }, [sendLocationPing]);
+
+  const stopLocationTracking = () => {
+    if (locationIntervalRef.current) {
+      clearInterval(locationIntervalRef.current);
+      locationIntervalRef.current = null;
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     staffManagementService.getStaffPortalSummary()
@@ -131,6 +171,9 @@ const StaffPortalDashboard = () => {
         const nextSummary = { ...emptySummary, ...data };
         setSummary(nextSummary);
         setActiveTask(nextSummary.tasks[0] || null);
+        if (nextSummary.attendance?.isClockedIn) {
+          startLocationTracking({ sendNow: true });
+        }
       })
       .catch((error) => {
         if (mounted) setNotice(error.response?.data?.message || error.message || 'Staff dashboard failed to load.');
@@ -140,8 +183,9 @@ const StaffPortalDashboard = () => {
       });
     return () => {
       mounted = false;
+      stopLocationTracking();
     };
-  }, []);
+  }, [startLocationTracking]);
 
   const profile = summary.profile || {};
   const stats = summary.stats || emptySummary.stats;
@@ -157,15 +201,33 @@ const StaffPortalDashboard = () => {
       ? `You logged in ${attendance.lateMinutes} min late. This month it is your ${attendance.monthlyLateCount}${getOrdinalSuffix(attendance.monthlyLateCount)} late login.`
       : '';
 
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && attendance.isClockedIn) {
+        sendLocationPing();
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [attendance.isClockedIn, sendLocationPing]);
+
   const handleClockIn = async () => {
     setSubmitting(true);
     try {
-      const result = await staffManagementService.clockIn();
+      const loc = await captureLocation();
+      const result = await staffManagementService.clockIn(loc || {});
       const lateMinutes = Number(result.lateMinutes || 0);
       const lateCount = Number(result.monthlyLateCount || 0);
       setNotice(lateMinutes > 0
         ? `You logged in ${lateMinutes} min late. This month it is your ${lateCount}${getOrdinalSuffix(lateCount)} late login.`
         : 'Clock-in saved.');
+      lastLocationPingAtRef.current = Date.now();
+      startLocationTracking();
       await loadSummary();
     } catch (error) {
       setNotice(error.response?.data?.message || error.message || 'Clock-in failed.');
@@ -177,7 +239,9 @@ const StaffPortalDashboard = () => {
   const submitClockOut = async (reason = '') => {
     setSubmitting(true);
     try {
-      const result = await staffManagementService.clockOut({ reason });
+      const loc = await captureLocation();
+      stopLocationTracking();
+      const result = await staffManagementService.clockOut({ reason, ...(loc || {}) });
       const overtimeMinutes = Number(result.overtimeMinutes || 0);
       setNotice(overtimeMinutes > 0 ? `Clock-out saved with ${overtimeMinutes} min extra work.` : 'Clock-out saved.');
       setModal(null);

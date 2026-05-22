@@ -119,4 +119,19 @@ export const staffManagementService = {
     return data;
   },
 
+  async sendLocationPing({ lat, lng, accuracy = 0 }) {
+    const { data } = await apiClient.post('/staff/location', { lat, lng, accuracy });
+    return data;
+  },
+
+  async getLiveLocations() {
+    const { data } = await apiClient.get('/admin/staff/live-locations');
+    return data;
+  },
+
+  async getStaffLocationHistory(staffId) {
+    const { data } = await apiClient.get(`/admin/staff/${staffId}/location-history`);
+    return data;
+  },
+
 };

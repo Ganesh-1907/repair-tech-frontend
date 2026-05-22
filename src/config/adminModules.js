@@ -40,6 +40,13 @@ const adminModules = [
         description: 'Search and manage staff with popup-based add/view/edit/assign/permissions.',
         actions: ['Add', 'View List', 'Manage'],
       },
+      {
+        id: 'staff-live-tracking',
+        label: 'Live Tracking',
+        path: '/admin/staff/live-tracking',
+        description: 'See where each staff member is during their shift on a live map with route history.',
+        actions: ['View Map'],
+      },
     ],
   },
   {

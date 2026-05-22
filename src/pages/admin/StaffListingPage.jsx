@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Edit, Eye, MoreVertical, Plus, Search, UserRoundPlus, X } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { Edit, Eye, MapPin, MoreVertical, Plus, Search, UserRoundPlus, X } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { staffManagementService } from '../../services/staffManagementService';
 
@@ -51,6 +51,7 @@ const formatAdminTime = (value) => {
 
 const StaffListingPage = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const initialMode = new URLSearchParams(location.search).get('mode') === 'add' || new URLSearchParams(location.search).get('add') === '1' ? 'add' : '';
   const [staff, setStaff] = useState([]);
   const [pendingJobs, setPendingJobs] = useState([]);
@@ -127,6 +128,10 @@ const StaffListingPage = () => {
     setForm(emptyForm);
     setAssignForm({ staffId: '', pendingJobId: '', priority: 'Medium', notes: '' });
     setErrors({});
+  };
+
+  const openTracking = (row) => {
+    navigate(`/admin/staff/live-tracking?staffId=${encodeURIComponent(row.id)}`);
   };
 
   const openAdd = () => {
@@ -343,6 +348,9 @@ const StaffListingPage = () => {
                         </button>
                         <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openAssign(row); }}>
                           <UserRoundPlus size={14} className="icon-muted" /> Assign Job
+                        </button>
+                        <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openTracking(row); }}>
+                          <MapPin size={14} className="icon-muted" /> Location Tracking
                         </button>
                       </div>
                     )}
