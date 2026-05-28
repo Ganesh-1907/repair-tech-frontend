@@ -38,6 +38,10 @@ export const campaignService = {
     });
   },
 
+  async deleteCampaign(id) {
+    return api.remove('campaigns', id);
+  },
+
   async getDashboardSummary() {
     const [campaigns, jobs] = await Promise.all([
       api.list('campaigns'),

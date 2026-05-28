@@ -4,8 +4,7 @@ import { Plus, Trash2, ChevronDown, ChevronUp, ArrowLeft, Save } from 'lucide-re
 import { api } from '../../services/apiClient';
 import { normalizeContractDevices } from './contractDeviceFormUtils';
 import './PlansCustomers.css';
-
-const DEVICE_TYPES = ['Laptop', 'Desktop', 'Printer', 'CCTV', 'Server', 'UPS', 'Scanner', 'Total Maintenance'];
+import { useLeadSettings } from '../../hooks/useLeadSettings';
 
 const createBlankDevice = (type = 'Laptop') => {
   switch (type) {
@@ -299,7 +298,7 @@ const TotalMaintenanceFields = ({ device, onReplace }) => {
       <div className="form-group" style={{ marginBottom: '20px', maxWidth: '260px' }}>
         <label>Device Sub-Type</label>
         <select className="form-select" value={sub} onChange={e => handleSubTypeChange(e.target.value)}>
-          {DEVICE_TYPES.filter(t => t !== 'Total Maintenance').map(t => <option key={t}>{t}</option>)}
+          {settings.devices.map(t => <option key={t}>{t}</option>)}
         </select>
       </div>
       {renderSubFields()}
@@ -356,7 +355,7 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
             onChange={e => onChange('type', e.target.value)}
             title="Change device type"
           >
-            {DEVICE_TYPES.map(t => <option key={t}>{t}</option>)}
+            {[...settings.devices, 'Total Maintenance'].map(t => <option key={t}>{t}</option>)}
           </select>
           <button className="accordion-remove-btn" onClick={() => onRemove(index)}>
             <Trash2 size={13} /> Remove
@@ -381,6 +380,7 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 const AMCNewContractPage = () => {
+  const { settings } = useLeadSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -428,7 +428,7 @@ const AMCNewContractPage = () => {
               return;
             }
             const details = existing.amcDetails || {};
-            const devices = normalizeContractDevices(details.devices || existing.devices, createBlankDevice, DEVICE_TYPES);
+            const devices = normalizeContractDevices(details.devices || existing.devices, createBlankDevice, [...settings.devices, 'Total Maintenance']);
             setForm({
               companyName: existing.customerName || existing.name || '',
               gstNumber: details.gstin || details.gst || existing.gstin || existing.gst || '',

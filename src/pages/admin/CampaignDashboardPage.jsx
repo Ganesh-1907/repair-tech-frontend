@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Plus, Download, RefreshCcw, Search, TrendingUp, Users, Target,
   IndianRupee, Package, ClipboardList, MoreVertical, ChevronRight,
-  Filter, Eye, Receipt, FileDown, Archive, X, Loader2,
+  Filter, Eye, Receipt, FileDown, Trash2, X, Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { campaignService } from '../../services/campaignServices';
@@ -90,12 +90,13 @@ const CampaignDashboardPage = () => {
     }
   };
 
-  const handleArchive = async (campaign) => {
+  const handleDelete = async (campaign) => {
+    if (!window.confirm(`Delete campaign "${campaign.name}"? This cannot be undone.`)) return;
     try {
-      await campaignService.saveCampaign({ ...campaign, status: 'Archived' });
+      await campaignService.deleteCampaign(campaign.id);
       load();
     } catch {
-      alert('Failed to archive campaign.');
+      alert('Failed to delete campaign.');
     }
     setOpenActionId(null);
   };
@@ -401,17 +402,13 @@ const CampaignDashboardPage = () => {
                             >
                               <FileDown size={14} /> Export CSV
                             </button>
-                            {c.status !== 'Archived' && (
-                              <>
-                                <div className="border-t border-slate-100 my-1" />
-                                <button
-                                  className="w-full text-left px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                  onClick={() => handleArchive(c)}
-                                >
-                                  <Archive size={14} /> Archive Campaign
-                                </button>
-                              </>
-                            )}
+                            <div className="border-t border-slate-100 my-1" />
+                            <button
+                              className="w-full text-left px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2"
+                              onClick={() => handleDelete(c)}
+                            >
+                              <Trash2 size={14} /> Delete
+                            </button>
                           </div>
                         )}
                       </div>

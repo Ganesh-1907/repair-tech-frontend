@@ -7,10 +7,11 @@ import { customerPortalService } from '../../services/customerPortalService';
  *  contractId      - string
  *  contractIds     - string[]  (optional, for linking multiple)
  *  customerName    - string
- *  email           - string   (pre-fill, editable)
+ *  email           - string   (pre-fill)
+ *  emailLocked     - boolean  (optional, prevents changing email in this modal)
  *  onClose         - () => void
  */
-const SendCredentialsModal = ({ contractId, contractIds, customerName, email: initialEmail, onClose }) => {
+const SendCredentialsModal = ({ contractId, contractIds, customerName, email: initialEmail, emailLocked = false, onClose }) => {
   const [email, setEmail] = useState(initialEmail || '');
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
@@ -22,7 +23,7 @@ const SendCredentialsModal = ({ contractId, contractIds, customerName, email: in
   ])];
 
   const handleSend = async () => {
-    if (!email.trim()) { setError('Email address is required.'); return; }
+    if (!email.trim()) { setError('No email is saved for this customer. Edit the lead and add an email before sending portal access.'); return; }
     if (!email.includes('@')) { setError('Please enter a valid email.'); return; }
     setSending(true);
     setError('');
@@ -58,14 +59,35 @@ const SendCredentialsModal = ({ contractId, contractIds, customerName, email: in
           {!result ? (
             <>
               <div className="form-group" style={{ marginBottom: 16 }}>
-                <label style={{ fontWeight: 600, fontSize: '0.85rem', display: 'block', marginBottom: 6 }}>Customer Email</label>
+                <label style={{ fontWeight: 600, fontSize: '0.85rem', display: 'block', marginBottom: 6 }}>Sending To</label>
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="customer@email.com"
-                  style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }}
+                  onChange={(e) => {
+                    if (!emailLocked) setEmail(e.target.value);
+                  }}
+                  placeholder={emailLocked ? 'No email saved on lead' : 'customer@email.com'}
+                  readOnly={emailLocked}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: 10,
+                    fontSize: '0.9rem',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    background: emailLocked ? '#f8fafc' : '#fff',
+                    color: email ? '#0f172a' : '#ef4444',
+                    cursor: emailLocked ? 'not-allowed' : 'text',
+                  }}
                 />
+                {emailLocked && (
+                  <p style={{ margin: '6px 0 0', color: email ? '#64748b' : '#dc2626', fontSize: '0.78rem', lineHeight: 1.4 }}>
+                    {email
+                      ? 'This email comes from the lead record. To change it, edit the lead email first.'
+                      : 'This lead has no email saved. Edit the lead and add an email before sending portal access.'}
+                  </p>
+                )}
               </div>
 
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', marginBottom: 16, fontSize: '0.83rem', color: '#64748b' }}>
@@ -82,7 +104,7 @@ const SendCredentialsModal = ({ contractId, contractIds, customerName, email: in
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                 <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleSend} disabled={sending} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button className="btn btn-primary" onClick={handleSend} disabled={sending || (emailLocked && !email.trim())} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Mail size={15} />
                   {sending ? 'Sending...' : 'Send Credentials'}
                 </button>

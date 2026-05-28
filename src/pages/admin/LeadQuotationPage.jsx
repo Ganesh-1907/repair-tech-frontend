@@ -423,7 +423,7 @@ const LeadQuotationPage = () => {
             {/* Totals */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '14px 18px', borderTop: '1px solid #f1f5f9' }}>
               <div style={{ width: 240 }}>
-                {[['Sub Total', fmt(subTotal)], ['SGST (9%)', fmt(sgst)], ['CGST (9%)', fmt(cgst)]].map(([l, v]) => (
+                {[['Sub Total', fmt(subTotal)], ['SGST', fmt(sgst)], ['CGST', fmt(cgst)]].map(([l, v]) => (
                   <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.83rem', marginBottom: 6, color: '#64748b' }}>
                     <span>{l}</span>
                     <span style={{ fontWeight: 600, color: '#0f172a' }}>₹{v}</span>
@@ -555,11 +555,11 @@ const LeadQuotationPage = () => {
                       <td colSpan={2} style={{ padding: '5px 8px', border: '1px solid #dde3ed', textAlign: 'right' }}>₹{fmt(subTotal)}</td>
                     </tr>
                     <tr>
-                      <td colSpan={5} style={{ padding: '5px 8px', border: '1px solid #dde3ed', textAlign: 'right', fontSize: 11, color: '#475569' }}>SGST @ 9%</td>
+                      <td colSpan={5} style={{ padding: '5px 8px', border: '1px solid #dde3ed', textAlign: 'right', fontSize: 11, color: '#475569' }}>SGST</td>
                       <td colSpan={2} style={{ padding: '5px 8px', border: '1px solid #dde3ed', textAlign: 'right' }}>₹{fmt(sgst)}</td>
                     </tr>
                     <tr>
-                      <td colSpan={5} style={{ padding: '5px 8px', border: '1px solid #dde3ed', textAlign: 'right', fontSize: 11, color: '#475569' }}>CGST @ 9%</td>
+                      <td colSpan={5} style={{ padding: '5px 8px', border: '1px solid #dde3ed', textAlign: 'right', fontSize: 11, color: '#475569' }}>CGST</td>
                       <td colSpan={2} style={{ padding: '5px 8px', border: '1px solid #dde3ed', textAlign: 'right' }}>₹{fmt(cgst)}</td>
                     </tr>
                     <tr className="tr-grand" style={{ background: '#ede9fe' }}>

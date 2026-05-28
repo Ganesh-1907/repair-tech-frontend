@@ -1,16 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion as Motion } from 'framer-motion';
 import {
-  Archive,
   CalendarDays,
   ChevronRight,
   ClipboardList,
   Loader2,
   MapPin,
+  MoreVertical,
   Pencil,
   Plus,
   RefreshCcw,
   Search,
+  Trash2,
   X,
 } from 'lucide-react';
 import { campaignService } from '../../services/campaignServices';
@@ -53,6 +54,8 @@ const CampaignsListingPage = () => {
   const [editingCampaign, setEditingCampaign] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
+  const [openActionId, setOpenActionId] = useState(null);
+  const actionMenuRef = useRef(null);
 
   const loadCampaigns = useCallback(async () => {
     setLoading(true);
@@ -69,6 +72,16 @@ const CampaignsListingPage = () => {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
+
+  useEffect(() => {
+    const handler = (event) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
+        setOpenActionId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const openAddModal = () => {
     setEditingCampaign(null);
@@ -121,12 +134,14 @@ const CampaignsListingPage = () => {
     }
   };
 
-  const handleArchive = async (campaign) => {
+  const handleDelete = async (campaign) => {
+    if (!window.confirm(`Delete campaign "${campaign.name}"? This cannot be undone.`)) return;
     try {
-      await campaignService.saveCampaign({ ...campaign, status: 'Archived' });
+      await campaignService.deleteCampaign(campaign.id);
+      setOpenActionId(null);
       loadCampaigns();
     } catch {
-      alert('Failed to archive campaign.');
+      alert('Failed to delete campaign.');
     }
   };
 
@@ -232,15 +247,42 @@ const CampaignsListingPage = () => {
                     <td className="text-xs text-slate-600 max-w-[220px]">{campaign.address || '-'}</td>
                     <td><span className="status-badge status-quote">{campaign.status}</span></td>
                     <td className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <button className="icon-button inline-flex" title="Edit campaign" onClick={() => openEditModal(campaign)}>
-                          <Pencil size={16} />
+                      <div ref={openActionId === campaign.id ? actionMenuRef : null} className="action-menu-wrap inline-block">
+                        <button
+                          className="icon-button inline-flex"
+                          title="Campaign actions"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenActionId(openActionId === campaign.id ? null : campaign.id);
+                          }}
+                        >
+                          <MoreVertical size={16} />
                         </button>
-                        {campaign.status !== 'Archived' && (
-                          <button className="icon-button inline-flex" title="Archive campaign" onClick={() => handleArchive(campaign)}>
-                            <Archive size={16} />
-                          </button>
-                        )}
+                        <AnimatePresence>
+                          {openActionId === campaign.id && (
+                            <Motion.div
+                              className="action-dropdown"
+                              initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                              animate={{ opacity: 1, scale: 1, y: 0 }}
+                              exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                              transition={{ duration: 0.15, ease: 'easeOut' }}
+                            >
+                              <button
+                                className="action-dropdown-item"
+                                onClick={() => {
+                                  openEditModal(campaign);
+                                  setOpenActionId(null);
+                                }}
+                              >
+                                <Pencil size={16} /> Edit Campaign
+                              </button>
+                              <div className="action-dropdown-divider" />
+                              <button className="action-dropdown-item danger" onClick={() => handleDelete(campaign)}>
+                                <Trash2 size={16} /> Delete
+                              </button>
+                            </Motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </td>
                   </tr>

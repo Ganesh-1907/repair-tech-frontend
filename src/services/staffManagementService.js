@@ -104,6 +104,13 @@ export const staffManagementService = {
     return data;
   },
 
+  getStaffTargets: () => api.list('staffTargets'),
+
+  async setStaffTarget(payload) {
+    const { data } = await apiClient.post('/admin/staff/target', payload);
+    return data;
+  },
+
   async addStaffPayment(payload) {
     const { data } = await apiClient.post('/staff/payments', payload);
     return data;

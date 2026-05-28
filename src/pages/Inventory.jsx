@@ -28,9 +28,9 @@ import { inventoryService } from '../services/inventoryService';
 import { assetManagementService } from '../services/assetManagementService';
 import { useToast } from '../context/ToastContext';
 import './InventoryPremiumStyles.css';
+import { useLeadSettings } from '../hooks/useLeadSettings';
 
 const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle'];
-const ASSET_TYPES = ['Laptop', 'Desktop', 'Printer', 'CCTV', 'Server', 'UPS'];
 
 const money = (value) => `₹${Number(value || 0).toLocaleString('en-IN')}`;
 
@@ -152,7 +152,6 @@ const InventoryManagement = () => {
         <div>
           <span className="inventory-eyebrow">Inventory & Asset Management</span>
           <h1>Device assets and stock listing</h1>
-          <p>Track every device — printers, laptops, desktops, CCTV, servers, UPS, and more — by serial number while keeping spare parts, sale stock, and low-stock alerts in one clean view.</p>
         </div>
         <div className="inventory-hero-actions">
           <button className="inventory-icon-button" onClick={handleReset} title="Reset stock inventory">
@@ -279,22 +278,42 @@ const DeviceIcon = ({ type }) => {
 
 const AssetRowMenu = ({ asset, onView, onEdit }) => {
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   const ref = useRef(null);
 
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const close = () => setOpen(false);
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', close, true);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', close, true);
+    };
   }, [open]);
+
+  const toggleMenu = (event) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = 132;
+    const menuHeight = 88;
+    const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
+    const opensUp = rect.bottom + menuHeight > window.innerHeight - 8;
+    const top = opensUp ? Math.max(8, rect.top - menuHeight - 6) : rect.bottom + 6;
+    setPosition({ top, left });
+    setOpen((value) => !value);
+  };
 
   return (
     <div className="inv-row-menu" ref={ref}>
-      <button className="inv-row-menu-trigger" onClick={() => setOpen((v) => !v)} title="Actions">
+      <button className="inv-row-menu-trigger" onClick={toggleMenu} title="Actions">
         <MoreVertical size={16} />
       </button>
       {open && (
-        <div className="inv-row-menu-dropdown">
+        <div className="inv-row-menu-dropdown" style={{ top: position.top, left: position.left }}>
           <button onClick={() => { onView(asset); setOpen(false); }}>View</button>
           <button onClick={() => { onEdit(asset); setOpen(false); }}>Edit</button>
         </div>
@@ -407,6 +426,7 @@ const StockTable = ({ items, onDelete }) => (
 );
 
 const AssetFormModal = ({ asset, onClose, onSave }) => {
+  const { settings } = useLeadSettings();
   const isEdit = !!asset;
   const [formData, setFormData] = useState({
     assetTag: asset?.assetTag || '',
@@ -457,7 +477,7 @@ const AssetFormModal = ({ asset, onClose, onSave }) => {
       <div className="inventory-form-grid three">
         <Field label="Type">
           <select value={formData.type} onChange={(e) => update('type', e.target.value)}>
-            {ASSET_TYPES.map((t) => <option key={t}>{t}</option>)}
+            {settings.devices.map((t) => <option key={t}>{t}</option>)}
           </select>
         </Field>
         <Field label="Model" error={errors.model}>

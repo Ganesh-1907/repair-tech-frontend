@@ -7,8 +7,10 @@ import {
   FileText, ArrowUpRight, Upload, Sun, Moon, User
 } from 'lucide-react';
 import './DeviceRegistry.css';
+import { useLeadSettings } from '../../hooks/useLeadSettings';
 
 const CMCDeviceRegistryPage = () => {
+  const { settings } = useLeadSettings();
   // --- State ---
   const [devices, setDevices] = useState([
     { id: 1, name: 'MacBook Pro M2', serial: 'SN-AP-M2-991', customer: 'Metro Hospital', type: 'Laptop', coverage: 'CMC', expiry: '2026-07-11', status: 'Active', lastService: '2026-04-21' },
@@ -432,11 +434,7 @@ const DeviceModal = ({ onClose, onSubmit, device }) => {
           <div className="form-field">
             <label>Asset Type</label>
             <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-              <option>Laptop</option>
-              <option>Desktop</option>
-              <option>Printer</option>
-              <option>Network</option>
-              <option>Server</option>
+              {settings.devices.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div className="form-field">

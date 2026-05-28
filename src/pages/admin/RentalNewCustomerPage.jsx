@@ -3,9 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Trash2, ChevronDown, ChevronUp, ArrowLeft, Save } from 'lucide-react';
 import { api } from '../../services/apiClient';
 import './PlansCustomers.css';
+import { useLeadSettings } from '../../hooks/useLeadSettings';
 
 const COLLECTION = 'rentalCustomers';
-const DEVICE_TYPES = ['Laptop', 'Desktop', 'Printer', 'CCTV', 'Server', 'Total Maintenance'];
 
 const createBlankDevice = (type = 'Laptop') => {
   switch (type) {
@@ -384,7 +384,7 @@ const TotalMaintenanceFields = ({ device, onReplace, errors = {} }) => {
       <div className="form-group" style={{ marginBottom: '20px', maxWidth: '260px' }}>
         <label>Device Sub-Type</label>
         <select className="form-select" value={sub} onChange={(e) => handleSubTypeChange(e.target.value)}>
-          {DEVICE_TYPES.filter((type) => type !== 'Total Maintenance').map((type) => <option key={type}>{type}</option>)}
+          {settings.devices.map((type) => <option key={type}>{type}</option>)}
         </select>
       </div>
       {renderSubFields()}
@@ -433,7 +433,7 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
             onChange={(e) => onChange('type', e.target.value)}
             title="Change device type"
           >
-            {DEVICE_TYPES.map((type) => <option key={type}>{type}</option>)}
+            {[...settings.devices, 'Total Maintenance'].map((type) => <option key={type}>{type}</option>)}
           </select>
           <button className="accordion-remove-btn" onClick={() => onRemove(index)}>
             <Trash2 size={13} /> Remove
@@ -456,6 +456,7 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
 };
 
 const RentalNewCustomerPage = () => {
+  const { settings } = useLeadSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);

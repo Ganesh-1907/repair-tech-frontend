@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Edit, Eye, MapPin, MoreVertical, Plus, Search, UserRoundPlus, X } from 'lucide-react';
+import { Edit, Eye, MapPin, MoreVertical, Plus, Search, Target, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { staffManagementService } from '../../services/staffManagementService';
@@ -33,16 +33,6 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
-const isAssignableJob = (job) => {
-  const status = String(job.status || job.jobStatus || '').toLowerCase();
-  return !['assigned', 'completed', 'closed', 'cancelled', 'canceled'].some((item) => status.includes(item));
-};
-
-const getPendingJobLabel = (job) => {
-  const title = job.title || [job.customerName, job.device, job.issue].filter(Boolean).join(' - ');
-  return title || job.id;
-};
-
 const formatAdminTime = (value) => {
   const date = value ? new Date(value) : null;
   if (!date || Number.isNaN(date.getTime())) return '-';
@@ -54,7 +44,7 @@ const StaffListingPage = () => {
   const navigate = useNavigate();
   const initialMode = new URLSearchParams(location.search).get('mode') === 'add' || new URLSearchParams(location.search).get('add') === '1' ? 'add' : '';
   const [staff, setStaff] = useState([]);
-  const [pendingJobs, setPendingJobs] = useState([]);
+  const [staffTargets, setStaffTargets] = useState([]);
   const [regularizationRequests, setRegularizationRequests] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -63,21 +53,26 @@ const StaffListingPage = () => {
   const [modalMode, setModalMode] = useState(initialMode);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [assignForm, setAssignForm] = useState({ staffId: '', pendingJobId: '', priority: 'Medium', notes: '' });
+  const [targetForm, setTargetForm] = useState({ staffId: '', month: '', targetAmount: '' });
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState('');
 
+  const currentMonthKey = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+
   const loadData = async () => {
-    const [staffResult, jobsResult, regResult] = await Promise.allSettled([
+    const [staffResult, targetsResult, regResult] = await Promise.allSettled([
       staffManagementService.getStaffList(),
-      staffManagementService.getPendingJobs(),
+      staffManagementService.getStaffTargets(),
       staffManagementService.getAttendanceRegularizations(),
     ]);
     const staffRows = staffResult.status === 'fulfilled' ? staffResult.value : [];
-    const jobs = jobsResult.status === 'fulfilled' ? jobsResult.value : [];
+    const targets = targetsResult.status === 'fulfilled' ? targetsResult.value : [];
     const regularizations = regResult.status === 'fulfilled' ? regResult.value : [];
     setStaff(Array.isArray(staffRows) ? staffRows : (staffRows?.data || []));
-    setPendingJobs(Array.isArray(jobs) ? jobs : (jobs?.data || []));
+    setStaffTargets(Array.isArray(targets) ? targets : (targets?.data || []));
     setRegularizationRequests(Array.isArray(regularizations) ? regularizations : []);
   };
 
@@ -85,15 +80,15 @@ const StaffListingPage = () => {
     let mounted = true;
     Promise.allSettled([
       staffManagementService.getStaffList(),
-      staffManagementService.getPendingJobs(),
+      staffManagementService.getStaffTargets(),
       staffManagementService.getAttendanceRegularizations(),
-    ]).then(([staffResult, jobsResult, regResult]) => {
+    ]).then(([staffResult, targetsResult, regResult]) => {
       if (!mounted) return;
       const staffRows = staffResult.status === 'fulfilled' ? staffResult.value : [];
-      const jobs = jobsResult.status === 'fulfilled' ? jobsResult.value : [];
+      const targets = targetsResult.status === 'fulfilled' ? targetsResult.value : [];
       const regularizations = regResult.status === 'fulfilled' ? regResult.value : [];
       setStaff(Array.isArray(staffRows) ? staffRows : (staffRows?.data || []));
-      setPendingJobs(Array.isArray(jobs) ? jobs : (jobs?.data || []));
+      setStaffTargets(Array.isArray(targets) ? targets : (targets?.data || []));
       setRegularizationRequests(Array.isArray(regularizations) ? regularizations : []);
     });
     return () => {
@@ -119,14 +114,15 @@ const StaffListingPage = () => {
     return true;
   }), [staff, search, statusFilter, departmentFilter]);
 
-  const assignableJobs = useMemo(() => pendingJobs.filter(isAssignableJob), [pendingJobs]);
   const pendingRegularizations = useMemo(() => regularizationRequests.filter((row) => row.status === 'Pending'), [regularizationRequests]);
+
+  const getStaffTarget = (staffId) => staffTargets.find((t) => t.staffId === staffId && t.month === currentMonthKey) || null;
 
   const closeModal = () => {
     setModalMode('');
     setSelectedStaff(null);
     setForm(emptyForm);
-    setAssignForm({ staffId: '', pendingJobId: '', priority: 'Medium', notes: '' });
+    setTargetForm({ staffId: '', month: '', targetAmount: '' });
     setErrors({});
   };
 
@@ -169,11 +165,24 @@ const StaffListingPage = () => {
     setErrors({});
   };
 
-  const openAssign = (row) => {
+  const openTarget = (row) => {
+    const existing = getStaffTarget(row.id);
     setSelectedStaff(row);
-    setAssignForm({ staffId: row.id, pendingJobId: assignableJobs[0]?.id || '', priority: 'Medium', notes: '' });
-    setModalMode('assign');
+    setTargetForm({ staffId: row.id, month: currentMonthKey, targetAmount: existing?.targetAmount || '' });
+    setModalMode('target');
     setErrors({});
+  };
+
+  const saveTarget = async () => {
+    const amount = Number(targetForm.targetAmount);
+    if (!amount || amount <= 0) {
+      setErrors({ targetAmount: 'Enter a valid target amount.' });
+      return;
+    }
+    await staffManagementService.setStaffTarget({ staffId: targetForm.staffId, month: targetForm.month, targetAmount: amount });
+    setNotice(`Monthly target set for ${selectedStaff.name}.`);
+    await loadData();
+    closeModal();
   };
 
   const validateStaff = () => {
@@ -213,21 +222,6 @@ const StaffListingPage = () => {
       const created = await staffManagementService.createStaff(form);
       setNotice(`Staff ${created.id} created.`);
     }
-    await loadData();
-    closeModal();
-  };
-
-  const saveAssignment = async () => {
-    if (!assignForm.staffId) {
-      setErrors({ assign: 'Staff is required.' });
-      return;
-    }
-    if (!assignForm.pendingJobId) {
-      setErrors({ assign: 'Pending job is required.' });
-      return;
-    }
-    await staffManagementService.assignJob(assignForm);
-    setNotice('Job assigned successfully.');
     await loadData();
     closeModal();
   };
@@ -311,6 +305,7 @@ const StaffListingPage = () => {
               <th>Department / Skill</th>
               <th>Status</th>
               <th>Assigned Jobs</th>
+              <th>Monthly Target</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -329,6 +324,16 @@ const StaffListingPage = () => {
                 </td>
                 <td>{row.assignedJobs}</td>
                 <td>
+                  {(() => {
+                    const t = getStaffTarget(row.id);
+                    return t ? (
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-primary, #2563eb)' }}>
+                        ₹{Number(t.targetAmount).toLocaleString('en-IN')}
+                      </span>
+                    ) : <span className="text-muted" style={{ fontSize: '12px' }}>Not set</span>;
+                  })()}
+                </td>
+                <td>
                   <div style={{ position: 'relative' }}>
                     <button
                       type="button"
@@ -346,8 +351,8 @@ const StaffListingPage = () => {
                         <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openEdit(row); }}>
                           <Edit size={14} className="icon-muted" /> Edit
                         </button>
-                        <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openAssign(row); }}>
-                          <UserRoundPlus size={14} className="icon-muted" /> Assign Job
+                        <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openTarget(row); }}>
+                          <Target size={14} className="icon-muted" /> Set Target
                         </button>
                         <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openTracking(row); }}>
                           <MapPin size={14} className="icon-muted" /> Location Tracking
@@ -359,7 +364,7 @@ const StaffListingPage = () => {
               </tr>
             ))}
             {filteredStaff.length === 0 && (
-              <tr><td colSpan="8" className="text-muted">No staff found.</td></tr>
+              <tr><td colSpan="9" className="text-muted">No staff found.</td></tr>
             )}
           </tbody>
         </table>
@@ -445,46 +450,41 @@ const StaffListingPage = () => {
         </div>
       )}
 
-      {modalMode === 'assign' && selectedStaff && (
+      {modalMode === 'target' && selectedStaff && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
           <div className="modal-panel">
             <div className="modal-header">
-              <div><h2>Assign Job</h2><p>Assign pending job to staff.</p></div>
-              <button className="icon-btn" onClick={closeModal} aria-label="Close assign job modal"><X size={16} /></button>
+              <div>
+                <h2>Set Monthly Target</h2>
+                <p>Set payment collection target for <strong>{selectedStaff.name}</strong>.</p>
+              </div>
+              <button className="icon-btn" onClick={closeModal} aria-label="Close target modal"><X size={16} /></button>
             </div>
             <div className="modal-form">
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Staff</label>
-                  <select value={assignForm.staffId} onChange={(event) => setAssignForm((current) => ({ ...current, staffId: event.target.value }))}>
-                    {staff.map((row) => <option key={row.id} value={row.id}>{row.name} ({row.id})</option>)}
-                  </select>
+                  <label>Month</label>
+                  <input
+                    type="month"
+                    value={targetForm.month}
+                    onChange={(event) => setTargetForm((c) => ({ ...c, month: event.target.value }))}
+                  />
                 </div>
                 <div className="form-group">
-                  <label>Pending Job</label>
-                  <select value={assignForm.pendingJobId} onChange={(event) => setAssignForm((current) => ({ ...current, pendingJobId: event.target.value }))}>
-                    <option value="">Select job</option>
-                    {assignableJobs.map((job) => <option key={job.id} value={job.id}>{job.id} - {getPendingJobLabel(job)}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Priority</label>
-                  <select value={assignForm.priority} onChange={(event) => setAssignForm((current) => ({ ...current, priority: event.target.value }))}>
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
-                    <option>Urgent</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Notes</label>
-                  <textarea rows={3} value={assignForm.notes} onChange={(event) => setAssignForm((current) => ({ ...current, notes: event.target.value }))} />
+                  <label>Target Amount (₹)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 20000"
+                    value={targetForm.targetAmount}
+                    onChange={(event) => { setTargetForm((c) => ({ ...c, targetAmount: event.target.value })); setErrors({}); }}
+                  />
+                  {errors.targetAmount && <span className="form-error">{errors.targetAmount}</span>}
                 </div>
               </div>
-              {errors.assign && <div className="form-error">{errors.assign}</div>}
               <div className="modal-actions">
                 <button className="btn btn-secondary" type="button" onClick={closeModal}>Cancel</button>
-                <button className="btn btn-primary" type="button" onClick={saveAssignment}>Assign Job</button>
+                <button className="btn btn-primary" type="button" onClick={saveTarget}>Save Target</button>
               </div>
             </div>
           </div>

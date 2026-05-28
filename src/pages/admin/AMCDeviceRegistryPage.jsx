@@ -7,8 +7,10 @@ import {
   FileText, ArrowUpRight, Upload, Sun, Moon, User
 } from 'lucide-react';
 import './DeviceRegistry.css';
+import { useLeadSettings } from '../../hooks/useLeadSettings';
 
 const AMCDeviceRegistryPage = () => {
+  const { settings } = useLeadSettings();
   // --- State ---
   const [devices, setDevices] = useState([
     { id: 1, name: 'Dell Latitude 5420', serial: 'SN-DL-5420-001', customer: 'Global Tech', type: 'Laptop', coverage: 'AMC', expiry: '2026-05-15', status: 'Active', lastService: '2026-04-20' },
@@ -436,11 +438,7 @@ const DeviceModal = ({ onClose, onSubmit, device }) => {
           <div className="form-field">
             <label>Device Type</label>
             <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})}>
-              <option>Laptop</option>
-              <option>Desktop</option>
-              <option>Printer</option>
-              <option>Network</option>
-              <option>Server</option>
+              {settings.devices.map((t) => <option key={t}>{t}</option>)}
             </select>
           </div>
           <div className="form-field">

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { assetManagementService } from '../../services/assetManagementService';
 import { useToast } from '../../context/ToastContext';
+import { useLeadSettings } from '../../hooks/useLeadSettings';
 import '../InventoryPremiumStyles.css';
 
 const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle'];
@@ -36,6 +37,7 @@ const statusTone = (status) => {
 
 const AssetManagementPage = () => {
   const { addToast } = useToast();
+  const { settings } = useLeadSettings();
   const [assets, setAssets] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
@@ -261,8 +263,7 @@ const AddAssetModal = ({ onClose, onSave }) => {
           <div className="inventory-form-grid three">
             <Field label="Type">
               <select value={formData.type} onChange={(event) => update('type', event.target.value)}>
-                <option>Printer</option>
-                <option>Laptop</option>
+                {settings.devices.map((t) => <option key={t}>{t}</option>)}
               </select>
             </Field>
             <Field label="Model" error={errors.model}>

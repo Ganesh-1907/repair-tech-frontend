@@ -42,6 +42,7 @@ const emptySummary = {
     totalPayments: 0,
     totalExpenses: 0,
   },
+  target: { month: '', targetAmount: 0, collected: 0, remaining: 0, achieved: 0 },
   tasks: [],
   payments: [],
   expenses: [],
@@ -100,13 +101,33 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   reader.readAsDataURL(file);
 });
 
-const captureLocation = () =>
+const captureLocation = ({ required = false } = {}) =>
   new Promise((resolve) => {
-    if (!navigator.geolocation) return resolve(null);
+    if (!navigator.geolocation) {
+      return resolve({
+        location: null,
+        message: 'Location is not supported on this device/browser.',
+      });
+    }
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => resolve({ lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy }),
-      () => resolve(null),
-      { timeout: 8000, maximumAge: 30000 }
+      ({ coords }) => resolve({
+        location: { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy },
+        message: '',
+      }),
+      (error) => {
+        const permissionDenied = error.code === error.PERMISSION_DENIED;
+        resolve({
+          location: null,
+          message: permissionDenied
+            ? 'Location permission is required to clock in and track attendance.'
+            : 'Unable to get current location. Please enable GPS/location and try again.',
+        });
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: required ? 15000 : 10000,
+        maximumAge: required ? 0 : 15000,
+      }
     );
   });
 
@@ -141,11 +162,11 @@ const StaffPortalDashboard = () => {
     const now = Date.now();
     if (!force && now - lastLocationPingAtRef.current < LOCATION_PING_INTERVAL_MS) return;
 
-    const loc = await captureLocation();
-    if (!loc) return;
+    const { location } = await captureLocation();
+    if (!location) return;
 
     lastLocationPingAtRef.current = now;
-    staffManagementService.sendLocationPing(loc).catch(() => null);
+    staffManagementService.sendLocationPing(location).catch(() => null);
   }, []);
 
   const startLocationTracking = useCallback(({ sendNow = false } = {}) => {
@@ -219,8 +240,13 @@ const StaffPortalDashboard = () => {
   const handleClockIn = async () => {
     setSubmitting(true);
     try {
-      const loc = await captureLocation();
-      const result = await staffManagementService.clockIn(loc || {});
+      const { location, message } = await captureLocation({ required: true });
+      if (!location) {
+        setNotice(message || 'Location permission is required to clock in.');
+        return;
+      }
+
+      const result = await staffManagementService.clockIn(location);
       const lateMinutes = Number(result.lateMinutes || 0);
       const lateCount = Number(result.monthlyLateCount || 0);
       setNotice(lateMinutes > 0
@@ -239,9 +265,9 @@ const StaffPortalDashboard = () => {
   const submitClockOut = async (reason = '') => {
     setSubmitting(true);
     try {
-      const loc = await captureLocation();
+      const { location } = await captureLocation();
       stopLocationTracking();
-      const result = await staffManagementService.clockOut({ reason, ...(loc || {}) });
+      const result = await staffManagementService.clockOut({ reason, ...(location || {}) });
       const overtimeMinutes = Number(result.overtimeMinutes || 0);
       setNotice(overtimeMinutes > 0 ? `Clock-out saved with ${overtimeMinutes} min extra work.` : 'Clock-out saved.');
       setModal(null);
@@ -329,6 +355,10 @@ const StaffPortalDashboard = () => {
         <StatCard icon={Wallet} label="Today Payments" value={formatCurrency(stats.todayPayments)} meta={`${formatCurrency(totalCollection)} total`} tone="teal" />
         <StatCard icon={ReceiptText} label="Daily Expenses" value={formatCurrency(stats.todayExpenses)} meta={`${formatCurrency(totalExpenses)} total`} tone="rose" />
       </section>
+
+      {summary.target?.targetAmount > 0 && (
+        <TargetProgressCard target={summary.target} formatCurrency={formatCurrency} />
+      )}
 
       <div className="card" style={{ padding: '24px' }}>
         <div className="staff-panel-header" style={{ marginBottom: '24px' }}>
@@ -573,6 +603,59 @@ const ClockOutReasonModal = ({ submitting, scheduledEnd, onClose, onSubmit }) =>
         </div>
       </form>
     </ModalShell>
+  );
+};
+
+const TargetProgressCard = ({ target, formatCurrency }) => {
+  const { targetAmount, collected, remaining, achieved, month } = target;
+  const clampedPct = Math.min(achieved, 100);
+  const monthLabel = month
+    ? new Date(`${month}-01`).toLocaleString('en-IN', { month: 'long', year: 'numeric' })
+    : '';
+  return (
+    <div className="card" style={{ padding: '20px 24px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700 }}>Monthly Collection Target</h3>
+          {monthLabel && <span style={{ fontSize: '12px', color: 'var(--color-muted, #6b7280)' }}>{monthLabel}</span>}
+        </div>
+        <span style={{
+          fontSize: '13px', fontWeight: 700,
+          color: achieved >= 100 ? '#16a34a' : achieved >= 60 ? '#d97706' : '#dc2626',
+          background: achieved >= 100 ? '#dcfce7' : achieved >= 60 ? '#fef3c7' : '#fee2e2',
+          padding: '2px 10px', borderRadius: '999px',
+        }}>
+          {achieved}% achieved
+        </span>
+      </div>
+
+      <div style={{ background: '#f1f5f9', borderRadius: '8px', height: '10px', overflow: 'hidden', marginBottom: '14px' }}>
+        <div style={{
+          height: '100%',
+          width: `${clampedPct}%`,
+          background: achieved >= 100 ? '#16a34a' : achieved >= 60 ? '#f59e0b' : '#3b82f6',
+          borderRadius: '8px',
+          transition: 'width 0.4s ease',
+        }} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '11px', color: 'var(--color-muted, #6b7280)', marginBottom: '2px' }}>Target</div>
+          <div style={{ fontSize: '16px', fontWeight: 700 }}>{formatCurrency(targetAmount)}</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '11px', color: 'var(--color-muted, #6b7280)', marginBottom: '2px' }}>Collected</div>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: '#16a34a' }}>{formatCurrency(collected)}</div>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '11px', color: 'var(--color-muted, #6b7280)', marginBottom: '2px' }}>Remaining</div>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: remaining > 0 ? '#dc2626' : '#16a34a' }}>
+            {remaining > 0 ? formatCurrency(remaining) : 'Goal reached!'}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

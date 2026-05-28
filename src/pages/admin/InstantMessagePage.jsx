@@ -139,6 +139,19 @@ const messageStatusClass = {
   Failed: 'badge badge-danger',
 };
 
+const normalizePhoneForWhatsApp = (phoneNumber = '') => {
+  const digits = String(phoneNumber).replace(/\D/g, '');
+  if (digits.length === 10) return `91${digits}`;
+  return digits;
+};
+
+const openWhatsAppMessage = (phoneNumber, message) => {
+  const phone = normalizePhoneForWhatsApp(phoneNumber);
+  if (!phone) return false;
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+  return true;
+};
+
 const InstantMessagePage = () => {
   const [bookings] = useState(initialBookings);
   const [messageHistory, setMessageHistory] = useState(initialHistory);
@@ -208,11 +221,16 @@ const InstantMessagePage = () => {
         recipient: selectedBooking.customerName,
         type: selectedTemplate.name,
         preview: messageDraft.trim().slice(0, 40) + '...',
-        status: result.status || 'Delivered',
+        status: channel === 'WhatsApp' ? 'Delivered' : (result.status || 'Delivered'),
         sentAt: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       };
       setMessageHistory((current) => [entry, ...current]);
-      setNotice(`Message sent successfully via ${channel}.`);
+      if (channel === 'WhatsApp') {
+        const opened = openWhatsAppMessage(recipient, messageDraft.trim());
+        setNotice(opened ? `${selectedTemplate.name} opened in WhatsApp.` : 'Enter a valid WhatsApp phone number.');
+      } else {
+        setNotice(`Message sent successfully via ${channel}.`);
+      }
       setActiveRightTab('History');
       setIsPreviewOpen(false);
     } catch {

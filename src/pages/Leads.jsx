@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   Edit,
   Eye,
   Search,
   MoreVertical,
-  Mail,
   Phone,
   Plus,
   UserPlus,
@@ -41,7 +40,9 @@ const initialLeadForm = {
   reviewMessageLink: '',
   deviceReceiveConfirmed: false,
   deviceDeliveryConfirmed: false,
-  problemInwardImages: [],
+  problemInwardImage1: null,
+  problemInwardImage2: null,
+  problemInwardImage3: null,
   deviceCheckImages: [],
   onsiteImages: [],
   category: 'Pending',
@@ -103,11 +104,10 @@ const normalizePhoneForWhatsApp = (mobileNumber = '') => {
   return digits;
 };
 
-const openWhatsAppForLead = (lead) => {
-  const phone = normalizePhoneForWhatsApp(lead.mobileNumber);
+const openWhatsAppMessage = (mobileNumber, message) => {
+  const phone = normalizePhoneForWhatsApp(mobileNumber);
   if (!phone) return;
-  const message = encodeURIComponent(`Hi ${lead.customerName || 'Customer'}, thank you for contacting RepairBoy. We will update you about your ${lead.serviceType || 'service'} request shortly.`);
-  window.open(`https://wa.me/${phone}?text=${message}`, '_blank', 'noopener,noreferrer');
+  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
 };
 
 const messageTemplates = [
@@ -153,6 +153,13 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
     const files = Array.from(event.target.files || []);
     const images = await Promise.all(files.map(fileToDataUrl));
     updateForm(field, images);
+  };
+
+  const handleSingleFile = async (field, event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const image = await fileToDataUrl(file);
+    updateForm(field, image);
   };
 
   const selectedServiceType = normalizeServiceType(form.serviceType);
@@ -203,7 +210,7 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
       reviewMessageLink: form.reviewMessageLink.trim(),
       deviceReceiveConfirmed: form.deviceReceiveConfirmed,
       deviceDeliveryConfirmed: form.deviceDeliveryConfirmed,
-      problemInwardImages: form.problemInwardImages,
+      problemInwardImages: [form.problemInwardImage1, form.problemInwardImage2, form.problemInwardImage3].filter(Boolean),
       deviceCheckImages: form.deviceCheckImages,
       onsiteImages: form.onsiteImages,
       assignedTechnician: selectedTechnician?.name || '',
@@ -376,8 +383,29 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
                   rows={3}
                   placeholder="Problem reported during inward"
                 />
-                <input type="file" accept="image/*" multiple onChange={(event) => handleFiles('problemInwardImages', event)} />
-                <span className="field-hint">{form.problemInwardImages.length} image(s) selected</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginTop: '10px' }}>
+                  {[
+                    { key: 'problemInwardImage1', label: 'Image 1', value: form.problemInwardImage1 },
+                    { key: 'problemInwardImage2', label: 'Image 2', value: form.problemInwardImage2 },
+                    { key: 'problemInwardImage3', label: 'Image 3', value: form.problemInwardImage3 },
+                  ].map(({ key, label, value }) => (
+                    <label key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '110px', padding: '14px 10px', border: `2px dashed ${value ? '#6366f1' : '#cbd5e1'}`, borderRadius: '12px', background: value ? '#eef2ff' : '#f8fafc', cursor: 'pointer', transition: 'all 0.18s', textAlign: 'center' }}>
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(event) => handleSingleFile(key, event)} />
+                      {value ? (
+                        <>
+                          <img src={value.dataUrl} alt={label} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: '8px', border: '2px solid #6366f1' }} />
+                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#4f46e5', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value.name}</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b' }}>{label}</span>
+                          <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Click to upload</span>
+                        </>
+                      )}
+                    </label>
+                  ))}
+                </div>
               </div>
             ) : (
               <>
@@ -551,100 +579,102 @@ const statusColors = {
 const ViewLeadModal = ({ lead, onClose, onEdit }) => {
   const sc = statusColors[lead.category] || { bg: '#f1f5f9', color: '#475569', dot: '#94a3b8' };
 
-  const chip = (label, value, full = false) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border-light, #e2e8f0)', gridColumn: full ? '1 / -1' : undefined }}>
+  const infoCell = (label, value, span = false) => (
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 3,
+      padding: '10px 14px',
+      background: 'var(--surface-muted, #f8fafc)',
+      border: '1px solid var(--border-light, #e2e8f0)',
+      borderRadius: 10,
+      gridColumn: span ? '1 / -1' : undefined,
+    }}>
       <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted, #64748b)' }}>{label}</span>
-      <span style={{ fontSize: '0.9rem', fontWeight: value ? 600 : 400, color: value ? 'var(--text-main, #0f172a)' : 'var(--text-muted, #94a3b8)' }}>{value || '-'}</span>
+      <span style={{ fontSize: '0.88rem', fontWeight: value ? 600 : 400, color: value ? 'var(--text-main, #0f172a)' : '#94a3b8' }}>{value || '-'}</span>
     </div>
   );
 
-  const isOnsite = lead.serviceType === 'Onsite service';
-
   return (
     <div className="modal-overlay" role="presentation">
-      <div className="modal-panel" role="dialog" aria-modal="true" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="modal-panel lead-form-modal" role="dialog" aria-modal="true" style={{ maxHeight: 'min(88vh, 780px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', padding: '22px 24px 20px', position: 'relative' }}>
-          <button className="icon-btn" onClick={onClose} aria-label="Close lead details" style={{ position: 'absolute', top: 14, right: 14, color: '#94a3b8', background: 'rgba(255,255,255,0.08)' }}><X size={18} /></button>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-            <div style={{ width: 46, height: 46, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+        {/* ── Header ── */}
+        <div className="modal-header" style={{ padding: '18px 24px 16px', borderBottom: '1px solid var(--border-light, #e2e8f0)', alignItems: 'center', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.1rem', fontWeight: 800, color: '#fff', flexShrink: 0 }}>
               {(lead.customerName || 'L')[0].toUpperCase()}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{lead.customerName || '-'}</h2>
-              <p style={{ margin: '3px 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>{lead.company || 'No company'}</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color, fontSize: '0.75rem', fontWeight: 700 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: sc.dot, display: 'inline-block' }} />
-                  {lead.category || 'Pending'}
-                </span>
-                <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 600 }}>
-                  {lead.serviceType || '-'}
-                </span>
-                <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(255,255,255,0.1)', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 600 }}>
-                  {lead.device || '-'}
-                </span>
-              </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main, #0f172a)', lineHeight: 1.2 }}>{lead.customerName || '-'}</h2>
+              <p style={{ margin: '2px 0 0', fontSize: '0.83rem', color: 'var(--text-muted, #64748b)' }}>{lead.company || '—'}</p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: sc.bg, color: sc.color, fontSize: '0.72rem', fontWeight: 700 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: sc.dot }} />
+                {lead.category || 'Pending'}
+              </span>
+              <span style={{ padding: '3px 10px', borderRadius: 20, background: '#ede9fe', color: '#6d28d9', fontSize: '0.72rem', fontWeight: 600 }}>{lead.serviceType || '-'}</span>
+              <span style={{ padding: '3px 10px', borderRadius: 20, background: '#e0f2fe', color: '#0369a1', fontSize: '0.72rem', fontWeight: 600 }}>{lead.device || '-'}</span>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <a href={`tel:${lead.mobileNumber}`} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.08)', color: '#e2e8f0', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none', border: '1px solid rgba(255,255,255,0.1)' }}>
-              <Phone size={14} /> {lead.mobileNumber || 'No phone'}
-            </a>
-            <button type="button" onClick={() => openWhatsAppForLead(lead)} disabled={!lead.mobileNumber} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, background: '#16a34a', color: '#fff', fontSize: '0.82rem', fontWeight: 600, border: 'none', cursor: lead.mobileNumber ? 'pointer' : 'not-allowed', opacity: lead.mobileNumber ? 1 : 0.5 }}>
-              <MessageCircleMore size={14} /> WhatsApp
-            </button>
+          <button className="icon-btn" onClick={onClose} aria-label="Close lead details"><X size={18} /></button>
+        </div>
+
+        {/* ── Quick actions ── */}
+        <div style={{ display: 'flex', gap: 10, padding: '10px 24px', borderBottom: '1px solid var(--border-light, #e2e8f0)', background: 'var(--surface-muted, #f8fafc)', flexShrink: 0 }}>
+          <a href={`tel:${lead.mobileNumber}`} className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}>
+            <Phone size={14} /> {lead.mobileNumber || 'No phone'}
+          </a>
+          <button type="button" className="btn btn-primary" onClick={() => openWhatsAppMessage(lead.mobileNumber, `Hi ${lead.customerName || 'Customer'}, thank you for contacting RepairBoy. We will update you about your ${lead.serviceType || 'service'} request shortly.`)} disabled={!lead.mobileNumber} style={{ background: '#16a34a', borderColor: '#16a34a' }}>
+            <MessageCircleMore size={14} /> WhatsApp
+          </button>
+        </div>
+
+        {/* ── Info grid ── */}
+        <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+            {infoCell('Customer Name', lead.customerName)}
+            {infoCell('Company', lead.company)}
+            {infoCell('Mobile Number', lead.mobileNumber)}
+            {infoCell('Source', lead.source)}
+            {infoCell('Service Type', lead.serviceType)}
+            {infoCell('Device', lead.device)}
+            {infoCell('Status', lead.category)}
+            {infoCell('Assigned To', lead.assignedTechnician || null)}
+            {infoCell('Created', lead.createdAt)}
+            {infoCell('Quote', lead.quote)}
+            {infoCell('Billing', lead.billing)}
+
+            {/* Location link */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '10px 14px', background: 'var(--surface-muted, #f8fafc)', border: '1px solid var(--border-light, #e2e8f0)', borderRadius: 10 }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted, #64748b)' }}>Location Link</span>
+              {lead.locationLink ? <a href={lead.locationLink} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', color: '#6366f1', fontWeight: 600 }}>Open Maps →</a> : <span style={{ fontSize: '0.88rem', color: '#94a3b8' }}>-</span>}
+            </div>
+
+            {/* Review link */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '10px 14px', background: 'var(--surface-muted, #f8fafc)', border: '1px solid var(--border-light, #e2e8f0)', borderRadius: 10 }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted, #64748b)' }}>Review Link</span>
+              {lead.reviewMessageLink ? <a href={lead.reviewMessageLink} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', color: '#6366f1', fontWeight: 600 }}>Open Link →</a> : <span style={{ fontSize: '0.88rem', color: '#94a3b8' }}>-</span>}
+            </div>
+
+            {infoCell('Device Receive Confirm', lead.deviceReceiveConfirmed ? 'Yes' : 'No')}
+            {infoCell('Device Delivery Confirm', lead.deviceDeliveryConfirmed ? 'Yes' : 'No')}
+
+            {/* Problem Inward Note — full width */}
+            <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 14px', background: lead.problemInwardNote ? '#fffbeb' : 'var(--surface-muted, #f8fafc)', border: `1px solid ${lead.problemInwardNote ? '#fde68a' : 'var(--border-light, #e2e8f0)'}`, borderRadius: 10 }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: lead.problemInwardNote ? '#92400e' : 'var(--text-muted, #64748b)' }}>Problem Inward Note</span>
+              <span style={{ fontSize: '0.88rem', color: lead.problemInwardNote ? '#78350f' : '#94a3b8', lineHeight: 1.6 }}>{lead.problemInwardNote || '-'}</span>
+            </div>
+
+            {/* Device Check Note — full width */}
+            <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4, padding: '12px 14px', background: lead.deviceCheckNote ? '#fffbeb' : 'var(--surface-muted, #f8fafc)', border: `1px solid ${lead.deviceCheckNote ? '#fde68a' : 'var(--border-light, #e2e8f0)'}`, borderRadius: 10 }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: lead.deviceCheckNote ? '#92400e' : 'var(--text-muted, #64748b)' }}>Device Check / Internal Report</span>
+              <span style={{ fontSize: '0.88rem', color: lead.deviceCheckNote ? '#78350f' : '#94a3b8', lineHeight: 1.6 }}>{lead.deviceCheckNote || '-'}</span>
+            </div>
           </div>
         </div>
 
-        {/* All fields */}
-        <div style={{ padding: '16px 20px', maxHeight: '55vh', overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          {chip('Customer Name', lead.customerName)}
-          {chip('Company', lead.company)}
-          {chip('Mobile Number', lead.mobileNumber)}
-          {chip('Source', lead.source)}
-          {chip('Service Type', lead.serviceType)}
-          {chip('Device', lead.device)}
-          {chip('Status', lead.category)}
-          {chip('Assigned To', lead.assignedTechnician || (lead.assignedTechnicianId ? lead.assignedTechnicianId : null))}
-          {chip('Quote', lead.quote)}
-          {chip('Billing', lead.billing)}
-          {chip('Created', lead.createdAt)}
-
-          {/* Location link — always shown */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border-light, #e2e8f0)' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted, #64748b)' }}>Location Link</span>
-            {lead.locationLink
-              ? <a href={lead.locationLink} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', color: '#6366f1', fontWeight: 600 }}>Open Maps →</a>
-              : <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>-</span>}
-          </div>
-
-          {/* Review link — always shown */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: '1px solid var(--border-light, #e2e8f0)' }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted, #64748b)' }}>Review Message Link</span>
-            {lead.reviewMessageLink
-              ? <a href={lead.reviewMessageLink} target="_blank" rel="noreferrer" style={{ fontSize: '0.88rem', color: '#6366f1', fontWeight: 600 }}>Open Link →</a>
-              : <span style={{ fontSize: '0.9rem', color: '#94a3b8' }}>-</span>}
-          </div>
-
-          {chip('Device Receive Confirmation', lead.deviceReceiveConfirmed ? 'Yes' : 'No')}
-          {chip('Device Delivery Confirmation', lead.deviceDeliveryConfirmed ? 'Yes' : 'No')}
-
-          {/* Problem note — full width, always shown */}
-          <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: lead.problemInwardNote ? '#fffbeb' : 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: `1px solid ${lead.problemInwardNote ? '#fde68a' : 'var(--border-light, #e2e8f0)'}` }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: lead.problemInwardNote ? '#92400e' : 'var(--text-muted, #64748b)' }}>Problem Inward Note</span>
-            <span style={{ fontSize: '0.9rem', fontWeight: lead.problemInwardNote ? 500 : 400, color: lead.problemInwardNote ? '#78350f' : '#94a3b8', lineHeight: 1.6 }}>{lead.problemInwardNote || '-'}</span>
-          </div>
-
-          {/* Device check note — full width, always shown */}
-          <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 14px', background: lead.deviceCheckNote ? '#fffbeb' : 'var(--surface-muted, #f8fafc)', borderRadius: '10px', border: `1px solid ${lead.deviceCheckNote ? '#fde68a' : 'var(--border-light, #e2e8f0)'}` }}>
-            <span style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: lead.deviceCheckNote ? '#92400e' : 'var(--text-muted, #64748b)' }}>Device Check / Internal Report</span>
-            <span style={{ fontSize: '0.9rem', fontWeight: lead.deviceCheckNote ? 500 : 400, color: lead.deviceCheckNote ? '#78350f' : '#94a3b8', lineHeight: 1.6 }}>{lead.deviceCheckNote || '-'}</span>
-          </div>
-        </div>
-
-        <div className="modal-actions" style={{ margin: 0, padding: '14px 20px', borderTop: '1px solid var(--border-light, #e2e8f0)' }}>
+        {/* ── Footer ── */}
+        <div className="modal-actions" style={{ margin: 0, padding: '14px 24px', borderTop: '1px solid var(--border-light, #e2e8f0)', flexShrink: 0 }}>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
           <button type="button" className="btn btn-primary" onClick={onEdit}>
             <Edit size={15} /> Edit Lead
@@ -960,7 +990,6 @@ const LeadTrackerModal = ({ lead, onClose, onSetStep, onCancelLead, updating }) 
 
 const InstantMessageModal = ({ lead, onClose, onSent }) => {
   const [templateId, setTemplateId] = useState(messageTemplates[0].id);
-  const [channel, setChannel] = useState('WhatsApp');
   const [draft, setDraft] = useState(() => prepareMessage(messageTemplates[0], lead));
   const [sending, setSending] = useState(false);
 
@@ -975,6 +1004,7 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
   const handleSend = async () => {
     if (!lead?.mobileNumber) {
       onSent('Lead does not have a mobile number.');
+      onClose();
       return;
     }
     if (!draft.trim()) {
@@ -984,21 +1014,23 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
 
     setSending(true);
     try {
-      const result = await sendOutboundMessage({
-        channel,
+      await sendOutboundMessage({
+        channel: 'WhatsApp',
         recipientType: 'Lead',
         recipient: lead.mobileNumber,
         message: draft.trim(),
         templateName: selectedTemplate.label,
         contextType: 'Lead',
       });
-      onSent(`${selectedTemplate.label} ${result.status || 'queued'} via ${channel}.`);
-      onClose();
-    } catch (error) {
-      onSent(error.message || `Failed to send ${channel} message.`);
+    } catch {
+      // best-effort backend log; proceed to open WhatsApp regardless
     } finally {
       setSending(false);
     }
+    const phone = normalizePhoneForWhatsApp(lead.mobileNumber);
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(draft.trim())}`, '_blank', 'noopener,noreferrer');
+    onSent(`${selectedTemplate.label} opened in WhatsApp.`);
+    onClose();
   };
 
   return (
@@ -1007,7 +1039,7 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
         <div className="modal-header">
           <div>
             <h2 id="lead-message-title">Instant Message</h2>
-            <p>Send WhatsApp or SMS to <strong>{lead.customerName}</strong>.</p>
+            <p>Send WhatsApp message to <strong>{lead.customerName}</strong>.</p>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close instant message">
             <X size={18} />
@@ -1026,31 +1058,13 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
             </div>
 
             <div className="form-group">
-              <label>Channel</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                {['WhatsApp', 'SMS'].map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className={`btn ${channel === item ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setChannel(item)}
-                    style={{ justifyContent: 'center' }}
-                  >
-                    {item === 'WhatsApp' ? <MessageCircleMore size={16} /> : <Smartphone size={16} />}
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="lead-message-preview">Message Preview</label>
+              <label htmlFor="lead-message-preview">Edit Message</label>
               <textarea
                 id="lead-message-preview"
                 className="form-textarea"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                rows={8}
+                rows={10}
                 style={{ resize: 'vertical' }}
               />
             </div>
@@ -1066,9 +1080,9 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
               </div>
             </div>
 
-            <div style={{ border: '1px solid var(--border-light)', borderRadius: '18px', padding: '14px', background: channel === 'WhatsApp' ? '#efeae2' : 'var(--bg-card)' }}>
-              <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '12px' }}>{channel} Preview</span>
-              <div style={{ marginLeft: 'auto', width: 'fit-content', maxWidth: '100%', borderRadius: '14px', borderTopRightRadius: 0, background: channel === 'WhatsApp' ? '#dcf8c6' : '#e0f2fe', padding: '10px 12px', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.12)' }}>
+            <div style={{ border: '1px solid var(--border-light)', borderRadius: '18px', padding: '14px', background: '#efeae2' }}>
+              <span style={{ display: 'block', color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: '12px' }}>WhatsApp Preview</span>
+              <div style={{ marginLeft: 'auto', width: 'fit-content', maxWidth: '100%', borderRadius: '14px', borderTopRightRadius: 0, background: '#dcf8c6', padding: '10px 12px', boxShadow: '0 1px 2px rgba(15, 23, 42, 0.12)' }}>
                 <p style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#0f172a', fontSize: '0.86rem', lineHeight: 1.45 }}>{draft}</p>
               </div>
             </div>
@@ -1079,7 +1093,7 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
           <button type="button" className="btn btn-primary" onClick={handleSend} disabled={sending || !lead.mobileNumber}>
             <Send size={16} />
-            {sending ? 'Sending...' : `Send ${channel}`}
+            {sending ? 'Opening...' : 'Send WhatsApp'}
           </button>
         </div>
       </div>
@@ -1089,6 +1103,7 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
 
 const Leads = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { settings } = useLeadSettings();
   const serviceTypeOptions = settings.serviceTypes;
@@ -1108,6 +1123,13 @@ const Leads = () => {
   const [notice, setNotice] = useState('');
   const [creatingLead, setCreatingLead] = useState(false);
   const [savingLead, setSavingLead] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.notice) {
+      setNotice(location.state.notice);
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
 
   const loadLeads = () => {
     leadManagementService.listLeads()
@@ -1370,7 +1392,7 @@ const Leads = () => {
           ))}
         </div>
 
-        <button className="btn btn-primary" type="button" onClick={() => setIsManualModalOpen(true)}>
+        <button className="btn btn-primary" type="button" onClick={() => navigate('/admin/leads/create')}>
           <Plus size={16} />
           Add Lead
         </button>
@@ -1436,17 +1458,6 @@ const Leads = () => {
                 <td>{lead.createdAt}</td>
                 <td>
                   <div className="action-btns" style={{ display: 'flex', gap: '8px' }}>
-                    <button className="icon-btn" title="Call" aria-label={`Call ${lead.customerName}`}><Phone size={16} /></button>
-                    <button className="icon-btn" title="Email" aria-label={`Email ${lead.customerName}`}><Mail size={16} /></button>
-                    <button
-                      className="icon-btn whatsapp-btn"
-                      title="Send WhatsApp"
-                      aria-label={`Send WhatsApp to ${lead.customerName}`}
-                      onClick={() => openWhatsAppForLead(lead)}
-                      disabled={!lead.mobileNumber}
-                    >
-                      <MessageCircleMore size={16} />
-                    </button>
                     <div style={{ position: 'relative' }}>
                       <button 
                         className="icon-btn action-trigger-btn" 
@@ -1466,7 +1477,7 @@ const Leads = () => {
                   <div className="empty-state">
                     <h3>No leads found</h3>
                     <p>Adjust your search or create a new lead to continue.</p>
-                    <button className="btn btn-primary" onClick={() => setIsManualModalOpen(true)}>Create Lead</button>
+                    <button className="btn btn-primary" onClick={() => navigate('/admin/leads/create')}>Create Lead</button>
                   </div>
                 </td>
               </tr>
@@ -1515,18 +1526,6 @@ const Leads = () => {
             </button>
           )}
         </div>
-      )}
-
-      {isLeadModalOpen && (
-        <LeadFormModal
-          technicians={technicians}
-          submitting={creatingLead}
-          onClose={closeLeadModal}
-          onCreate={handleCreateLead}
-          serviceTypeOptions={serviceTypeOptions}
-          sourceOptions={sourceOptions}
-          deviceOptions={deviceOptions}
-        />
       )}
 
       {assigningLead && (
@@ -1582,6 +1581,7 @@ const Leads = () => {
           contractId={credentialsTarget.id}
           customerName={credentialsTarget.customerName || credentialsTarget.name || ''}
           email={credentialsTarget.email || credentialsTarget.customerEmail || ''}
+          emailLocked
           onClose={() => setCredentialsTarget(null)}
         />
       )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -11,6 +11,7 @@ import { campaignService } from '../../services/campaignServices';
 import { campaignJobWorkflowService } from '../../services/campaignJobWorkflowService';
 import { staffManagementService } from '../../services/staffManagementService';
 import './CampaignModule.css';
+import { useLeadSettings } from '../../hooks/useLeadSettings';
 
 import JobViewModal from './campaign_modals/JobViewModal';
 import JobQuoteModal from './campaign_modals/JobQuoteModal';
@@ -19,7 +20,6 @@ import JobRepairModal from './campaign_modals/JobRepairModal';
 import JobDeliveryModal from './campaign_modals/JobDeliveryModal';
 
 
-const DEVICE_TYPES = ['Laptop', 'Desktop', 'Printer', 'Mobile', 'Tablet', 'Monitor', 'Projector', 'Other'];
 const PROBLEMS = ['Screen Issue', 'Battery Issue', 'SSD Upgrade', 'Keyboard Issue', 'Software Issue', 'Printer Issue', 'RAM Upgrade', 'Data Recovery', 'Other'];
 const ACCESSORIES = ['Charger', 'Bag/Case', 'Mouse', 'Keyboard', 'Power Adapter', 'USB Dongle'];
 const DELIVERY_TYPES = ['Pickup from Office', 'Return to College', 'Doorstep Delivery'];
@@ -64,6 +64,7 @@ const useToast = () => {
 const CampaignJobsPage = () => {
   const [searchParams] = useSearchParams();
   const campaignFilter = searchParams.get('campaign');
+  const { settings } = useLeadSettings();
   const { toast, show: showToast } = useToast();
 
   const [jobs, setJobs] = useState([]);
@@ -79,15 +80,15 @@ const CampaignJobsPage = () => {
   const [activeJob, setActiveJob] = useState(null);
   const [modalMode, setModalMode] = useState(null); // 'view', 'quote', 'intake', 'repair', 'delivery', 'billing'
 
-  const [openActionId, setOpenActionId] = useState(null);
-  const actionRef = useRef(null);
+  const [activeMenu, setActiveMenu] = useState({ id: null, open: false, x: 0, y: 0, width: 220 });
+
 
   const [qeOpen, setQeOpen] = useState(false);
   const [qeEditJob, setQeEditJob] = useState(null); // null = create mode, job object = edit mode
   const [qeForm, setQeForm] = useState({ campaignId: '', name: '', phone: '', deviceType: '', brand: '', serial: '', problem: '', notes: '' });
   const [qeLoading, setQeLoading] = useState(false);
   const quickEntryCampaigns = campaigns.filter((campaign) => (
-    campaign.name && (campaign.startDate || campaign.endDate || campaign.description || campaign.address)
+    campaign.status !== 'Archived' && campaign.name
   ));
   const resetQeForm = () => setQeForm({ campaignId: '', name: '', phone: '', deviceType: '', brand: '', serial: '', problem: '', notes: '' });
 
@@ -153,7 +154,7 @@ const CampaignJobsPage = () => {
   }, [loadCampaignOptions]);
 
   useEffect(() => {
-    const h = (e) => { if (actionRef.current && !actionRef.current.contains(e.target)) setOpenActionId(null); };
+    const h = () => setActiveMenu((prev) => ({ ...prev, open: false, id: null }));
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
@@ -329,60 +330,26 @@ const CampaignJobsPage = () => {
                       <td><span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${QUOTE_COLOR[qs] || 'bg-slate-50 text-slate-500'}`}>{qs}</span></td>
                       <td className="text-xs font-semibold text-slate-600">{ds}</td>
                       <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <div ref={openActionId === job.id ? actionRef : null} className="action-menu-wrap">
-                          <button
-                            className="icon-button inline-flex"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenActionId(openActionId === job.id ? null : job.id);
-                            }}>
-                            <MoreVertical size={16}/>
-                          </button>
-                          <AnimatePresence>
-                            {openActionId === job.id && (
-                              <Motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: -10, transformOrigin: 'top right' }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                transition={{ duration: 0.15, ease: 'easeOut' }}
-                                className="action-dropdown">
-                                <button className="action-dropdown-item"
-                                  onClick={() => { openModal(job, 'view'); setOpenActionId(null); }}>
-                                  <Eye size={16}/> View Details
-                                </button>
-                                <button className="action-dropdown-item"
-                                  onClick={() => { openQeForEdit(job); setOpenActionId(null); }}>
-                                  <Pencil size={16}/> Edit Job
-                                </button>
-                                <div className="action-dropdown-divider"/>
-                                {(st === 'Received at office' || qs === 'Draft') && (
-                                  <button className="action-dropdown-item"
-                                    onClick={() => { openModal(job, 'quote'); setOpenActionId(null); }}>
-                                    <Send size={16}/> Send Quote
-                                  </button>
-                                )}
-                                {qs === 'Approved' && (
-                                  <button className="action-dropdown-item"
-                                    onClick={() => { openModal(job, 'intake'); setOpenActionId(null); }}>
-                                    <FileText size={16}/> Acknowledge Receipt
-                                  </button>
-                                )}
-                                {(st === 'Diagnosis in progress' || st === 'Repair in progress' || st === 'Waiting for parts') && (
-                                  <button className="action-dropdown-item"
-                                    onClick={() => { openModal(job, 'repair'); setOpenActionId(null); }}>
-                                    <Wrench size={16}/> Manage Repair
-                                  </button>
-                                )}
-                                {st === 'Repair completed' && (
-                                  <button className="action-dropdown-item"
-                                    onClick={() => { openModal(job, 'delivery'); setOpenActionId(null); }}>
-                                    <Truck size={16}/> Plan Delivery
-                                  </button>
-                                )}
-                              </Motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
+                        <button
+                          className="icon-button inline-flex"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const menuWidth = 220;
+                            const menuHeight = 160;
+                            const x = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
+                            const shouldOpenUp = rect.bottom + menuHeight + 8 > window.innerHeight;
+                            const y = shouldOpenUp
+                              ? rect.top - menuHeight - 4
+                              : rect.bottom + 4;
+                            setActiveMenu((prev) =>
+                              prev.open && prev.id === job.id
+                                ? { ...prev, open: false, id: null }
+                                : { id: job.id, open: true, x, y, width: menuWidth }
+                            );
+                          }}>
+                          <MoreVertical size={16}/>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -392,6 +359,62 @@ const CampaignJobsPage = () => {
           </div>
         )}
       </section>
+
+      {/* ─── Floating Action Menu ── */}
+      <AnimatePresence>
+        {activeMenu.open && (() => {
+          const job = filtered.find((j) => j.id === activeMenu.id);
+          if (!job) return null;
+          const st = job.jobStatus || job.status || 'Received at office';
+          const qs = job.quoteStatus || job.workflow?.quote?.status || 'Draft';
+          return (
+            <Motion.div
+              key="action-menu"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.13, ease: 'easeOut' }}
+              className="action-dropdown"
+              style={{ position: 'fixed', left: `${activeMenu.x}px`, top: `${activeMenu.y}px`, width: `${activeMenu.width}px`, zIndex: 9999 }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}>
+              <button className="action-dropdown-item"
+                onClick={() => { openModal(job, 'view'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
+                <Eye size={16}/> View Details
+              </button>
+              <button className="action-dropdown-item"
+                onClick={() => { openQeForEdit(job); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
+                <Pencil size={16}/> Edit Job
+              </button>
+              <div className="action-dropdown-divider"/>
+              {(st === 'Received at office' || qs === 'Draft') && (
+                <button className="action-dropdown-item"
+                  onClick={() => { openModal(job, 'quote'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
+                  <Send size={16}/> Send Quote
+                </button>
+              )}
+              {qs === 'Approved' && (
+                <button className="action-dropdown-item"
+                  onClick={() => { openModal(job, 'intake'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
+                  <FileText size={16}/> Acknowledge Receipt
+                </button>
+              )}
+              {(st === 'Diagnosis in progress' || st === 'Repair in progress' || st === 'Waiting for parts') && (
+                <button className="action-dropdown-item"
+                  onClick={() => { openModal(job, 'repair'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
+                  <Wrench size={16}/> Manage Repair
+                </button>
+              )}
+              {st === 'Repair completed' && (
+                <button className="action-dropdown-item"
+                  onClick={() => { openModal(job, 'delivery'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
+                  <Truck size={16}/> Plan Delivery
+                </button>
+              )}
+            </Motion.div>
+          );
+        })()}
+      </AnimatePresence>
 
       {/* ─── Focused Job Modals (Symmetric UX) ── */}
       <AnimatePresence>
@@ -452,7 +475,7 @@ const CampaignJobsPage = () => {
                   <div className="form-field"><label>Device Type *</label>
                     <select value={qeForm.deviceType} onChange={(e) => setQeForm((f) => ({ ...f, deviceType: e.target.value }))}>
                       <option value="">Select...</option>
-                      {DEVICE_TYPES.map((d) => <option key={d}>{d}</option>)}
+                      {settings.devices.map((d) => <option key={d}>{d}</option>)}
                     </select>
                   </div>
                   <div className="form-field"><label>Brand / Model</label>
