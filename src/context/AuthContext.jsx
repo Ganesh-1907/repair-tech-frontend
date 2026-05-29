@@ -35,7 +35,8 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: userData };
     } catch (error) {
       const message = error?.response?.data?.message
-        || (error?.request ? 'Unable to reach backend server. Please confirm backend is running on port 5000.' : null)
+        || error?.response?.data?.error
+        || (error?.request && !error?.response ? 'Unable to reach backend server. Please confirm backend is running on port 5000.' : null)
         || 'Unable to sign in. Please try again.';
       return { success: false, message };
     }

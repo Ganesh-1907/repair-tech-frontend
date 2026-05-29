@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Plus, X, Edit, Eye, MoreVertical } from 'lucide-react';
+import { Search, Plus, X, Edit, Eye, MoreVertical, UploadCloud } from 'lucide-react';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { usePrivacy } from '../../context/PrivacyContext';
 import { expenseManagementService } from '../../services/expenseManagementService';
 import { api } from '../../services/apiClient';
+import { useExpenseSettings } from '../../hooks/useExpenseSettings';
 
 const ActionMenu = ({ items }) => {
   const [open, setOpen] = useState(false);
@@ -77,10 +78,12 @@ const emptyForm = {
   customerName: '',
   referenceNumber: '',
   notes: '',
+  receiptName: '',
 };
 
 const PaymentsListPage = () => {
   const { formatCurrency } = usePrivacy();
+  const { settings: expenseSettings } = useExpenseSettings();
   const [payments, setPayments] = useState([]);
   const [staffList, setStaffList] = useState([]);
   const [search, setSearch] = useState('');
@@ -132,12 +135,36 @@ const PaymentsListPage = () => {
   }, [staffList, payments]);
 
   const allCategories = useMemo(() => {
-    const cats = new Set(payments.map((r) => r.category).filter(Boolean));
+    const cats = new Set([
+      ...expenseSettings.expenseCategories,
+      ...payments.map((r) => r.category).filter(Boolean),
+    ]);
     return Array.from(cats);
-  }, [payments]);
+  }, [expenseSettings.expenseCategories, payments]);
+
+  const paymentModeOptions = useMemo(() => {
+    const modes = new Set([
+      ...expenseSettings.paymentModes,
+      ...payments.map((r) => r.paymentMode).filter(Boolean),
+      ...(form.paymentMode ? [form.paymentMode] : []),
+    ]);
+    return Array.from(modes);
+  }, [expenseSettings.paymentModes, payments, form.paymentMode]);
+
+  const formCategoryOptions = useMemo(() => {
+    const cats = new Set([
+      ...expenseSettings.expenseCategories,
+      ...(form.category ? [form.category] : []),
+    ]);
+    return Array.from(cats);
+  }, [expenseSettings.expenseCategories, form.category]);
 
   const openAdd = () => {
-    setForm(emptyForm);
+    setForm({
+      ...emptyForm,
+      category: expenseSettings.expenseCategories[0] || 'Salaries',
+      paymentMode: expenseSettings.paymentModes[0] || 'Cash',
+    });
     setSelectedPayment(null);
     setErrors({});
     setModalMode('add');
@@ -158,6 +185,7 @@ const PaymentsListPage = () => {
       customerName: row.customerName || row.vendorPayee || '',
       referenceNumber: row.referenceNumber || '',
       notes: row.notes || '',
+      receiptName: row.receiptName || '',
     });
     setErrors({});
     setModalMode('edit');
@@ -196,6 +224,7 @@ const PaymentsListPage = () => {
       vendorPayee: form.customerName.trim(),
       referenceNumber: form.referenceNumber.trim(),
       notes: form.notes.trim(),
+      receiptName: form.receiptName.trim(),
       flowType: 'Income',
     };
     if (modalMode === 'edit' && selectedPayment?.id) {
@@ -319,20 +348,20 @@ const PaymentsListPage = () => {
       {/* Add / Edit Modal */}
       {(modalMode === 'add' || modalMode === 'edit') && (
         <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal-panel" style={{ width: 'min(100%, 680px)', maxHeight: 'min(92vh, 800px)' }}>
-            <div className="modal-header" style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border-light)' }}>
+          <div className="modal-panel payment-modal-panel">
+            <div className="modal-header">
               <div>
-                <h2 style={{ margin: 0, fontSize: '1.18rem', fontWeight: 800 }}>{modalMode === 'edit' ? 'Edit Payment' : 'Add Payment'}</h2>
-                <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: '0.84rem' }}>{modalMode === 'edit' ? 'Update payment record' : 'Record an income payment'}</p>
+                <h2>{modalMode === 'edit' ? 'Edit Payment' : 'Add Payment'}</h2>
+                <p>{modalMode === 'edit' ? 'Update payment record' : 'Record an income payment'}</p>
               </div>
               <button className="icon-btn" onClick={closeModal}><X size={16} /></button>
             </div>
-            <div className="modal-form" style={{ padding: '20px 24px 24px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 18px' }}>
+            <div className="modal-form">
+              <div className="payment-form-grid">
                 <div className="form-group">
                   <label>Category</label>
                   <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
-                    {expenseManagementService.paymentCategories.map((c) => <option key={c}>{c}</option>)}
+                    {formCategoryOptions.map((c) => <option key={c}>{c}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
@@ -352,24 +381,45 @@ const PaymentsListPage = () => {
                 <div className="form-group">
                   <label>Payment Mode</label>
                   <select value={form.paymentMode} onChange={(e) => setForm((f) => ({ ...f, paymentMode: e.target.value }))}>
-                    {expenseManagementService.paymentModes.map((m) => <option key={m}>{m}</option>)}
+                    {paymentModeOptions.map((m) => <option key={m}>{m}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
                   <label>Reference Number</label>
                   <input value={form.referenceNumber} onChange={(e) => setForm((f) => ({ ...f, referenceNumber: e.target.value }))} placeholder="e.g. TXN-001" />
                 </div>
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <div className="form-group payment-form-wide">
                   <label>Description</label>
                   <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="e.g. AMC renewal payment" />
                   {errors.description && <span className="form-error">{errors.description}</span>}
                 </div>
-                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                  <label>Notes <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(optional)</span></label>
-                  <textarea rows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Any additional notes..." />
+                <div className="form-group payment-form-wide payment-attachment-grid">
+                  <div className="expense-attachment-field">
+                    <label>Receipt Upload</label>
+                    <label className="file-upload-box expense-receipt-upload payment-receipt-upload">
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          setForm((f) => ({ ...f, receiptName: file ? file.name : '' }));
+                        }}
+                      />
+                      <UploadCloud size={24} />
+                      <span className="expense-receipt-title">
+                        {form.receiptName || 'Click to upload receipt'}
+                      </span>
+                      {!form.receiptName && <span className="expense-receipt-meta">PDF, JPG, PNG</span>}
+                    </label>
+                  </div>
+                  <div className="expense-attachment-field">
+                    <label>Notes <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(optional)</span></label>
+                    <textarea className="payment-notes-input" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Any additional notes..." />
+                  </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
+              <div className="modal-actions payment-modal-actions">
                 <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>
                 <button className="btn btn-primary" onClick={savePayment}>{modalMode === 'edit' ? 'Update Payment' : 'Save Payment'}</button>
               </div>
@@ -398,6 +448,7 @@ const PaymentsListPage = () => {
                 <div><span>Mode</span><strong>{selectedPayment.paymentMode}</strong></div>
                 {selectedPayment.taskTitle && <div><span>Task</span><strong>{selectedPayment.taskTitle}</strong></div>}
                 <div><span>Reference</span><strong>{selectedPayment.referenceNumber || '-'}</strong></div>
+                <div><span>Receipt</span><strong>{selectedPayment.receiptName || '-'}</strong></div>
                 <div><span>Notes</span><strong>{selectedPayment.notes || '-'}</strong></div>
               </div>
               <div className="modal-actions">

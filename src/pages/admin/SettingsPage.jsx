@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, RefreshCw, Check } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 import { invalidateLeadSettingsCache } from '../../hooks/useLeadSettings';
+import { invalidateExpenseSettingsCache, EXPENSE_SETTINGS_ID } from '../../hooks/useExpenseSettings';
 
 const SETTINGS_ID = 'lead-options';
 
@@ -9,6 +10,19 @@ const DEFAULTS = {
   serviceTypes: ['Walk-in', 'Onsite service'],
   sources: ['Google', 'FB', 'Insta', 'Walkin'],
   devices: ['Laptop', 'Desktop', 'CCTV'],
+};
+
+const EXPENSE_DEFAULTS = {
+  expenseCategories: ['Salaries', 'Purchases', 'Rent', 'Utilities', 'Travel', 'Others'],
+  paymentModes: ['Cash', 'UPI', 'Bank Transfer', 'Card', 'Other'],
+  vendorPayeeOptions: [
+    'Technician Salary', 'Support Staff Salary', 'Admin Salary', 'Delivery Staff Salary',
+    'Device Purchase Vendor', 'Spare Parts Vendor', 'Consumables Vendor', 'Necessary Office Purchase Vendor',
+    'Shop Rent Owner', 'Office Rent Owner', 'Warehouse Rent Owner',
+    'Electricity Board', 'Internet Provider', 'Water Utility Provider', 'Cloud Service Provider',
+    'Field Team Reimbursement', 'Fuel Station Vendor', 'Travel Agency', 'Local Transport Vendor',
+    'Miscellaneous Vendor', 'Service Partner', 'Other Payee',
+  ],
 };
 
 const Section = ({ title, description, items, onAdd, onRemove, saving }) => {
@@ -111,6 +125,13 @@ const SettingsPage = () => {
   const [devices, setDevices] = useState([]);
   const [recordId, setRecordId] = useState(null);
   const recordIdRef = useRef(null);
+
+  const [expenseCategories, setExpenseCategories] = useState([]);
+  const [paymentModes, setPaymentModes] = useState([]);
+  const [vendorPayeeOptions, setVendorPayeeOptions] = useState([]);
+  const [expenseRecordId, setExpenseRecordId] = useState(null);
+  const expenseRecordIdRef = useRef(null);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -121,6 +142,7 @@ const SettingsPage = () => {
     apiClient.get('/records/appSettings')
       .then((res) => {
         const all = Array.isArray(res.data) ? res.data : [];
+
         const record = all.find((r) => r.settingsId === SETTINGS_ID);
         if (record) {
           recordIdRef.current = record.id;
@@ -133,11 +155,41 @@ const SettingsPage = () => {
           setSources([...DEFAULTS.sources]);
           setDevices([...DEFAULTS.devices]);
         }
+
+        const expenseRecord = all.find((r) => r.settingsId === EXPENSE_SETTINGS_ID);
+        if (expenseRecord) {
+          expenseRecordIdRef.current = expenseRecord.id;
+          setExpenseRecordId(expenseRecord.id);
+          setExpenseCategories(expenseRecord.expenseCategories?.length ? expenseRecord.expenseCategories : [...EXPENSE_DEFAULTS.expenseCategories]);
+          setPaymentModes(expenseRecord.paymentModes?.length ? expenseRecord.paymentModes : [...EXPENSE_DEFAULTS.paymentModes]);
+          setVendorPayeeOptions(expenseRecord.vendorPayeeOptions?.length ? expenseRecord.vendorPayeeOptions : [...EXPENSE_DEFAULTS.vendorPayeeOptions]);
+        } else {
+          const defaultCategories = [...EXPENSE_DEFAULTS.expenseCategories];
+          const defaultPaymentModes = [...EXPENSE_DEFAULTS.paymentModes];
+          const defaultVendors = [...EXPENSE_DEFAULTS.vendorPayeeOptions];
+          setExpenseCategories(defaultCategories);
+          setPaymentModes(defaultPaymentModes);
+          setVendorPayeeOptions(defaultVendors);
+          apiClient.post('/records/appSettings', {
+            settingsId: EXPENSE_SETTINGS_ID,
+            expenseCategories: defaultCategories,
+            paymentModes: defaultPaymentModes,
+            vendorPayeeOptions: defaultVendors,
+          }).then((res) => {
+            const newId = res.data?.id || null;
+            expenseRecordIdRef.current = newId;
+            setExpenseRecordId(newId);
+            invalidateExpenseSettingsCache();
+          }).catch(() => {});
+        }
       })
       .catch(() => {
         setServiceTypes([...DEFAULTS.serviceTypes]);
         setSources([...DEFAULTS.sources]);
         setDevices([...DEFAULTS.devices]);
+        setExpenseCategories([...EXPENSE_DEFAULTS.expenseCategories]);
+        setPaymentModes([...EXPENSE_DEFAULTS.paymentModes]);
+        setVendorPayeeOptions([...EXPENSE_DEFAULTS.vendorPayeeOptions]);
       })
       .finally(() => setLoading(false));
   };
@@ -203,6 +255,70 @@ const SettingsPage = () => {
     persist(serviceTypes, sources, updated);
   };
 
+  const persistExpense = async (newCategories, newPaymentModes, newVendorPayeeOptions) => {
+    setSaving(true);
+    setSaved(false);
+    setError('');
+    const payload = {
+      settingsId: EXPENSE_SETTINGS_ID,
+      expenseCategories: newCategories,
+      paymentModes: newPaymentModes,
+      vendorPayeeOptions: newVendorPayeeOptions,
+    };
+    try {
+      const currentId = expenseRecordIdRef.current;
+      if (currentId) {
+        await apiClient.put(`/records/appSettings/${currentId}`, payload);
+      } else {
+        const res = await apiClient.post('/records/appSettings', payload);
+        const newId = res.data?.id || null;
+        expenseRecordIdRef.current = newId;
+        setExpenseRecordId(newId);
+      }
+      invalidateExpenseSettingsCache();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setError('Failed to save. Please try again.');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddExpenseCategory = (v) => {
+    const updated = [...expenseCategories, v];
+    setExpenseCategories(updated);
+    persistExpense(updated, paymentModes, vendorPayeeOptions);
+  };
+  const handleRemoveExpenseCategory = (v) => {
+    const updated = expenseCategories.filter((x) => x !== v);
+    setExpenseCategories(updated);
+    persistExpense(updated, paymentModes, vendorPayeeOptions);
+  };
+
+  const handleAddPaymentMode = (v) => {
+    const updated = [...paymentModes, v];
+    setPaymentModes(updated);
+    persistExpense(expenseCategories, updated, vendorPayeeOptions);
+  };
+  const handleRemovePaymentMode = (v) => {
+    const updated = paymentModes.filter((x) => x !== v);
+    setPaymentModes(updated);
+    persistExpense(expenseCategories, updated, vendorPayeeOptions);
+  };
+
+  const handleAddVendorPayee = (v) => {
+    const updated = [...vendorPayeeOptions, v];
+    setVendorPayeeOptions(updated);
+    persistExpense(expenseCategories, paymentModes, updated);
+  };
+  const handleRemoveVendorPayee = (v) => {
+    const updated = vendorPayeeOptions.filter((x) => x !== v);
+    setVendorPayeeOptions(updated);
+    persistExpense(expenseCategories, paymentModes, updated);
+  };
+
   if (loading) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
@@ -211,33 +327,38 @@ const SettingsPage = () => {
     );
   }
 
+  const statusIndicator = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', fontWeight: 600, minWidth: 100, justifyContent: 'flex-end' }}>
+      {saving && (
+        <span style={{ color: '#6366f1', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving…
+        </span>
+      )}
+      {saved && !saving && (
+        <span style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Check size={13} /> Saved
+        </span>
+      )}
+      {error && !saving && (
+        <span style={{ color: '#dc2626' }}>{error}</span>
+      )}
+    </div>
+  );
+
   return (
     <div style={{ padding: '24px 32px', maxWidth: 780 }}>
       <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Lead Settings</h1>
+          <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Settings</h1>
           <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: '#64748b' }}>
             Changes are saved automatically when you add or remove options.
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.82rem', fontWeight: 600, minWidth: 100, justifyContent: 'flex-end' }}>
-          {saving && (
-            <span style={{ color: '#6366f1', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> Saving…
-            </span>
-          )}
-          {saved && !saving && (
-            <span style={{ color: '#16a34a', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Check size={13} /> Saved
-            </span>
-          )}
-          {error && !saving && (
-            <span style={{ color: '#dc2626' }}>{error}</span>
-          )}
-        </div>
+        {statusIndicator}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <p style={{ margin: '0 0 12px', fontSize: '0.8rem', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Lead Settings</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 32 }}>
         <Section
           title="Service Types"
           description="Options shown in Service Type dropdown (e.g. Walk-in, Onsite service)"
@@ -260,6 +381,34 @@ const SettingsPage = () => {
           items={devices}
           onAdd={handleAddDevice}
           onRemove={handleRemoveDevice}
+          saving={saving}
+        />
+      </div>
+
+      <p style={{ margin: '0 0 12px', fontSize: '0.8rem', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Expense Settings</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <Section
+          title="Expense Categories"
+          description="Options shown in Category dropdown for expenses and payments"
+          items={expenseCategories}
+          onAdd={handleAddExpenseCategory}
+          onRemove={handleRemoveExpenseCategory}
+          saving={saving}
+        />
+        <Section
+          title="Payment Modes"
+          description="Options shown in Payment Mode dropdown for expenses and payments"
+          items={paymentModes}
+          onAdd={handleAddPaymentMode}
+          onRemove={handleRemovePaymentMode}
+          saving={saving}
+        />
+        <Section
+          title="Vendor & Payee Options"
+          description="Options shown in Vendor and Payee dropdown when adding/editing an expense"
+          items={vendorPayeeOptions}
+          onAdd={handleAddVendorPayee}
+          onRemove={handleRemoveVendorPayee}
           saving={saving}
         />
       </div>

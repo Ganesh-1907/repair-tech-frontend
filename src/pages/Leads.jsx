@@ -352,15 +352,15 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
               </div>
             )}
 
-            <div className="form-group">
+            {/* <div className="form-group">
               <label htmlFor="lead-quote">Quote</label>
               <input id="lead-quote" type="text" placeholder="Enter quote amount/details" value={form.quote} onChange={(event) => updateForm('quote', event.target.value)} />
-            </div>
+            </div> */}
 
-            <div className="form-group">
+            {/* <div className="form-group">
               <label htmlFor="lead-billing">Billing</label>
               <input id="lead-billing" type="text" placeholder="Enter billing details" value={form.billing} onChange={(event) => updateForm('billing', event.target.value)} />
-            </div>
+            </div> */}
 
             <div className="form-group form-group-full">
               <label htmlFor="lead-review-link">Review Message Link</label>
@@ -842,15 +842,15 @@ const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate, servi
               </div>
             )}
 
-            <div className="form-group">
+            {/* <div className="form-group">
               <label htmlFor="edit-lead-quote">Quote</label>
               <input id="edit-lead-quote" type="text" placeholder="Enter quote amount/details" value={form.quote} onChange={(e) => updateForm('quote', e.target.value)} />
-            </div>
+            </div> */}
 
-            <div className="form-group">
+            {/* <div className="form-group">
               <label htmlFor="edit-lead-billing">Billing</label>
               <input id="edit-lead-billing" type="text" placeholder="Enter billing details" value={form.billing} onChange={(e) => updateForm('billing', e.target.value)} />
-            </div>
+            </div> */}
 
             <div className="form-group form-group-full">
               <label htmlFor="edit-lead-review-link">Review Message Link</label>

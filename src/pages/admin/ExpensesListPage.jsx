@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Search, Plus, X, Edit, Eye, MoreVertical } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Search, Plus, X, Edit, Eye, MoreVertical, ChevronDown, UploadCloud } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { usePrivacy } from '../../context/PrivacyContext';
 import { expenseManagementService } from '../../services/expenseManagementService';
 import { api } from '../../services/apiClient';
+import { useExpenseSettings } from '../../hooks/useExpenseSettings';
 
 const formatDateLabel = (value) => {
   if (!value) return '-';
@@ -29,6 +30,7 @@ const emptyForm = {
 
 const ExpensesListPage = () => {
   const { formatCurrency } = usePrivacy();
+  const { settings: expenseSettings } = useExpenseSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [expenses, setExpenses] = useState([]);
   const [staffList, setStaffList] = useState([]);
@@ -44,6 +46,11 @@ const ExpensesListPage = () => {
   const [modalMode, setModalMode] = useState('');
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
+  const [vendorSearch, setVendorSearch] = useState('');
+  const [vendorPanelPos, setVendorPanelPos] = useState({});
+  const vendorDropdownRef = useRef(null);
+  const vendorTriggerRef = useRef(null);
 
   const loadExpenses = async () => {
     const rows = await expenseManagementService.getAllExpenses();
@@ -59,6 +66,17 @@ const ExpensesListPage = () => {
     const handleClickOutside = (event) => {
       if (!event.target.closest('.member-action-menu') && !event.target.closest('.action-trigger-btn')) {
         setActiveDropdownId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (vendorDropdownRef.current && !vendorDropdownRef.current.contains(event.target)) {
+        setVendorDropdownOpen(false);
+        setVendorSearch('');
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -97,19 +115,16 @@ const ExpensesListPage = () => {
   }, [filtered]);
 
   const vendorPayeeOptions = useMemo(() => {
-    const options = expenseManagementService.getVendorPayeeOptions(form.category);
+    const options = expenseSettings.vendorPayeeOptions;
     if (form.vendorPayee && !options.includes(form.vendorPayee)) return [...options, form.vendorPayee];
     return options;
-  }, [form.category, form.vendorPayee]);
+  }, [expenseSettings.vendorPayeeOptions, form.vendorPayee]);
 
-  const applyCategory = (category) => {
-    const nextOptions = expenseManagementService.getVendorPayeeOptions(category);
-    setForm((current) => ({
-      ...current,
-      category,
-      vendorPayee: nextOptions.includes(current.vendorPayee) ? current.vendorPayee : (nextOptions[0] || ''),
-    }));
-  };
+  const paymentModeOptions = useMemo(() => {
+    const options = expenseSettings.paymentModes;
+    if (form.paymentMode && !options.includes(form.paymentMode)) return [...options, form.paymentMode];
+    return options;
+  }, [expenseSettings.paymentModes, form.paymentMode]);
 
   const closeModal = () => {
     setModalMode('');
@@ -126,8 +141,11 @@ const ExpensesListPage = () => {
 
   const openAddModal = () => {
     setModalMode('add');
-    const defaultOptions = expenseManagementService.getVendorPayeeOptions(emptyForm.category);
-    setForm({ ...emptyForm, vendorPayee: defaultOptions[0] || '' });
+    setForm({
+      ...emptyForm,
+      category: expenseSettings.expenseCategories[0] || 'Salaries',
+      paymentMode: expenseSettings.paymentModes[0] || 'Cash',
+    });
     setSelectedExpense(null);
     setErrors({});
   };
@@ -274,7 +292,7 @@ const ExpensesListPage = () => {
         <label className="expenses-control-select">
           <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
             <option value="All">All Categories</option>
-            {expenseManagementService.categories.map((category) => <option key={category}>{category}</option>)}
+            {expenseSettings.expenseCategories.map((category) => <option key={category}>{category}</option>)}
           </select>
         </label>
         <label className="expenses-control-select expenses-date-filter">
@@ -401,8 +419,8 @@ const ExpensesListPage = () => {
                 </div>
                 <div className="form-group">
                   <label>Category</label>
-                  <select value={form.category} onChange={(event) => applyCategory(event.target.value)}>
-                    {expenseManagementService.categories.map((category) => <option key={category}>{category}</option>)}
+                  <select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>
+                    {expenseSettings.expenseCategories.map((category) => <option key={category}>{category}</option>)}
                   </select>
                   {errors.category && <span className="form-error">{errors.category}</span>}
                 </div>
@@ -424,29 +442,96 @@ const ExpensesListPage = () => {
                 <div className="form-group">
                   <label>Payment Mode</label>
                   <select value={form.paymentMode} onChange={(event) => setForm((current) => ({ ...current, paymentMode: event.target.value }))}>
-                    {expenseManagementService.paymentModes.map((mode) => <option key={mode}>{mode}</option>)}
+                    {paymentModeOptions.map((mode) => <option key={mode}>{mode}</option>)}
                   </select>
                 </div>
-                <div className="form-group">
+                <div className="form-group" ref={vendorDropdownRef}>
                   <label>Vendor and Payee</label>
-                  <select value={form.vendorPayee} onChange={(event) => setForm((current) => ({ ...current, vendorPayee: event.target.value }))}>
-                    <option value="">Select vendor and payee</option>
-                    {vendorPayeeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                  <span className="form-hint">{expenseManagementService.getVendorPayeeHint(form.category)}</span>
+                  <button
+                    ref={vendorTriggerRef}
+                    type="button"
+                    className="expense-vendor-trigger"
+                    onClick={() => {
+                      const rect = vendorTriggerRef.current.getBoundingClientRect();
+                      const panelH = 280;
+                      const openUp = window.innerHeight - rect.bottom < panelH;
+                      setVendorPanelPos(openUp
+                        ? { bottom: window.innerHeight - rect.top + 6, left: rect.left, width: rect.width }
+                        : { top: rect.bottom + 6, left: rect.left, width: rect.width });
+                      setVendorDropdownOpen((o) => !o);
+                      setVendorSearch('');
+                    }}
+                  >
+                    <span className={form.vendorPayee ? '' : 'placeholder'}>{form.vendorPayee || 'Select vendor and payee'}</span>
+                    <ChevronDown size={14} className={`vendor-chevron${vendorDropdownOpen ? ' open' : ''}`} />
+                  </button>
+                  {vendorDropdownOpen && (
+                    <div
+                      className="expense-vendor-panel"
+                      style={vendorPanelPos}
+                    >
+                      <div className="expense-vendor-search">
+                        <Search size={13} />
+                        <input
+                          autoFocus
+                          placeholder="Search..."
+                          value={vendorSearch}
+                          onChange={(e) => setVendorSearch(e.target.value)}
+                        />
+                      </div>
+                      <div className="expense-vendor-list">
+                        {vendorPayeeOptions
+                          .filter((o) => o.toLowerCase().includes(vendorSearch.toLowerCase()))
+                          .map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              className={`expense-vendor-option${form.vendorPayee === option ? ' selected' : ''}`}
+                              onClick={() => {
+                                setForm((c) => ({ ...c, vendorPayee: option }));
+                                setVendorDropdownOpen(false);
+                                setVendorSearch('');
+                              }}
+                            >
+                              {option}
+                            </button>
+                          ))}
+                        {vendorPayeeOptions.filter((o) => o.toLowerCase().includes(vendorSearch.toLowerCase())).length === 0 && (
+                          <span className="expense-vendor-empty">No options match</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {errors.vendorPayee && <span className="form-error">{errors.vendorPayee}</span>}
                 </div>
                 <div className="form-group">
                   <label>Reference Number</label>
                   <input value={form.referenceNumber} onChange={(event) => setForm((current) => ({ ...current, referenceNumber: event.target.value }))} />
                 </div>
-                <div className="form-group">
-                  <label>Receipt Upload (placeholder)</label>
-                  <input type="text" placeholder="receipt-file.pdf" value={form.receiptName} onChange={(event) => setForm((current) => ({ ...current, receiptName: event.target.value }))} />
-                </div>
-                <div className="form-group">
-                  <label>Notes</label>
-                  <textarea rows={3} value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
+                <div className="form-group form-group-full expense-attachment-grid">
+                  <div className="expense-attachment-field">
+                    <label>Receipt Upload</label>
+                    <label className="file-upload-box expense-receipt-upload">
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          setForm((c) => ({ ...c, receiptName: file ? file.name : '' }));
+                        }}
+                      />
+                      <UploadCloud size={24} />
+                      <span className="expense-receipt-title">
+                        {form.receiptName || 'Click to upload receipt'}
+                      </span>
+                      {!form.receiptName && <span className="expense-receipt-meta">PDF, JPG, PNG</span>}
+                    </label>
+                  </div>
+                  <div className="expense-attachment-field">
+                    <label>Notes</label>
+                    <textarea className="expense-notes-input" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
+                  </div>
                 </div>
               </div>
               <div className="modal-actions">
