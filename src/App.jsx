@@ -18,6 +18,7 @@ import CMCReport from './pages/CMCReport';
 import AMCReport from './pages/AMCReport';
 // Lead Pages
 import LeadQuotationPage from './pages/admin/LeadQuotationPage';
+import LeadBillingPage from './pages/admin/LeadBillingPage';
 import CreateLeadPage from './pages/admin/CreateLeadPage';
 import SettingsPage from './pages/admin/SettingsPage';
 
@@ -261,6 +262,7 @@ function App() {
               <Route path="/admin/leads/create" element={<Layout><CreateLeadPage /></Layout>} />
               <Route path="/admin/leads/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="leads" /></Layout>} />
               <Route path="/admin/leads/quotation/:id" element={<Layout><LeadQuotationPage /></Layout>} />
+              <Route path="/admin/leads/billing/:id" element={<Layout><LeadBillingPage /></Layout>} />
               <Route path="/admin/settings" element={<Layout><SettingsPage /></Layout>} />
               <Route path="/workflow" element={<Layout><Workflow /></Layout>} />
               <Route path="/billing" element={<Layout><Billing /></Layout>} />

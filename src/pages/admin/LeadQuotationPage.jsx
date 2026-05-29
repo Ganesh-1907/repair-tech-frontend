@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 import './PlansCustomers.css';
+import rbLogo from '../../assets/Screenshot from 2026-05-29 11-40-17.png';
 
 /* ─── PDF ─────────────────────────────────────────────────────── */
 const generatePdfBase64 = async (el, filename) => {
@@ -470,17 +471,25 @@ const LeadQuotationPage = () => {
               }}
             >
               {/* Doc header */}
-              <div className="lq-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 18, marginBottom: 24 }}>
+              <div className="lq-header" style={{ borderBottom: '2px solid #1e293b', paddingBottom: 18, marginBottom: 24 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                  <div>
+                    <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a' }}>REPAIR BOY</h2>
+                    <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA</p>
+                    <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Hyderabad</p>
+                    <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Phone no. : 9912432383</p>
+                    <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Email : support@repairboy.in</p>
+                    <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>GSTIN : 36BNWPR8968L1ZH</p>
+                    <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>State: 36-Telangana</p>
+                  </div>
+                  <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0 }} />
+                </div>
                 <div>
                   <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, letterSpacing: 1 }}>QUOTATION</h1>
                   <p style={{ margin: 0, fontSize: 11.5, color: '#64748b' }}>No: {quote.quoteNo}</p>
                   <p style={{ margin: 0, fontSize: 11.5, color: '#64748b' }}>
                     Date: {fmtDate(quote.date)} &nbsp;|&nbsp; Valid: {quote.validity}
                   </p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <h2 style={{ margin: '0 0 2px', fontSize: 15, fontWeight: 800 }}>RepairBoy Enterprise</h2>
-                  <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>Authorized Service Center</p>
                 </div>
               </div>
 

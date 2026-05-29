@@ -17,6 +17,7 @@ import {
   Mail,
 } from 'lucide-react';
 import { api, apiClient } from '../../services/apiClient';
+import rbLogo from '../../assets/Screenshot from 2026-05-29 11-40-17.png';
 
 const generatePdfBase64 = async (element, filename) => {
   const html2pdf = (await import('html2pdf.js')).default;
@@ -667,18 +668,23 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
           <div className="agreement-document" ref={printRef}>
 
             {/* ── HEADER ── */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-              <div>
-                <h1 style={{ fontSize: 24, fontWeight: 900, margin: '0 0 4px', letterSpacing: '-0.5px' }}>CMC QUOTATION</h1>
-                <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo}</p>
-                <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Date: {quote.date} | Valid: {quote.validity}</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 14 }}>
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a', textAlign: 'left' }}>REPAIR BOY</h2>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA</p>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>Hyderabad</p>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>Phone no. : 9912432383</p>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>Email : support@repairboy.in</p>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>GSTIN : 36BNWPR8968L1ZH</p>
+                <p style={{ margin: 0, fontSize: 11, color: '#374151', textAlign: 'left' }}>State: 36-Telangana</p>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <p style={{ margin: '0 0 2px', fontSize: 14, fontWeight: 700 }}>RepairBoy Enterprise</p>
-                <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>Authorized Service Center</p>
-              </div>
+              <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 110, height: 110, objectFit: 'contain', flexShrink: 0 }} />
             </div>
-            <hr style={{ border: 'none', borderTop: '2px solid #1e293b', margin: '12px 0 20px' }} />
+            <div style={{ marginBottom: 6 }}>
+              <h1 style={{ fontSize: 24, fontWeight: 900, margin: '0 0 4px', letterSpacing: '-0.5px' }}>CMC QUOTATION</h1>
+              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo}</p>
+              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Date: {quote.date} | Valid: {quote.validity}</p>
+            </div>
 
             {/* ── CUSTOMER DETAILS ── */}
             <div style={{ marginBottom: 24 }}>
@@ -926,14 +932,22 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
         {/* ── RIGHT: LIVE PREVIEW ── */}
         <div className="agreement-preview-container">
           <div className="agreement-document" ref={agreeRef}>
-            <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>
+                <div>
+                  <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a' }}>REPAIR BOY</h2>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Hyderabad</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Phone no. : 9912432383</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Email : support@repairboy.in</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>GSTIN : 36BNWPR8968L1ZH</p>
+                  <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>State: 36-Telangana</p>
+                </div>
+                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0 }} />
+              </div>
+              <div style={{ textAlign: 'center' }}>
                 <h1 style={{ fontSize: 20, margin: '0 0 4px' }}>CMC AGREEMENT</h1>
                 <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {form.agreementNumber} &nbsp;|&nbsp; Date: {form.agreementDate}</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <h2 style={{ fontSize: 15, margin: 0 }}>RepairBoy Solutions</h2>
-                <p style={{ fontSize: 11, margin: 0, color: '#64748b' }}>Authorized Service Center</p>
               </div>
             </div>
 

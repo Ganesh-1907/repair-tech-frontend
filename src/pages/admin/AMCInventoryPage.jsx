@@ -6,6 +6,7 @@ import {
   ArrowLeft, Printer, Wrench, CheckCircle, Mail
 } from 'lucide-react';
 import { api, apiClient } from '../../services/apiClient';
+import rbLogo from '../../assets/Screenshot from 2026-05-29 11-40-17.png';
 
 const generatePdfBase64 = async (element, filename) => {
   const html2pdf = (await import('html2pdf.js')).default;
@@ -481,14 +482,28 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
 
         <div className="agreement-preview-container">
           <div className="agreement-document" ref={printRef}>
-            <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div><h1 style={{ fontSize: 22, margin: '0 0 4px' }}>AMC QUOTATION</h1><p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo}</p><p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Date: {quote.date} | Valid: {quote.validity}</p></div>
-              <div style={{ textAlign: 'right' }}><h2 style={{ fontSize: 16, margin: 0 }}>RepairBoy Enterprise</h2><p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>Authorized Service Center</p></div>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a', textAlign: 'left' }}>REPAIR BOY</h2>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>Hyderabad</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>Phone no. : 9912432383</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>Email : support@repairboy.in</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>GSTIN : 36BNWPR8968L1ZH</p>
+                  <p style={{ margin: 0, fontSize: 11, color: '#374151', textAlign: 'left' }}>State: 36-Telangana</p>
+                </div>
+                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 110, height: 110, objectFit: 'contain', flexShrink: 0 }} />
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <h1 style={{ fontSize: 22, margin: '0 0 4px' }}>AMC QUOTATION</h1>
+                <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo} &nbsp;|&nbsp; Date: {quote.date} &nbsp;|&nbsp; Valid: {quote.validity}</p>
+              </div>
             </div>
-            <div className="agreement-section" style={{ marginBottom: 16 }}><h2>Customer Details</h2><div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>{[
+            <div className="agreement-section" style={{ marginBottom: 16 }}><h2 style={{ textAlign: 'left' }}>Customer Details</h2><div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>{[
               ['Customer Name', customer.name], ['Contact Person', customer.authorizedPerson1], ['Address', customer.address], ['GSTIN', customer.gstin], ['AMC ID', customer.contractId], ['AMC Plan', customer.plan], ['SLA Response', quote.slaResponse],
             ].map(([key, val]) => <div key={key} style={{ display: 'flex', fontSize: 12 }}><span style={{ minWidth: 130, fontWeight: 700, color: '#64748b' }}>{key}</span><span style={{ color: '#94a3b8', marginRight: 10 }}>—</span><span>{val || '—'}</span></div>)}</div></div>
-            <div className="agreement-section"><h2>Device & Pricing Details</h2><table className="agreement-table"><thead><tr><th>Device</th><th>Model / Serial</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>{quoteDevices.map((row) => <tr key={row.id}><td>{row.device}</td><td>{row.model}<br />{row.serial}</td><td>{row.qty}</td><td>₹{Number(row.unitPrice || 0).toLocaleString('en-IN')}</td><td>₹{(Number(row.qty || 0) * Number(row.unitPrice || 0)).toLocaleString('en-IN')}</td></tr>)}<tr><td colSpan={4} style={{ textAlign: 'right' }}><strong>Subtotal</strong></td><td><strong>₹{subtotal().toLocaleString('en-IN')}</strong></td></tr><tr><td colSpan={4} style={{ textAlign: 'right' }}>GST ({quote.gstPercent}%)</td><td>₹{gstAmount().toLocaleString('en-IN')}</td></tr><tr style={{ background: '#f0fdf4' }}><td colSpan={4} style={{ textAlign: 'right' }}><strong>Grand Total</strong></td><td><strong>₹{grandTotal().toLocaleString('en-IN')}</strong></td></tr></tbody></table></div>
+            <div className="agreement-section"><h2 style={{ textAlign: 'left' }}>Device & Pricing Details</h2><table className="agreement-table"><thead><tr><th>Device</th><th>Model / Serial</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>{quoteDevices.map((row) => <tr key={row.id}><td>{row.device}</td><td>{row.model}<br />{row.serial}</td><td>{row.qty}</td><td>₹{Number(row.unitPrice || 0).toLocaleString('en-IN')}</td><td>₹{(Number(row.qty || 0) * Number(row.unitPrice || 0)).toLocaleString('en-IN')}</td></tr>)}<tr><td colSpan={4} style={{ textAlign: 'right' }}><strong>Subtotal</strong></td><td><strong>₹{subtotal().toLocaleString('en-IN')}</strong></td></tr><tr><td colSpan={4} style={{ textAlign: 'right' }}>GST ({quote.gstPercent}%)</td><td>₹{gstAmount().toLocaleString('en-IN')}</td></tr><tr style={{ background: '#f0fdf4' }}><td colSpan={4} style={{ textAlign: 'right' }}><strong>Grand Total</strong></td><td><strong>₹{grandTotal().toLocaleString('en-IN')}</strong></td></tr></tbody></table></div>
             <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
               <div className="agreement-section" style={{ flex: 1 }}><h2>Scope of Work</h2><ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>{quote.scope.split(',').map((item) => item.trim()).filter(Boolean).map((item, i) => <li key={i} style={{ fontSize: 12, marginBottom: 4 }}>• {item}</li>)}</ul></div>
               <div className="agreement-section" style={{ flex: 1 }}><h2>Exclusions</h2><ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>{quote.exclusions.split(',').map((item) => item.trim()).filter(Boolean).map((item, i) => <li key={i} style={{ fontSize: 12, marginBottom: 4 }}>• {item}</li>)}</ul></div>
@@ -698,14 +713,22 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
 
         <div className="agreement-preview-container">
           <div className="agreement-document" ref={agreeRef} style={{ fontFamily: '"Times New Roman", Times, serif', padding: 28, color: '#0f172a', lineHeight: 1.55 }}>
-            <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #333', paddingBottom: 20, marginBottom: 28 }}>
-              <div>
+            <div style={{ marginBottom: 28 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a', textAlign: 'left' }}>REPAIR BOY</h2>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>Hyderabad</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>Phone no. : 9912432383</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>Email : support@repairboy.in</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>GSTIN : 36BNWPR8968L1ZH</p>
+                  <p style={{ margin: 0, fontSize: 11, color: '#374151', textAlign: 'left' }}>State: 36-Telangana</p>
+                </div>
+                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 110, height: 110, objectFit: 'contain', flexShrink: 0 }} />
+              </div>
+              <div style={{ textAlign: 'center' }}>
                 <h1 style={{ fontSize: 22, margin: '0 0 8px', textTransform: 'uppercase' }}>AMC Agreement</h1>
                 <p style={{ margin: 0, fontSize: 12, color: '#475569' }}>No: {agreement.agreementNo} | Date: {agreement.agreementDate}</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <h2 style={{ fontSize: 16, margin: '0 0 4px', textTransform: 'uppercase' }}>RepairBoy Solutions</h2>
-                <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>Authorized Service Center</p>
               </div>
             </div>
 

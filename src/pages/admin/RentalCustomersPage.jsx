@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 import './RentalCustomerManagement.css';
 import './RentalDocuments.css';
 import './PlansCustomers.css';
+import rbLogo from '../../assets/Screenshot from 2026-05-29 11-40-17.png';
 import { api, apiClient } from '../../services/apiClient';
 import SendCredentialsModal from '../../components/common/SendCredentialsModal';
 
@@ -596,15 +597,23 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
         {/* ── RIGHT: LIVE PREVIEW ── */}
         <div className="agreement-preview-container no-print-hide">
           <div className="agreement-document" ref={printRef}>
-            <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a', textAlign: 'left' }}>REPAIR BOY</h2>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Hyderabad</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Phone no. : 9912432383</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Email : support@repairboy.in</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>GSTIN : 36BNWPR8968L1ZH</p>
+                  <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>State: 36-Telangana</p>
+                </div>
+                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 110, height: 110, objectFit: 'contain', flexShrink: 0 }} />
+              </div>
+              <div style={{ textAlign: 'center' }}>
                 <h1 style={{ fontSize: 22, margin: '0 0 4px' }}>QUOTATION</h1>
                 <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo}</p>
                 <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Date: {quote.date} &nbsp;|&nbsp; Valid: {quote.validity}</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <h2 style={{ fontSize: 16, margin: '0 0 2px' }}>RepairBoy Enterprise</h2>
-                <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>Authorized Service Center</p>
               </div>
             </div>
 
@@ -725,9 +734,9 @@ const RentalAgreementView = ({ customer, onBack }) => {
     gstin: customer.gst || savedQuote.gstin || '',
     phone: customer.phone || savedQuote.phone || '',
     email: customer.email || savedQuote.email || '',
-    providerName: 'RepairBoy Enterprise',
-    providerAddress: 'Plot 42, Tech Hub, City',
-    providerGstin: '22AAAAA0000A1Z5',
+    providerName: 'REPAIR BOY',
+    providerAddress: '42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA, Hyderabad',
+    providerGstin: '36BNWPR8968L1ZH',
     billingCycle: 'Monthly',
     paymentDueDays: '7',
     gstPercent: toPercentValue(savedQuote.gstPercent),
@@ -934,14 +943,22 @@ const RentalAgreementView = ({ customer, onBack }) => {
         {/* ── RIGHT: LIVE PREVIEW ── */}
         <div className="agreement-preview-container">
           <div className="agreement-document" ref={agreementRef}>
-            <div className="agreement-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a', textAlign: 'left' }}>REPAIR BOY</h2>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Hyderabad</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Phone no. : 9912432383</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Email : support@repairboy.in</p>
+                  <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>GSTIN : 36BNWPR8968L1ZH</p>
+                  <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>State: 36-Telangana</p>
+                </div>
+                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 110, height: 110, objectFit: 'contain', flexShrink: 0 }} />
+              </div>
+              <div style={{ textAlign: 'center' }}>
                 <h1 style={{ fontSize: 20 }}>{form.customerType.toUpperCase()} RENTAL AGREEMENT</h1>
                 <p style={{ fontSize: 11, color: '#64748b', margin: 0 }}>No: {form.agreementNo} &nbsp;|&nbsp; Date: {form.agreementDate}</p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <h2 style={{ fontSize: 15, margin: 0 }}>RepairBoy Enterprise</h2>
-                <p style={{ fontSize: 11, margin: 0, color: '#64748b' }}>Authorized Service Center</p>
               </div>
             </div>
 

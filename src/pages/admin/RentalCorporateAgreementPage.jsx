@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Eye, Edit, Printer, Plus, Trash2 } from 'lucide-react';
 import './PlansCustomers.css';
 import './RentalWorkflow.css';
+import rbLogo from '../../assets/Screenshot from 2026-05-29 11-40-17.png';
 
 const DEVICE_OPTIONS = ['Desktop', 'Laptop', 'Priner', 'CCTV', 'Server'];
 
@@ -68,7 +69,18 @@ const RentalCorporateAgreementPage = () => {
 
         <div className="document-paper">
           <div className="paper-header">
-            <div className="company-info"><h2 style={{ color: 'var(--secondary)', margin: 0 }}>RepairBoy Solutions</h2><p>Rental Management Division</p></div>
+            <div className="company-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 14 }}>
+              <div>
+                <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a' }}>REPAIR BOY</h2>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA</p>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Hyderabad</p>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Phone no. : 9912432383</p>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>Email : support@repairboy.in</p>
+                <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>GSTIN : 36BNWPR8968L1ZH</p>
+                <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>State: 36-Telangana</p>
+              </div>
+              <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0 }} />
+            </div>
             <div className="doc-type" style={{ textAlign: 'right' }}>
               <h1 style={{ margin: 0, fontSize: '28px' }}>CORPORATE AGREEMENT</h1>
               <p><strong>Date:</strong> {form.agreementDate}</p><p><strong>Agreement #:</strong> {form.agreementNo}</p>

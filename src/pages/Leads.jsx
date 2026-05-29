@@ -1321,7 +1321,7 @@ const Leads = () => {
 
     const rect = event.currentTarget.getBoundingClientRect();
     const menuWidth = 220;
-    const menuHeight = lead.assignedTechnician ? 294 : 248;
+    const menuHeight = lead.assignedTechnician ? 334 : 288;
     const gap = 8;
     const viewportPadding = 16;
     const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
@@ -1513,6 +1513,9 @@ const Leads = () => {
           </button>
           <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/quotation/${activeMenuLead.id}`, { state: { lead: activeMenuLead } }); }}>
             <FileText size={14} className="icon-muted" /> Create Quotation
+          </button>
+          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/billing/${activeMenuLead.id}`, { state: { lead: activeMenuLead } }); }}>
+            <FileText size={14} className="icon-muted" /> Billing
           </button>
           <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/repair/${activeMenuLead.id}`); }}>
             <Wrench size={14} className="icon-muted" /> Manage Repair

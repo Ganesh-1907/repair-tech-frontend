@@ -5,6 +5,17 @@ import { invalidateLeadSettingsCache } from '../../hooks/useLeadSettings';
 import { invalidateExpenseSettingsCache, EXPENSE_SETTINGS_ID } from '../../hooks/useExpenseSettings';
 
 const SETTINGS_ID = 'lead-options';
+const COMPANY_SETTINGS_ID = 'company-profile';
+
+const COMPANY_DEFAULTS = {
+  companyName: 'REPAIR BOY',
+  address: '',
+  city: '',
+  phone: '',
+  email: '',
+  gstin: '',
+  state: '',
+};
 
 const DEFAULTS = {
   serviceTypes: ['Walk-in', 'Onsite service'],
@@ -132,6 +143,12 @@ const SettingsPage = () => {
   const [expenseRecordId, setExpenseRecordId] = useState(null);
   const expenseRecordIdRef = useRef(null);
 
+  const [company, setCompany] = useState({ ...COMPANY_DEFAULTS });
+  const [companyRecordId, setCompanyRecordId] = useState(null);
+  const companyRecordIdRef = useRef(null);
+  const [companySaving, setCompanySaving] = useState(false);
+  const [companySaved, setCompanySaved] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -154,6 +171,13 @@ const SettingsPage = () => {
           setServiceTypes([...DEFAULTS.serviceTypes]);
           setSources([...DEFAULTS.sources]);
           setDevices([...DEFAULTS.devices]);
+        }
+
+        const companyRecord = all.find((r) => r.settingsId === COMPANY_SETTINGS_ID);
+        if (companyRecord) {
+          companyRecordIdRef.current = companyRecord.id;
+          setCompanyRecordId(companyRecord.id);
+          setCompany({ ...COMPANY_DEFAULTS, ...companyRecord });
         }
 
         const expenseRecord = all.find((r) => r.settingsId === EXPENSE_SETTINGS_ID);
@@ -286,6 +310,34 @@ const SettingsPage = () => {
     }
   };
 
+  const persistCompany = async (data) => {
+    setCompanySaving(true);
+    setCompanySaved(false);
+    const payload = { settingsId: COMPANY_SETTINGS_ID, ...data };
+    try {
+      const currentId = companyRecordIdRef.current;
+      if (currentId) {
+        await apiClient.put(`/records/appSettings/${currentId}`, payload);
+      } else {
+        const res = await apiClient.post('/records/appSettings', payload);
+        const newId = res.data?.id || null;
+        companyRecordIdRef.current = newId;
+        setCompanyRecordId(newId);
+      }
+      setCompanySaved(true);
+      setTimeout(() => setCompanySaved(false), 2000);
+    } catch {
+      setError('Failed to save company profile.');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setCompanySaving(false);
+    }
+  };
+
+  const handleCompanyChange = (field, value) => setCompany((prev) => ({ ...prev, [field]: value }));
+
+  const handleCompanySave = () => persistCompany(company);
+
   const handleAddExpenseCategory = (v) => {
     const updated = [...expenseCategories, v];
     setExpenseCategories(updated);
@@ -355,6 +407,44 @@ const SettingsPage = () => {
           </p>
         </div>
         {statusIndicator}
+      </div>
+
+      <p style={{ margin: '0 0 12px', fontSize: '0.8rem', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Company Profile</p>
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden', marginBottom: 32 }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>Company Details</div>
+            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>Appears on billing estimates and quotation PDFs</div>
+          </div>
+          <button
+            type="button"
+            onClick={handleCompanySave}
+            disabled={companySaving}
+            style={{ padding: '7px 18px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            {companySaving ? 'Saving…' : companySaved ? '✓ Saved' : 'Save'}
+          </button>
+        </div>
+        <div style={{ padding: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {[
+            { field: 'companyName', label: 'Company Name' },
+            { field: 'phone', label: 'Phone No.' },
+            { field: 'address', label: 'Address', full: true },
+            { field: 'city', label: 'City' },
+            { field: 'email', label: 'Email' },
+            { field: 'gstin', label: 'GSTIN' },
+            { field: 'state', label: 'State (e.g. 36-Telangana)' },
+          ].map(({ field, label, full }) => (
+            <div key={field} style={full ? { gridColumn: '1 / -1' } : {}}>
+              <label style={{ display: 'block', marginBottom: 5, fontSize: '0.72rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</label>
+              <input
+                value={company[field] || ''}
+                onChange={(e) => handleCompanyChange(field, e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', border: '1px solid #dbe3ef', borderRadius: 8, fontSize: '0.86rem', color: '#0f172a', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       <p style={{ margin: '0 0 12px', fontSize: '0.8rem', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Lead Settings</p>
