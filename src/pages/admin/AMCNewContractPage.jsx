@@ -38,6 +38,16 @@ const createBlankDevice = (type = 'Laptop') => {
   }
 };
 
+const getDeviceTypeOptions = (configuredDevices = []) => Array.from(new Set([
+  ...configuredDevices,
+  'Laptop',
+  'Desktop',
+  'Server',
+  'Printer',
+  'CCTV',
+  'Total Maintenance',
+]));
+
 const generateContractId = (contracts) => {
   const year = new Date().getFullYear();
   const prefix = `AMC-${year}-`;
@@ -270,9 +280,10 @@ const CCTVFields = ({ device, onChange }) => {
 };
 
 // Reuses existing field components — sub-type can be any device type except Total Maintenance
-const TotalMaintenanceFields = ({ device, onReplace }) => {
+const TotalMaintenanceFields = ({ device, onReplace, deviceTypes }) => {
   const sub = device.subDeviceType || 'Laptop';
   const subData = device.subDeviceData || createBlankDevice(sub);
+  const subDeviceTypes = deviceTypes.filter((type) => type !== 'Total Maintenance');
 
   const handleSubTypeChange = (newType) => {
     onReplace({ ...device, subDeviceType: newType, subDeviceData: createBlankDevice(newType) });
@@ -298,7 +309,7 @@ const TotalMaintenanceFields = ({ device, onReplace }) => {
       <div className="form-group" style={{ marginBottom: '20px', maxWidth: '260px' }}>
         <label>Device Sub-Type</label>
         <select className="form-select" value={sub} onChange={e => handleSubTypeChange(e.target.value)}>
-          {settings.devices.map(t => <option key={t}>{t}</option>)}
+          {subDeviceTypes.map(t => <option key={t}>{t}</option>)}
         </select>
       </div>
       {renderSubFields()}
@@ -317,7 +328,7 @@ const getDeviceSummary = (d) => {
   return '';
 };
 
-const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, onAdd }) => {
+const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, onAdd, deviceTypes }) => {
   const onChange = (field, value) => {
     if (field === 'type') {
       onUpdate(index, createBlankDevice(value));
@@ -333,7 +344,7 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
       case 'Server': return <DesktopServerFields device={device} onChange={onChange} />;
       case 'Printer': return <PrinterFields device={device} onChange={onChange} />;
       case 'CCTV': return <CCTVFields device={device} onChange={onChange} />;
-      case 'Total Maintenance': return <TotalMaintenanceFields device={device} onReplace={(updated) => onUpdate(index, updated)} />;
+      case 'Total Maintenance': return <TotalMaintenanceFields device={device} onReplace={(updated) => onUpdate(index, updated)} deviceTypes={deviceTypes} />;
       default: return null;
     }
   };
@@ -355,7 +366,7 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
             onChange={e => onChange('type', e.target.value)}
             title="Change device type"
           >
-            {[...settings.devices, 'Total Maintenance'].map(t => <option key={t}>{t}</option>)}
+            {deviceTypes.map(t => <option key={t}>{t}</option>)}
           </select>
           <button className="accordion-remove-btn" onClick={() => onRemove(index)}>
             <Trash2 size={13} /> Remove
@@ -385,10 +396,12 @@ const AMCNewContractPage = () => {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const editId = queryParams.get('id');
+  const deviceTypes = getDeviceTypeOptions(settings.devices);
 
   const [amcPlans, setAmcPlans] = useState([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [existingAmcDetails, setExistingAmcDetails] = useState({});
   const [openDevices, setOpenDevices] = useState(new Set([0]));
 
   const [form, setForm] = useState({
@@ -428,7 +441,8 @@ const AMCNewContractPage = () => {
               return;
             }
             const details = existing.amcDetails || {};
-            const devices = normalizeContractDevices(details.devices || existing.devices, createBlankDevice, [...settings.devices, 'Total Maintenance']);
+            setExistingAmcDetails(details);
+            const devices = normalizeContractDevices(details.devices || existing.devices, createBlankDevice, getDeviceTypeOptions());
             setForm({
               companyName: existing.customerName || existing.name || '',
               gstNumber: details.gstin || details.gst || existing.gstin || existing.gst || '',
@@ -520,6 +534,7 @@ const AMCNewContractPage = () => {
         endDate: form.expiryDate,
         status: form.status,
         amcDetails: {
+          ...existingAmcDetails,
           planName: form.amcPlan,
           gstin: form.gstNumber,
           address: form.registeredAddress,
@@ -720,6 +735,7 @@ const AMCNewContractPage = () => {
                   onUpdate={updateDevice}
                   onRemove={removeDevice}
                   onAdd={addDevice}
+                  deviceTypes={deviceTypes}
                 />
               ))}
             </div>

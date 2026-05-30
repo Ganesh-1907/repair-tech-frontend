@@ -11,6 +11,7 @@ import {
   AlertCircle,
   FileText,
   ClipboardCheck,
+  IndianRupee,
   ArrowLeft,
   Printer,
   ShieldCheck,
@@ -293,6 +294,7 @@ const RentalCustomersPage = () => {
               <>
                 <button className="menu-item" onClick={() => openQuotation(c)}><FileText size={14} /> Create Quotation</button>
                 <button className="menu-item" onClick={() => openAgreement(c)}><ClipboardCheck size={14} /> Create Agreement</button>
+                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/billing/${c.id}`, { state: { customer: c } }); }}><IndianRupee size={14} /> Billing</button>
                 <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/repair/${c.id}`); }}><Wrench size={14} /> Manage Repair</button>
                 <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu(prev => ({ ...prev, open: false, id: null })); }}><CheckCircle2 size={14} /> Send Portal Access</button>
                 <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> View Customer</button>

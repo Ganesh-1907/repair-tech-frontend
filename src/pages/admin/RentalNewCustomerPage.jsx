@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Trash2, ChevronDown, ChevronUp, ArrowLeft, Save } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, ArrowLeft, HardDrive, Save, Search } from 'lucide-react';
 import { api } from '../../services/apiClient';
 import './PlansCustomers.css';
-import { useLeadSettings } from '../../hooks/useLeadSettings';
+import '../InventoryPremiumStyles.css';
 
 const COLLECTION = 'rentalCustomers';
 
@@ -41,8 +41,6 @@ const createBlankDevice = (type = 'Laptop') => {
 
 const trimText = (value) => String(value || '').trim();
 
-const joinParts = (parts) => parts.filter(Boolean).join(' | ');
-
 const getDeviceBase = (device) => (
   device.type === 'Total Maintenance'
     ? { ...device.subDeviceData, type: device.subDeviceType || 'Laptop' }
@@ -58,76 +56,45 @@ const getDeviceSummary = (device) => {
   return '';
 };
 
-const getDeviceAssetType = (device) => {
-  if (device.type === 'Total Maintenance') return device.subDeviceType || 'Laptop';
-  return device.type || 'Device';
-};
+const getAssetDisplayId = (asset) => asset.assetTag || asset.assetId || asset.id;
 
-const getDeviceBrand = (device) => {
-  const base = getDeviceBase(device);
-  if (base.type === 'Desktop' || base.type === 'Server') return base.cpu?.brand || base.monitor?.brand || '';
-  return base.brand || '';
-};
+const mapInventoryAssetToRentalDevice = (asset = {}) => ({
+  inventoryAssetId: asset.id,
+  assetId: getAssetDisplayId(asset),
+  assetTag: asset.assetTag || asset.assetId || asset.id,
+  serialNumber: asset.serialNumber || '',
+  type: asset.type || asset.deviceType || 'Device',
+  deviceType: asset.type || asset.deviceType || 'Device',
+  brand: asset.brand || '',
+  model: asset.model || '',
+  subType: asset.subType || '',
+  location: asset.location || '',
+  configuration: asset.configuration || asset.configurations || '',
+  configurations: asset.configuration || asset.configurations || '',
+  addOnParts: asset.addOnParts || '',
+  deviceDetails: asset.deviceDetails || null,
+  source: 'inventory',
+});
 
-const getDeviceModel = (device) => {
-  const base = getDeviceBase(device);
-  if (base.type === 'Desktop' || base.type === 'Server') return base.cpu?.model || '';
-  return base.model || '';
-};
-
-const getDeviceLocation = (device) => {
-  const base = getDeviceBase(device);
-  if (base.type === 'Desktop' || base.type === 'Server') return base.cpu?.location || base.monitor?.location || '';
-  return base.location || '';
-};
-
-const getDeviceSubType = (device) => {
-  const base = getDeviceBase(device);
-  if (base.type === 'Desktop' || base.type === 'Server') return base.cpu?.subType || base.monitor?.subType || '';
-  return base.subType || '';
-};
-
-const getDeviceConfiguration = (device) => {
-  const base = getDeviceBase(device);
-  if (base.type === 'Laptop') {
-    return (base.configurations || [])
-      .map((row) => joinParts([row.name, row.specification]))
-      .filter(Boolean)
-      .join(' | ');
-  }
-  if (base.type === 'Desktop' || base.type === 'Server') {
-    return joinParts([
-      base.cpu?.subType && `CPU Type: ${base.cpu.subType}`,
-      base.cpu?.brand && `CPU Brand: ${base.cpu.brand}`,
-      base.cpu?.model && `CPU Model: ${base.cpu.model}`,
-      base.cpu?.config && `CPU Config: ${base.cpu.config}`,
-      base.monitor?.subType && `Monitor Type: ${base.monitor.subType}`,
-      base.monitor?.brand && `Monitor Brand: ${base.monitor.brand}`,
-    ]);
-  }
-  if (base.type === 'Printer') return joinParts([base.subType, base.inputField]);
-  if (base.type === 'CCTV') return (base.specs || []).filter(Boolean).join(' | ');
-  return '';
-};
-
-const buildRentalAssetPayloads = (devices, customer) => {
-  const stamp = Date.now();
+const buildRentalAssetPayloads = (assets, customer) => {
   const customerName = customer.companyName || customer.customerName || '';
-  return devices.map((device, index) => {
-    const id = `AST-${customer.id}-${stamp}-${index + 1}`;
-    const assetType = getDeviceAssetType(device);
-    const location = getDeviceLocation(device) || customer.address || '';
-    const configuration = getDeviceConfiguration(device);
+  return assets.map((asset) => {
+    const assetType = asset.type || asset.deviceType || 'Device';
+    const id = `RA-${customer.id}-${asset.id}`;
+    const location = asset.location || customer.address || '';
+    const configuration = asset.configuration || asset.configurations || '';
     return {
       id,
-      assetId: id,
+      assetId: getAssetDisplayId(asset),
+      inventoryAssetId: asset.id,
       customerId: customer.id,
       customerName,
       type: assetType,
       deviceType: assetType,
-      brand: getDeviceBrand(device),
-      model: getDeviceModel(device) || assetType,
-      subType: getDeviceSubType(device),
+      brand: asset.brand || '',
+      model: asset.model || assetType,
+      subType: asset.subType || '',
+      serialNumber: asset.serialNumber || '',
       specs: configuration,
       configuration,
       configurations: configuration,
@@ -136,8 +103,9 @@ const buildRentalAssetPayloads = (devices, customer) => {
       quantity: 1,
       status: 'Registration Pending',
       installationStatus: 'Pending',
-      deviceDetails: device,
-      notes: device.type === 'Total Maintenance' ? `Total Maintenance - ${assetType}` : '',
+      deviceDetails: asset.deviceDetails || null,
+      addOnParts: asset.addOnParts || '',
+      notes: `Inventory asset ${getAssetDisplayId(asset)}`,
     };
   });
 };
@@ -356,7 +324,7 @@ const CCTVFields = ({ device, onChange, errors = {} }) => {
   );
 };
 
-const TotalMaintenanceFields = ({ device, onReplace, errors = {} }) => {
+const TotalMaintenanceFields = ({ device, onReplace, errors = {}, settings = { devices: ['Laptop', 'Desktop', 'Server', 'Printer', 'CCTV'] } }) => {
   const sub = device.subDeviceType || 'Laptop';
   const subData = device.subDeviceData || createBlankDevice(sub);
 
@@ -392,7 +360,7 @@ const TotalMaintenanceFields = ({ device, onReplace, errors = {} }) => {
   );
 };
 
-const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, onAdd, errors = {} }) => {
+const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, onAdd, errors = {}, settings = { devices: ['Laptop', 'Desktop', 'Server', 'Printer', 'CCTV'] } }) => {
   const onChange = (field, value) => {
     if (field === 'type') {
       onUpdate(index, createBlankDevice(value));
@@ -456,7 +424,6 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
 };
 
 const RentalNewCustomerPage = () => {
-  const { settings } = useLeadSettings();
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -464,9 +431,11 @@ const RentalNewCustomerPage = () => {
 
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
-  const [openDevices, setOpenDevices] = useState(new Set([0]));
   const errorBannerRef = useRef(null);
   const [plans, setPlans] = useState([]);
+  const [inventoryAssets, setInventoryAssets] = useState([]);
+  const [assetSearch, setAssetSearch] = useState('');
+  const [originalAssetIds, setOriginalAssetIds] = useState([]);
 
   const [form, setForm] = useState({
     companyName: '',
@@ -480,15 +449,19 @@ const RentalNewCustomerPage = () => {
     planId: '',
     planName: '',
     planDetails: null,
-    devices: [createBlankDevice('Laptop')],
+    selectedAssetIds: [],
+    devices: [],
   });
 
   useEffect(() => {
-    api.list('rentalPricingPlans')
-      .then((data) => {
-        const all = Array.isArray(data) ? data : [];
-        // In edit mode show all plans (including inactive) so the currently assigned plan always appears
-        setPlans(editId ? all : all.filter((p) => p.status !== 'Inactive'));
+    Promise.all([
+      api.list('rentalPricingPlans'),
+      api.list('assets'),
+    ])
+      .then(([plansData, assetsData]) => {
+        const allPlans = Array.isArray(plansData) ? plansData : [];
+        setPlans(editId ? allPlans : allPlans.filter((p) => p.status !== 'Inactive'));
+        setInventoryAssets(Array.isArray(assetsData) ? assetsData : []);
       })
       .catch(() => {});
   }, [editId]);
@@ -519,13 +492,14 @@ const RentalNewCustomerPage = () => {
             planId: existing.planId || '',
             planName: existing.planName || '',
             planDetails: existing.planDetails || null,
-            devices: Array.isArray(existing.devices) && existing.devices.length > 0
-              ? existing.devices.map((d) => ({ ...d, _existingDevice: true }))
-              : [createBlankDevice('Laptop')],
+            selectedAssetIds: existing.selectedAssetIds || (Array.isArray(existing.devices)
+              ? existing.devices.map((d) => d.inventoryAssetId).filter(Boolean)
+              : []),
+            devices: Array.isArray(existing.devices) ? existing.devices : [],
           });
-          if (existing.devices) {
-            setOpenDevices(new Set(existing.devices.map((_, i) => i)));
-          }
+          setOriginalAssetIds(existing.selectedAssetIds || (Array.isArray(existing.devices)
+            ? existing.devices.map((d) => d.inventoryAssetId).filter(Boolean)
+            : []));
         }
       } catch (err) {
         console.error('Failed to load rental customer:', err);
@@ -536,48 +510,6 @@ const RentalNewCustomerPage = () => {
 
   const setContact = (type, field, value) => {
     setForm((current) => ({ ...current, [type]: { ...current[type], [field]: value } }));
-  };
-
-  const addDevice = () => {
-    const newIndex = form.devices.length;
-    setForm((current) => ({ ...current, devices: [...current.devices, createBlankDevice('Laptop')] }));
-    setOpenDevices((current) => new Set([...current, newIndex]));
-  };
-
-  const updateDevice = (index, updated) => {
-    setForm((current) => {
-      const devices = [...current.devices];
-      devices[index] = updated;
-      return { ...current, devices };
-    });
-    // clear validation errors for this device the moment the user edits any field
-    setErrors((current) => {
-      if (!current.devices) return current;
-      const nextDeviceErrors = [...current.devices];
-      nextDeviceErrors[index] = {};
-      return { ...current, devices: nextDeviceErrors };
-    });
-  };
-
-  const removeDevice = (index) => {
-    setForm((current) => ({ ...current, devices: current.devices.filter((_, i) => i !== index) }));
-    setOpenDevices((current) => {
-      const next = new Set();
-      current.forEach((i) => {
-        if (i < index) next.add(i);
-        else if (i > index) next.add(i - 1);
-      });
-      return next;
-    });
-  };
-
-  const toggleDevice = (index) => {
-    setOpenDevices((current) => {
-      const next = new Set(current);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
   };
 
   const handlePlanChange = (planId) => {
@@ -591,6 +523,50 @@ const RentalNewCustomerPage = () => {
     setErrors((current) => ({ ...current, planId: undefined }));
   };
 
+  const selectedAssets = useMemo(() => (
+    form.selectedAssetIds
+      .map((assetId) => inventoryAssets.find((asset) => String(asset.id) === String(assetId)))
+      .filter(Boolean)
+  ), [form.selectedAssetIds, inventoryAssets]);
+
+  const filteredInventoryAssets = useMemo(() => {
+    const query = assetSearch.trim().toLowerCase();
+    return inventoryAssets.filter((asset) => {
+      const haystack = [
+        asset.assetTag,
+        asset.assetId,
+        asset.id,
+        asset.serialNumber,
+        asset.type,
+        asset.model,
+        asset.configuration,
+        asset.configurations,
+        asset.addOnParts,
+      ].join(' ').toLowerCase();
+      return !query || haystack.includes(query);
+    });
+  }, [assetSearch, inventoryAssets]);
+
+  const toggleAssetSelection = (asset) => {
+    const isAssignedElsewhere = asset.rentalCustomerId && String(asset.rentalCustomerId) !== String(editId || '');
+    if (isAssignedElsewhere) return;
+    setForm((current) => {
+      const selected = new Set((current.selectedAssetIds || []).map(String));
+      const assetId = String(asset.id);
+      if (selected.has(assetId)) selected.delete(assetId);
+      else selected.add(assetId);
+      const selectedAssetList = Array.from(selected)
+        .map((selectedId) => inventoryAssets.find((row) => String(row.id) === selectedId))
+        .filter(Boolean);
+      return {
+        ...current,
+        selectedAssetIds: Array.from(selected),
+        devices: selectedAssetList.map(mapInventoryAssetToRentalDevice),
+      };
+    });
+    setErrors((current) => ({ ...current, selectedAssetIds: undefined }));
+  };
+
   const validate = () => {
     const nextErrors = {};
     if (!form.companyName.trim()) nextErrors.companyName = 'Company / customer name is required';
@@ -601,34 +577,7 @@ const RentalNewCustomerPage = () => {
     if (!form.registeredAddress.trim()) nextErrors.registeredAddress = 'Registered address is required';
     if (!form.planId) nextErrors.planId = 'A rental plan is required';
 
-    const deviceErrors = form.devices.map((device) => {
-      const de = {};
-      const isTotal = device.type === 'Total Maintenance';
-      const base = isTotal ? (device.subDeviceData || {}) : device;
-      const baseType = isTotal ? (device.subDeviceType || 'Laptop') : device.type;
-      if (baseType === 'Laptop') {
-        if (!base.brand?.trim()) de.brand = 'Brand is required';
-        if (!base.model?.trim()) de.model = 'Model is required';
-      } else if (baseType === 'Desktop' || baseType === 'Server') {
-        if (!base.cpu?.subType?.trim()) de.cpuSubType = 'CPU Type is required';
-        if (!base.cpu?.brand?.trim()) de.cpuBrand = 'CPU Brand is required';
-        if (!base.cpu?.model?.trim()) de.cpuModel = 'CPU Model is required';
-        if (!base.cpu?.config?.trim()) de.cpuConfig = 'CPU Configuration is required';
-        if (!base.monitor?.subType?.trim()) de.monitorSubType = 'Monitor Type is required';
-        if (!base.monitor?.brand?.trim()) de.monitorBrand = 'Monitor Brand is required';
-      } else if (baseType === 'Printer') {
-        if (!base.subType?.trim()) de.subType = 'Printer type is required';
-        if (!base.brand?.trim()) de.brand = 'Brand is required';
-        if (!base.model?.trim()) de.model = 'Model is required';
-        if (!base.inputField?.trim()) de.inputField = 'Input field is required';
-      } else if (baseType === 'CCTV') {
-        if (!base.subType?.trim()) de.subType = 'CCTV type is required';
-        if (!base.brand?.trim()) de.brand = 'Brand is required';
-        if (!base.model?.trim()) de.model = 'Model is required';
-      }
-      return de;
-    });
-    if (deviceErrors.some((de) => Object.keys(de).length > 0)) nextErrors.devices = deviceErrors;
+    if (!form.selectedAssetIds.length) nextErrors.selectedAssetIds = 'Select at least one inventory asset';
     return nextErrors;
   };
 
@@ -636,13 +585,6 @@ const RentalNewCustomerPage = () => {
     const nextErrors = validate();
     if (Object.keys(nextErrors).length > 0) {
       setErrors({ ...nextErrors, general: 'Please fill in all required fields marked below.' });
-      if (nextErrors.devices) {
-        setOpenDevices((prev) => {
-          const next = new Set(prev);
-          nextErrors.devices.forEach((de, i) => { if (Object.keys(de).length > 0) next.add(i); });
-          return next;
-        });
-      }
       setTimeout(() => errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
       return;
     }
@@ -694,30 +636,35 @@ const RentalNewCustomerPage = () => {
         notes: trimText(form.notes),
         status: 'Active',
         locations,
-        devices: form.devices.map(({ _existingDevice, ...rest }) => rest),
+        selectedAssetIds: form.selectedAssetIds,
+        devices: selectedAssets.map(mapInventoryAssetToRentalDevice),
         planId: form.planId,
         planName: form.planName,
         planDetails: form.planDetails,
       };
 
-      if (editId) {
-        await api.update(COLLECTION, editId, customerPayload);
-        const newDevices = form.devices.filter((d) => !d._existingDevice);
-        if (newDevices.length > 0) {
-          const customerForAssets = {
-            id: editId,
-            companyName: form.companyName,
-            customerName: form.primaryContact.name || form.companyName,
-            address: form.registeredAddress,
-          };
-          const assetPayloads = buildRentalAssetPayloads(newDevices, customerForAssets);
-          await Promise.all(assetPayloads.map((asset) => api.create('rentalAssets', asset)));
-        }
-      } else {
-        const savedCustomer = await api.create(COLLECTION, customerPayload);
-        const assetPayloads = buildRentalAssetPayloads(form.devices, savedCustomer);
-        await Promise.all(assetPayloads.map((asset) => api.create('rentalAssets', asset)));
-      }
+      const savedCustomer = editId
+        ? await api.update(COLLECTION, editId, customerPayload)
+        : await api.create(COLLECTION, customerPayload);
+
+      const assetPayloads = buildRentalAssetPayloads(selectedAssets, savedCustomer);
+      await Promise.all(assetPayloads.map((asset) => api.create('rentalAssets', asset)));
+      await Promise.all(selectedAssets.map((asset) => api.patch('assets', asset.id, {
+        status: 'Rented',
+        assignedCustomer: companyName,
+        rentalCustomerId: savedCustomer.id,
+        customerId: savedCustomer.id,
+        customerName: companyName,
+      })));
+      const selectedIdSet = new Set(form.selectedAssetIds.map(String));
+      const removedAssetIds = originalAssetIds.filter((assetId) => !selectedIdSet.has(String(assetId)));
+      await Promise.all(removedAssetIds.map((assetId) => api.patch('assets', assetId, {
+        status: 'Idle',
+        assignedCustomer: null,
+        rentalCustomerId: null,
+        customerId: null,
+        customerName: null,
+      }).catch(() => null)));
       navigate('/admin/rental/customers');
     } catch (err) {
       console.error('Failed to save rental customer:', err);
@@ -924,32 +871,136 @@ const RentalNewCustomerPage = () => {
 
         <div className="amc-form-card card-devices">
           <div className="amc-form-card-header device-registry-header">
-            <h2 className="amc-form-section-title">3. Device Registry</h2>
-            <button className="primary-button" style={{ height: '36px', fontSize: '13px' }} onClick={addDevice}>
-              <Plus size={16} /> Add Device
+            <div>
+              <h2 className="amc-form-section-title">3. Inventory Assets *</h2>
+              <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 13 }}>
+                Select devices already registered in Inventory. Rental tracking will use only these assets.
+              </p>
+            </div>
+            <button className="secondary-button" style={{ height: '36px', fontSize: '13px' }} onClick={() => navigate('/admin/inventory/assets/new')}>
+              <Plus size={16} /> Add Inventory Asset
             </button>
           </div>
           <div className="amc-form-card-body">
-            {form.devices.length === 0 && (
+            <div className={`form-group${errors.selectedAssetIds ? ' has-error' : ''}`}>
+              <label>Select Assets From Inventory *</label>
+              <div className="plans-search" style={{ maxWidth: 420, marginBottom: 14 }}>
+                <Search size={16} />
+                <input
+                  value={assetSearch}
+                  onChange={(e) => setAssetSearch(e.target.value)}
+                  placeholder="Search device ID, serial, model..."
+                />
+              </div>
+              {errors.selectedAssetIds && <span className="field-error">{errors.selectedAssetIds}</span>}
+            </div>
+
+            {inventoryAssets.length === 0 ? (
               <div className="empty-devices-hint">
-                No devices added. Click "Add Device" to register the first device.
+                No inventory assets found. Add devices in Inventory first, then select them here for rental tracking.
+              </div>
+            ) : (
+              <div className="inventory-table-wrap" style={{ borderRadius: 12, border: '1px solid #e2e8f0' }}>
+                <table className="inventory-table asset-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: 52 }}>Use</th>
+                      <th>Device ID / Serial Number</th>
+                      <th>Type</th>
+                      <th>Model</th>
+                      <th>Configuration</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredInventoryAssets.map((asset) => {
+                      const checked = form.selectedAssetIds.map(String).includes(String(asset.id));
+                      const assignedElsewhere = asset.rentalCustomerId && String(asset.rentalCustomerId) !== String(editId || '');
+                      return (
+                        <tr key={asset.id} className={checked ? 'bg-indigo-50' : ''}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={assignedElsewhere}
+                              onChange={() => toggleAssetSelection(asset)}
+                              style={{ width: 16, height: 16 }}
+                              title={assignedElsewhere ? 'Already assigned to another rental customer' : 'Select asset'}
+                            />
+                          </td>
+                          <td>
+                            <div className="inventory-device-cell">
+                              <div className="inventory-device-icon"><HardDrive size={18} /></div>
+                              <div>
+                                <strong>{getAssetDisplayId(asset)}</strong>
+                                <span>S/N: {asset.serialNumber || '-'}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{asset.type || '-'}</td>
+                          <td>{asset.model || '-'}</td>
+                          <td className="inventory-muted-cell">{asset.configuration || asset.configurations || '-'}</td>
+                          <td>
+                            <span className={`status-badge status-${String(asset.status || 'idle').toLowerCase().replace(/\s+/g, '-')}`}>
+                              {assignedElsewhere ? 'Assigned' : asset.status || 'Idle'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredInventoryAssets.length === 0 && (
+                      <tr><td colSpan={6} className="inventory-empty">No inventory assets match this search.</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             )}
-            <div className="device-accordion-list">
-              {form.devices.map((device, index) => (
-                <DeviceAccordion
-                  key={index}
-                  device={device}
-                  index={index}
-                  isOpen={openDevices.has(index)}
-                  onToggle={() => toggleDevice(index)}
-                  onUpdate={updateDevice}
-                  onRemove={removeDevice}
-                  onAdd={addDevice}
-                  errors={(errors.devices && errors.devices[index]) || {}}
-                />
-              ))}
-            </div>
+
+            {selectedAssets.length > 0 && (
+              <div className="device-accordion-list" style={{ marginTop: 18 }}>
+                {selectedAssets.map((asset, index) => (
+                  <div key={asset.id} className="device-accordion open">
+                    <div className="accordion-header">
+                      <div className="accordion-title-area">
+                        <span className="accordion-device-index">Asset {index + 1}</span>
+                        <span className="accordion-device-type-badge">{asset.type || 'Device'}</span>
+                        <span className="accordion-device-summary">{getAssetDisplayId(asset)} · {asset.serialNumber || 'No serial'}</span>
+                      </div>
+                    </div>
+                    <div className="accordion-body">
+                      <div className="device-fields-section">
+                        <div className="device-fields-row">
+                          <div className="form-group">
+                            <label>Model</label>
+                            <input className="form-input" value={asset.model || '-'} readOnly />
+                          </div>
+                          <div className="form-group">
+                            <label>Location</label>
+                            <input className="form-input" value={asset.location || '-'} readOnly />
+                          </div>
+                          <div className="form-group">
+                            <label>Add-on Parts</label>
+                            <input className="form-input" value={asset.addOnParts || '-'} readOnly />
+                          </div>
+                        </div>
+                        <div className="config-table-section">
+                          <div className="config-table-header"><span className="config-table-title">Configuration</span></div>
+                          <table className="config-table">
+                            <thead><tr><th>Name</th><th>Specification</th></tr></thead>
+                            <tbody>
+                              <tr>
+                                <td><input className="form-input" value="Inventory Details" readOnly /></td>
+                                <td><input className="form-input" value={asset.configuration || asset.configurations || '-'} readOnly /></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

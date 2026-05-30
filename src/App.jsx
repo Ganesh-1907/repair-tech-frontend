@@ -43,6 +43,7 @@ import LiveTrackingPage from './pages/admin/LiveTrackingPage';
 import InventoryDashboardPage from './pages/admin/InventoryDashboardPage';
 import AssetManagementPage from './pages/admin/AssetManagementPage';
 import AssetDetailPage from './pages/admin/AssetDetailPage';
+import InventoryAssetFormPage from './pages/admin/InventoryAssetFormPage';
 import QuoteApprovalPlaceholderPage from './pages/admin/QuoteApprovalPlaceholderPage';
 import CampaignDashboardPage from './pages/admin/CampaignDashboardPage';
 import CampaignsListingPage from './pages/admin/CampaignsListingPage';
@@ -205,6 +206,7 @@ function App() {
               <Route path="/admin/rental/reports" element={<Navigate to="/admin/rental/customers" replace />} />
               <Route path="/admin/rental/new" element={<Layout><RentalNewCustomerPage /></Layout>} />
               <Route path="/admin/rental/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="rental" /></Layout>} />
+              <Route path="/admin/rental/billing/:id" element={<Layout><LeadBillingPage moduleType="rental" /></Layout>} />
               <Route path="/admin/rental/customers/:customerId" element={<Layout><RentalCustomerDetailPage /></Layout>} />
               <Route path="/admin/rental/assets/:assetId" element={<Layout><RentalAssetDetailPage /></Layout>} />
               <Route path="/admin/rental/billing/generate" element={<Layout><RentalBillingGeneratePage /></Layout>} />
@@ -220,6 +222,7 @@ function App() {
               <Route path="/admin/amc/new" element={<Layout><AMCNewContractPage /></Layout>} />
               <Route path="/admin/amc/view/:id" element={<Layout><AMCViewPage /></Layout>} />
               <Route path="/admin/amc/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="amc" /></Layout>} />
+              <Route path="/admin/amc/billing/:id" element={<Layout><LeadBillingPage moduleType="amc" /></Layout>} />
               <Route path="/admin/amc/reports" element={<Layout><AMCReportsPage /></Layout>} />
 
               {/* CMC Module Redirects & Explicit Routes */}
@@ -230,6 +233,7 @@ function App() {
               <Route path="/admin/cmc/new" element={<Layout><CMCNewContractPage /></Layout>} />
               <Route path="/admin/cmc/view/:id" element={<Layout><CMCViewPage /></Layout>} />
               <Route path="/admin/cmc/repair/:id" element={<Layout><AMCRepairManagementPage moduleType="cmc" /></Layout>} />
+              <Route path="/admin/cmc/billing/:id" element={<Layout><LeadBillingPage moduleType="cmc" /></Layout>} />
               <Route path="/admin/cmc/reports" element={<Layout><CMCReportsPage /></Layout>} />
 
               {/* Discounts Module Routes */}
@@ -237,10 +241,15 @@ function App() {
               <Route path="/admin/discounts/dashboard" element={<Layout><DiscountsDashboardPage /></Layout>} />
               <Route path="/admin/discounts/codes" element={<Layout><DiscountsListPage /></Layout>} />
 
+              {/* Explicit Inventory Asset Routes */}
+              <Route path="/admin/inventory/assets/new" element={<Layout><InventoryAssetFormPage /></Layout>} />
+              <Route path="/admin/inventory/assets/:assetId/edit" element={<Layout><InventoryAssetFormPage /></Layout>} />
+
               {/* Explicit Campaign Routes */}
               <Route path="/admin/campaign/dashboard" element={<Layout><CampaignDashboardPage /></Layout>} />
               <Route path="/admin/campaign/campaigns" element={<Layout><CampaignsListingPage /></Layout>} />
               <Route path="/admin/campaign/jobs" element={<Layout><CampaignJobsPage /></Layout>} />
+              <Route path="/admin/campaign/billing/:id" element={<Layout><LeadBillingPage moduleType="campaign" /></Layout>} />
 
               {/* Dynamic Admin Routes */}
               {safeRouteEntries.map((route) => {

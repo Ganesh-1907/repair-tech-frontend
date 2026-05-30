@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Activity,
   AlertTriangle,
@@ -28,7 +28,6 @@ import { inventoryService } from '../services/inventoryService';
 import { assetManagementService } from '../services/assetManagementService';
 import { useToast } from '../context/ToastContext';
 import './InventoryPremiumStyles.css';
-import { useLeadSettings } from '../hooks/useLeadSettings';
 
 const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle'];
 
@@ -51,7 +50,7 @@ const statusTone = (status) => {
 };
 
 const InventoryManagement = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { addToast } = useToast();
   const [items, setItems] = useState([]);
   const [assets, setAssets] = useState([]);
@@ -60,15 +59,9 @@ const InventoryManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [stockType, setStockType] = useState('All');
   const [assetStatus, setAssetStatus] = useState('All');
-  const [showAddModal, setShowAddModal] = useState(false);
   const [viewAsset, setViewAsset] = useState(null);
-  const [editAsset, setEditAsset] = useState(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     try {
       const [nextItems, nextStats, nextAssets] = await Promise.all([
         inventoryService.getItems(),
@@ -81,7 +74,14 @@ const InventoryManagement = () => {
     } catch (error) {
       addToast(error.response?.data?.message || error.message || 'Inventory data failed to load.', 'error');
     }
-  }
+  }, [addToast]);
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      loadData();
+    }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [loadData]);
 
   const filteredItems = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -133,17 +133,6 @@ const InventoryManagement = () => {
     await loadData();
   };
 
-  const isAddModalOpen = showAddModal || searchParams.get('asset') === '1';
-
-  const closeAddModal = () => {
-    setShowAddModal(false);
-    if (searchParams.get('asset') === '1') {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete('asset');
-      setSearchParams(nextParams, { replace: true });
-    }
-  };
-
   const lowStock = Number(stats.lowStock || items.filter((item) => item.type === 'Sales' && Number(item.currentStock) <= Number(item.minStock)).length);
 
   return (
@@ -157,7 +146,7 @@ const InventoryManagement = () => {
           <button className="inventory-icon-button" onClick={handleReset} title="Reset stock inventory">
             <RefreshCcw size={18} />
           </button>
-          <button className="inventory-primary-button" onClick={() => setShowAddModal(true)}>
+          <button className="inventory-primary-button" onClick={() => navigate('/admin/inventory/assets/new')}>
             <Plus size={17} /> Add Asset
           </button>
         </div>
@@ -205,7 +194,7 @@ const InventoryManagement = () => {
             <AssetTable
               assets={filteredAssets}
               onView={(asset) => setViewAsset(asset)}
-              onEdit={(asset) => setEditAsset(asset)}
+              onEdit={(asset) => navigate(`/admin/inventory/assets/${asset.id}/edit`)}
             />
           </>
         ) : (
@@ -222,33 +211,11 @@ const InventoryManagement = () => {
         )}
       </section>
 
-      {isAddModalOpen && (
-        <AssetFormModal
-          onClose={closeAddModal}
-          onSave={async () => {
-            await loadData();
-            closeAddModal();
-            setActiveView('assets');
-          }}
-        />
-      )}
-
-      {editAsset && (
-        <AssetFormModal
-          asset={editAsset}
-          onClose={() => setEditAsset(null)}
-          onSave={async () => {
-            await loadData();
-            setEditAsset(null);
-          }}
-        />
-      )}
-
       {viewAsset && (
         <ViewAssetModal
           asset={viewAsset}
           onClose={() => setViewAsset(null)}
-          onEdit={() => { setEditAsset(viewAsset); setViewAsset(null); }}
+          onEdit={() => navigate(`/admin/inventory/assets/${viewAsset.id}/edit`)}
         />
       )}
     </div>
@@ -425,80 +392,6 @@ const StockTable = ({ items, onDelete }) => (
   </div>
 );
 
-const AssetFormModal = ({ asset, onClose, onSave }) => {
-  const { settings } = useLeadSettings();
-  const isEdit = !!asset;
-  const [formData, setFormData] = useState({
-    assetTag: asset?.assetTag || '',
-    serialNumber: asset?.serialNumber || '',
-    type: asset?.type || 'Printer',
-    model: asset?.model || '',
-    configuration: asset?.configuration || asset?.configurations || '',
-    addOnParts: asset?.addOnParts || '',
-    status: normalizeAssetStatus(asset?.status) || 'Active',
-  });
-  const [errors, setErrors] = useState({});
-
-  const update = (field, value) => setFormData((current) => ({ ...current, [field]: value }));
-
-  const handleSave = async () => {
-    const nextErrors = {};
-    if (!formData.assetTag.trim()) nextErrors.assetTag = 'Device ID is required';
-    if (!formData.serialNumber.trim()) nextErrors.serialNumber = 'Serial number is required';
-    if (!formData.model.trim()) nextErrors.model = 'Model is required';
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
-
-    const payload = { ...formData, configurations: formData.configuration, purchasePrice: 0, currentValue: 0 };
-    if (isEdit) {
-      await assetManagementService.updateAsset(asset.id, payload);
-    } else {
-      await assetManagementService.addAsset(payload);
-    }
-    await onSave();
-  };
-
-  return (
-    <Modal
-      title={isEdit ? 'Edit Asset' : 'Add Asset'}
-      subtitle="Each device is tracked individually by serial number."
-      onClose={onClose}
-      onSave={handleSave}
-      saveLabel={isEdit ? 'Save Changes' : 'Save Asset'}
-    >
-      <div className="inventory-form-grid two">
-        <Field label="Device ID" error={errors.assetTag}>
-          <input value={formData.assetTag} onChange={(e) => update('assetTag', e.target.value)} placeholder="RT-PRN-001" />
-        </Field>
-        <Field label="Serial Number" error={errors.serialNumber}>
-          <input value={formData.serialNumber} onChange={(e) => update('serialNumber', e.target.value)} placeholder="SN-4582-XL" />
-        </Field>
-      </div>
-      <div className="inventory-form-grid three">
-        <Field label="Type">
-          <select value={formData.type} onChange={(e) => update('type', e.target.value)}>
-            {settings.devices.map((t) => <option key={t}>{t}</option>)}
-          </select>
-        </Field>
-        <Field label="Model" error={errors.model}>
-          <input value={formData.model} onChange={(e) => update('model', e.target.value)} placeholder="HP LaserJet / Dell Latitude" />
-        </Field>
-        <Field label="Status">
-          <select value={formData.status} onChange={(e) => update('status', e.target.value)}>
-            {ASSET_STATUSES.map((s) => <option key={s}>{s}</option>)}
-          </select>
-        </Field>
-      </div>
-      <Field label="Configurations">
-        <textarea value={formData.configuration} onChange={(e) => update('configuration', e.target.value)} placeholder="Processor, RAM, storage, resolution, channels, speed, capacity..." />
-      </Field>
-      <Field label="Add-on Parts">
-        <textarea value={formData.addOnParts} onChange={(e) => update('addOnParts', e.target.value)} placeholder="Extra tray, duplex unit, RAM upgrade, docking station..." />
-      </Field>
-    </Modal>
-  );
-};
-
 const VIEW_FIELDS = [
   { label: 'Device ID', key: (a) => a.assetTag || a.id },
   { label: 'Serial Number', key: (a) => a.serialNumber },
@@ -520,14 +413,6 @@ const ViewAssetModal = ({ asset, onClose, onEdit }) => (
       ))}
     </div>
   </Modal>
-);
-
-const Field = ({ label, error, children }) => (
-  <label className="inventory-field">
-    <span>{label}</span>
-    {children}
-    {error && <small>{error}</small>}
-  </label>
 );
 
 const Modal = ({ title, subtitle, children, onClose, onSave, saveLabel }) => (

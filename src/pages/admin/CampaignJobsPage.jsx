@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Plus, Search, RefreshCcw, MoreVertical, ChevronRight, X, Loader2,
   Wrench, FileText, Truck, CheckCircle2, Send, Download,
-  Eye, ClipboardList, Pencil
+  Eye, ClipboardList, IndianRupee, Pencil
 } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { campaignService } from '../../services/campaignServices';
@@ -62,6 +62,7 @@ const useToast = () => {
 };
 
 const CampaignJobsPage = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const campaignFilter = searchParams.get('campaign');
   const { settings } = useLeadSettings();
@@ -336,7 +337,7 @@ const CampaignJobsPage = () => {
                             e.stopPropagation();
                             const rect = e.currentTarget.getBoundingClientRect();
                             const menuWidth = 220;
-                            const menuHeight = 160;
+                            const menuHeight = 200;
                             const x = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
                             const shouldOpenUp = rect.bottom + menuHeight + 8 > window.innerHeight;
                             const y = shouldOpenUp
@@ -385,6 +386,10 @@ const CampaignJobsPage = () => {
               <button className="action-dropdown-item"
                 onClick={() => { openQeForEdit(job); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
                 <Pencil size={16}/> Edit Job
+              </button>
+              <button className="action-dropdown-item"
+                onClick={() => { navigate(`/admin/campaign/billing/${job.id}`, { state: { customer: job } }); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
+                <IndianRupee size={16}/> Billing
               </button>
               <div className="action-dropdown-divider"/>
               {(st === 'Received at office' || qs === 'Draft') && (

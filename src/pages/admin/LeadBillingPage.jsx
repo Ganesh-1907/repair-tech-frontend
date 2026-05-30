@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Download, FileText, Mail, Plus, Printer, Save, Trash2 } from 'lucide-react';
-import { apiClient } from '../../services/apiClient';
+import { api, apiClient } from '../../services/apiClient';
 import { leadManagementService } from '../../services/leadManagementService';
 import rbLogo from '../../assets/Screenshot from 2026-05-29 11-40-17.png';
 
@@ -34,6 +34,129 @@ const newItem = () => ({
 });
 
 const units = ['-', 'Nos', 'Mtr', 'Pcs', 'Box', 'Set', 'Roll', 'Sqft'];
+
+const sourceConfig = {
+  leads: {
+    title: 'Lead Billing Estimate',
+    backLabel: 'Back to leads',
+    footer: 'Leads Management System',
+  },
+  amc: {
+    title: 'AMC Billing Estimate',
+    backLabel: 'Back to AMC inventory',
+    footer: 'AMC Management System',
+  },
+  cmc: {
+    title: 'CMC Billing Estimate',
+    backLabel: 'Back to CMC inventory',
+    footer: 'CMC Management System',
+  },
+  rental: {
+    title: 'Rental Billing Estimate',
+    backLabel: 'Back to rental customers',
+    footer: 'Rental Management System',
+  },
+  campaign: {
+    title: 'Campaign Billing Estimate',
+    backLabel: 'Back to walk-ins and jobs',
+    footer: 'Campaign Management System',
+  },
+};
+
+const summarizeDevices = (devices = [], fallback = '') => {
+  if (!Array.isArray(devices) || devices.length === 0) return fallback;
+  return devices
+    .map((device) => device.type || device.deviceType || device.device || device.productName || device.name || device.brand || '')
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(', ') || fallback;
+};
+
+const normalizeBillingCustomer = (record = {}, sourceModule = 'leads') => {
+  const raw = record.raw || record;
+  if (sourceModule === 'amc') {
+    const details = raw.amcDetails || {};
+    const primaryContact = details.primaryContact || {};
+    return {
+      ...raw,
+      customerName: raw.customerName || raw.name || record.name || details.companyName || details.authorizedPerson1 || 'AMC Customer',
+      mobileNumber: raw.mobileNumber || raw.primaryMobile || record.primaryMobile || primaryContact.mobile || details.contact || raw.contact || '',
+      email: raw.email || raw.primaryEmail || record.primaryEmail || primaryContact.email || details.email || '',
+      company: raw.company || details.address || raw.address || record.address || details.planName || raw.plan || '',
+      address: details.address || raw.address || record.address || '',
+      serviceType: 'AMC',
+      device: summarizeDevices(details.devices || raw.devices || record.devices, details.planName || raw.plan || 'AMC Service'),
+    };
+  }
+  if (sourceModule === 'cmc') {
+    const details = raw.cmcDetails || {};
+    const primaryContact = details.primaryContact || {};
+    return {
+      ...raw,
+      customerName: raw.customerName || raw.name || record.name || details.companyName || details.authorizedPerson1 || 'CMC Customer',
+      mobileNumber: raw.mobileNumber || raw.primaryMobile || record.primaryMobile || primaryContact.mobile || details.contact || raw.contact || '',
+      email: raw.email || raw.primaryEmail || record.primaryEmail || primaryContact.email || details.email || '',
+      company: raw.company || details.address || raw.address || record.address || details.planName || raw.plan || '',
+      address: details.address || raw.address || record.address || '',
+      serviceType: 'CMC',
+      device: summarizeDevices(details.devices || raw.devices || record.devices, details.planName || raw.plan || 'CMC Service'),
+    };
+  }
+  if (sourceModule === 'rental') {
+    return {
+      ...raw,
+      customerName: record.name || raw.companyName || raw.customerName || raw.name || 'Rental Customer',
+      mobileNumber: record.phone || raw.contactNumber || raw.mobileNumber || raw.phone || '',
+      email: record.email || raw.email || '',
+      company: record.address || raw.billingAddress || raw.address || raw.companyName || '',
+      address: record.address || raw.billingAddress || raw.address || '',
+      serviceType: 'Rental',
+      device: summarizeDevices(raw.devices || record.devices, 'Rental Service'),
+    };
+  }
+  if (sourceModule === 'campaign') {
+    return {
+      ...raw,
+      customerName: raw.customerName || raw.customer || raw.name || 'Campaign Customer',
+      mobileNumber: raw.phoneNumber || raw.phone || raw.mobileNumber || '',
+      email: raw.email || raw.customerEmail || '',
+      company: raw.campaignSource || raw.campaign || raw.company || 'Walk-in',
+      address: raw.address || '',
+      serviceType: 'Walk-in',
+      device: raw.deviceType || raw.device || raw.productName || '',
+    };
+  }
+  return {
+    ...raw,
+    customerName: raw.customerName || raw.name || 'Lead',
+    mobileNumber: raw.mobileNumber || raw.phoneNumber || raw.phone || '',
+    email: raw.email || raw.customerEmail || raw.emailAddress || '',
+    company: raw.company || raw.address || '',
+    address: raw.address || raw.company || '',
+    serviceType: raw.serviceType || 'Walk-in',
+    device: raw.device || raw.deviceType || '',
+  };
+};
+
+const loadSourceRecord = async (sourceModule, id) => {
+  if (!id) return null;
+  if (sourceModule === 'leads') {
+    const rows = await leadManagementService.listLeads();
+    return rows.find((row) => String(row.id) === String(id)) || null;
+  }
+  if (sourceModule === 'amc') return api.get('amcContracts', id);
+  if (sourceModule === 'cmc') return api.get('cmcContracts', id);
+  if (sourceModule === 'rental') return api.get('rentalCustomers', id);
+  if (sourceModule === 'campaign') {
+    try {
+      return await api.get('campaignJobs', id);
+    } catch {
+      const rows = await api.list('campaignJobs');
+      return rows.find((row) => String(row.id) === String(id) || String(row.ticketId) === String(id)) || null;
+    }
+  }
+  return null;
+};
 
 const inputStyle = {
   width: '100%',
@@ -93,13 +216,16 @@ const generatePdfBase64 = async (element, filename) => {
   return uri.split(',')[1];
 };
 
-const LeadBillingPage = () => {
+const LeadBillingPage = ({ moduleType = 'leads' }) => {
   const navigate = useNavigate();
   const { id } = useParams();
   const { state } = useLocation();
   const printRef = useRef(null);
+  const sourceModule = sourceConfig[moduleType] ? moduleType : 'leads';
+  const pageConfig = sourceConfig[sourceModule];
+  const routeStateRecord = state?.lead || state?.customer || state?.record || null;
 
-  const [lead, setLead] = useState(state?.lead || null);
+  const [sourceRecord, setSourceRecord] = useState(routeStateRecord);
   const [items, setItems] = useState([newItem()]);
   const [companyProfile, setCompanyProfile] = useState({
     companyName: 'REPAIR BOY',
@@ -123,7 +249,7 @@ const LeadBillingPage = () => {
     terms: 'Thanks for doing business with us.\nPayment due on approval of this estimate.',
   });
 
-  const customer = lead || {};
+  const customer = useMemo(() => normalizeBillingCustomer(sourceRecord || {}, sourceModule), [sourceRecord, sourceModule]);
   const customerEmail = customer.email || customer.customerEmail || customer.emailAddress || '';
 
   useEffect(() => {
@@ -136,17 +262,22 @@ const LeadBillingPage = () => {
   }, []);
 
   useEffect(() => {
-    if (lead || !id) return;
-    leadManagementService.listLeads()
-      .then((rows) => setLead(rows.find((row) => String(row.id) === String(id)) || null))
+    if (sourceRecord || !id) return;
+    loadSourceRecord(sourceModule, id)
+      .then((record) => setSourceRecord(record))
       .catch(() => {});
-  }, [id, lead]);
+  }, [id, sourceModule, sourceRecord]);
 
   useEffect(() => {
     apiClient.get('/records/leadBillings')
       .then((res) => {
         const all = Array.isArray(res.data) ? res.data : [];
-        const existing = id ? all.find((entry) => String(entry.leadId) === String(id)) : null;
+        const existing = id
+          ? all.find((entry) => (
+              String(entry.sourceModule || 'leads') === sourceModule
+              && String(entry.sourceId || entry.leadId) === String(id)
+            ))
+          : null;
         if (existing) {
           setSavedId(existing.id);
           setItems(existing.items?.length ? existing.items.map((item) => ({ ...newItem(), ...item, id: item.id || newItem().id })) : [newItem()]);
@@ -170,7 +301,7 @@ const LeadBillingPage = () => {
         setEstimate((current) => ({ ...current, estimateNo: `RPB${next}` }));
       })
       .catch(() => {});
-  }, [id]);
+  }, [id, sourceModule]);
 
   const showNotice = (message, ok = true) => {
     setNotice(message);
@@ -201,7 +332,9 @@ const LeadBillingPage = () => {
   const totalQty = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
 
   const payload = () => ({
-    leadId: id,
+    sourceModule,
+    sourceId: id,
+    leadId: sourceModule === 'leads' ? id : undefined,
     customerName: customer.customerName || '',
     customerEmail,
     customerMobile: customer.mobileNumber || '',
@@ -255,7 +388,7 @@ const LeadBillingPage = () => {
     const win = window.open('', '_blank', 'width=900,height=1200');
     if (!win) { window.print(); return; }
     win.document.open();
-    win.document.write(`<!doctype html><html><head><title>​</title><style>
+    win.document.write(`<!doctype html><html><head><title>${pageConfig.title} ${estimate.estimateNo}</title><style>
       @page{size:A4 portrait;margin:0mm}
       *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       body{margin:0;padding:10mm;background:#fff;font-family:"Times New Roman",Times,serif;color:#0f172a}
@@ -301,14 +434,14 @@ const LeadBillingPage = () => {
     <div className="lead-billing-page" style={{ minHeight: '100vh', background: '#eef2f7', paddingBottom: 32 }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', padding: '14px 24px', background: '#ffffff', borderBottom: '1px solid #e2e8f0', boxShadow: '0 2px 12px rgba(15,23,42,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button type="button" className="icon-btn" onClick={() => navigate(-1)} aria-label="Back to leads">
+          <button type="button" className="icon-btn" onClick={() => navigate(-1)} aria-label={pageConfig.backLabel}>
             <ArrowLeft size={18} />
           </button>
           <div style={{ width: 40, height: 40, display: 'grid', placeItems: 'center', borderRadius: 10, background: '#ede9fe', color: '#6d5bd0' }}>
             <FileText size={19} />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>Lead Billing Estimate</h1>
+            <h1 style={{ margin: 0, fontSize: '1.05rem', color: '#0f172a' }}>{pageConfig.title}</h1>
             <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.8rem' }}>{customer.customerName || 'Lead'} · {estimate.estimateNo}</p>
           </div>
         </div>
@@ -554,7 +687,7 @@ const LeadBillingPage = () => {
               </div>
 
               <div className="lq-footer" style={{ marginTop: 32, paddingTop: 12, borderTop: '1px solid #f1f5f9', textAlign: 'center', color: '#94a3b8', fontSize: 10 }}>
-                Generated by RepairBoy Enterprise — Leads Management System
+                Generated by RepairBoy Enterprise — {pageConfig.footer}
               </div>
             </div>
           </div>

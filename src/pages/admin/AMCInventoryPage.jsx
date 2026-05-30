@@ -8,23 +8,83 @@ import {
 import { api, apiClient } from '../../services/apiClient';
 import rbLogo from '../../assets/Screenshot from 2026-05-29 11-40-17.png';
 
-const generatePdfBase64 = async (element, filename) => {
-  const html2pdf = (await import('html2pdf.js')).default;
-  const styleBlock = `<style>* { box-sizing: border-box; -webkit-print-color-adjust: exact; } body { margin: 0; padding: 0; background: #fff; font-family: "Times New Roman", Times, serif; color: #0f172a; }</style>`;
+const AGREEMENT_PDF_CSS = `
+  .agreement-document {
+    width: 100%;
+    max-width: none;
+    overflow: visible !important;
+    max-height: none !important;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+    background: #fff;
+    line-height: 1.6;
+  }
+  .agreement-section { margin-bottom: 18px; overflow: visible !important; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 700; }
+  p, li { font-size: 12px; line-height: 1.6; }
+`;
+
+const buildPdfStyleBlock = (printCss = '') => `<style>* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { margin: 0; padding: 0; background: #fff; font-family: "Times New Roman", Times, serif; color: #0f172a; } ${printCss}</style>`;
+
+const getPdfOptions = (filename, fullHeight) => ({
+  margin: [10, 12, 10, 12],
+  filename,
+  pagebreak: { mode: ['css', 'legacy'] },
+  html2canvas: {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    windowWidth: 794,
+    windowHeight: fullHeight,
+    height: fullHeight,
+    width: 794,
+  },
+  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+});
+
+const measurePdfHeight = (element, styleBlock) => {
   const probe = document.createElement('div');
   probe.style.cssText = 'position:absolute;top:0;left:-9999px;width:794px;background:#fff;';
   probe.innerHTML = styleBlock + element.outerHTML;
   document.body.appendChild(probe);
   const fullHeight = probe.scrollHeight;
   document.body.removeChild(probe);
+  return fullHeight;
+};
+
+const generatePdfBase64 = async (element, filename, printCss = '') => {
+  const html2pdf = (await import('html2pdf.js')).default;
+  const styleBlock = buildPdfStyleBlock(printCss);
+  const fullHeight = measurePdfHeight(element, styleBlock);
   const dataUri = await html2pdf()
-    .set({ margin: [10, 12, 10, 12], filename, html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794, windowHeight: fullHeight, height: fullHeight, width: 794 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } })
+    .set(getPdfOptions(filename, fullHeight))
     .from(styleBlock + element.outerHTML, 'string')
     .outputPdf('datauristring');
   return dataUri.split(',')[1];
 };
+
+const downloadPdfFromElement = async (element, filename, printCss = '') => {
+  const html2pdf = (await import('html2pdf.js')).default;
+  const styleBlock = buildPdfStyleBlock(printCss);
+  const fullHeight = measurePdfHeight(element, styleBlock);
+  await html2pdf()
+    .set(getPdfOptions(filename, fullHeight))
+    .from(styleBlock + element.outerHTML, 'string')
+    .save();
+};
 import SendCredentialsModal from '../../components/common/SendCredentialsModal';
 import './PlansCustomers.css';
+
+const getCustomerEmail = (customer = {}) => (
+  customer.primaryEmail
+  || customer.amcDetails?.primaryContact?.email
+  || customer.email
+  || ''
+);
 
 const AMCInventoryPage = () => {
   const navigate = useNavigate();
@@ -156,8 +216,13 @@ const AMCInventoryPage = () => {
         customer={selectedCustomer}
         onBack={() => setViewMode('list')}
         onSaved={(updated) => {
-          setSelectedCustomer((prev) => ({ ...prev, ...updated, quotation: updated.amcDetails?.quotation }));
-          setCustomers((prev) => prev.map((row) => (row.contractId === updated.id ? { ...row, ...updated, quotation: updated.amcDetails?.quotation } : row)));
+          const savedQuotation = updated.amcDetails?.quotation;
+          setSelectedCustomer((prev) => ({ ...prev, ...updated, quotation: savedQuotation }));
+          setCustomers((prev) => prev.map((row) =>
+            (row.contractId === updated.contractId || row.id === updated.id || row.contractId === updated.id)
+              ? { ...row, ...updated, quotation: savedQuotation }
+              : row
+          ));
           setToast('Quotation saved successfully.');
         }}
       />
@@ -295,6 +360,7 @@ const AMCInventoryPage = () => {
                 <button className="menu-item" onClick={() => navigate(`/admin/amc/new?id=${c.id}`)}><Edit size={14} /> Edit AMC</button>
                 <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileEdit size={14} /> AMC Quotation</button>
                 <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileText size={14} /> AMC Agreement</button>
+                <button className="menu-item" onClick={() => { navigate(`/admin/amc/billing/${c.id}`, { state: { customer: c } }); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><IndianRupee size={14} /> Billing</button>
                 <button className="menu-item" onClick={() => navigate(`/admin/amc/repair/${c.contractId || c.id}`)}><Wrench size={14} /> Manage Repair</button>
                 <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><CheckCircle size={14} /> Send Portal Access</button>
                 <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>
@@ -332,7 +398,7 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
     model: [device.brand, device.model || device.cpu?.model].filter(Boolean).join(' ') || '-',
     serial: device.serialNumber || device.monitor?.serialNumber || '-',
     qty: 1,
-    unitPrice: Number(saved.devices?.[index]?.unitPrice ?? saved.unitPrice ?? 0),
+    unitPrice: Number(saved.devices?.[index]?.unitPrice ?? 0),
   }));
   const [quote, setQuote] = useState({
     quoteNo: saved.quoteNo || `AMC-QT-${String(currentCustomer.contractId || currentCustomer.id || '1001').split('-').pop()}`,
@@ -345,10 +411,18 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
     exclusions: saved.exclusions || 'Replacement of spare parts, Consumables, Physical damage or water logged devices, External cables and connectors',
   });
   const [quoteDevices, setQuoteDevices] = useState(devices);
+  const customerId = currentCustomer.contractId || currentCustomer.id;
+  const prevCustomerIdRef = React.useRef(customerId);
+  React.useEffect(() => {
+    if (prevCustomerIdRef.current !== customerId) {
+      prevCustomerIdRef.current = customerId;
+      setQuoteDevices(devices);
+    }
+  }, [customerId]);
   const [saving, setSaving] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState(currentCustomer.primaryEmail || currentCustomer.email || '');
+  const recipientEmail = getCustomerEmail(currentCustomer);
   const set = (field, val) => setQuote((prev) => ({ ...prev, [field]: val }));
   const updateDevice = (id, value) => setQuoteDevices((prev) => prev.map((row) => (row.id === id ? { ...row, unitPrice: value } : row)));
   const subtotal = () => quoteDevices.reduce((sum, row) => sum + Number(row.qty || 0) * Number(row.unitPrice || 0), 0);
@@ -357,7 +431,7 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
 
   const handleEmail = async () => {
     if (emailSending) return;
-    if (!recipientEmail) { setEmailStatus('Please enter a recipient email address in the "Send to Email" field below.'); return; }
+    if (!recipientEmail) { setEmailStatus('No email address is saved for this customer. Add it in the AMC enrollment first.'); return; }
     setEmailSending(true);
     setEmailStatus('');
     try {
@@ -391,7 +465,12 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
       const updated = await api.patch('amcContracts', customer.contractId || customer.id, {
         amcDetails: { ...(customer.amcDetails || {}), quotation: payload },
       });
-      onSaved?.(updated);
+      onSaved?.({
+        ...updated,
+        contractId: updated.contractId || customer.contractId || customer.id,
+        amcDetails: { ...(customer.amcDetails || {}), ...(updated?.amcDetails || {}), quotation: payload },
+        quotation: payload,
+      });
     } finally {
       setSaving(false);
     }
@@ -438,9 +517,10 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
-          <button className="secondary-button" onClick={handleEmail} disabled={emailSending}>
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !recipientEmail} title={!recipientEmail ? 'Add customer email in AMC enrollment to enable' : ''}>
             <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
           </button>
+          <button className="secondary-button" onClick={async () => { if (printRef.current) await downloadPdfFromElement(printRef.current, `AMC-Quotation-${quote.quoteNo}.pdf`, AGREEMENT_PDF_CSS); }}><Download size={18} /> Download</button>
           <button className="secondary-button" onClick={handlePrint}><Printer size={18} /> Print Quote</button>
           <button className="primary-button" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Quotation'}</button>
         </div>
@@ -469,13 +549,23 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
           <div className="table-card">
             <div className="card-header"><div className="card-title-area"><h2>Charges &amp; Terms</h2></div></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
-              <div className="form-group"><label>GST (%)</label><select className="form-select" value={quote.gstPercent} onChange={(e) => set('gstPercent', e.target.value)}><option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option></select></div>
+              <div className="form-group"><label>Apply GST</label><select className="form-select" value={Number(quote.gstPercent) === 0 ? '0' : '18'} onChange={(e) => set('gstPercent', Number(e.target.value))}><option value="18">Yes — 18%</option><option value="0">No — Not Apply</option></select></div>
               <div className="form-group"><label>Validity</label><input className="form-input" value={quote.validity} onChange={(e) => set('validity', e.target.value)} /></div>
               <div className="form-group"><label>SLA Response</label><input className="form-input" value={quote.slaResponse} onChange={(e) => set('slaResponse', e.target.value)} /></div>
               <div className="form-group"><label>SLA Resolution</label><input className="form-input" value={quote.slaResolution} onChange={(e) => set('slaResolution', e.target.value)} /></div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Scope of Work</label><textarea className="form-input" style={{ height: 80 }} value={quote.scope} onChange={(e) => set('scope', e.target.value)} /></div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Exclusions</label><textarea className="form-input" style={{ height: 64 }} value={quote.exclusions} onChange={(e) => set('exclusions', e.target.value)} /></div>
-              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Send to Email</label><input type="email" className="form-input" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="customer@company.com" /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                <label>Send to Email</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={recipientEmail}
+                  readOnly
+                  placeholder="No customer email saved"
+                  style={{ background: 'var(--slate-50)', color: recipientEmail ? 'var(--text-color)' : 'var(--text-muted)', cursor: 'default' }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -596,20 +686,22 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
   const exclusionItems = splitAgreementItems(agreement.exclusions);
   const paymentItems = splitAgreementItems(agreement.paymentTerms);
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState(currentCustomer.primaryEmail || currentCustomer.email || '');
+  const recipientEmail = getCustomerEmail(currentCustomer);
+  const agreementFilename = `AMC-Agreement-${agreement.agreementNo}.pdf`;
   const setAgreementField = (field, value) => setAgreement((prev) => ({ ...prev, [field]: value }));
 
   const handleEmail = async () => {
     if (emailSending) return;
-    if (!recipientEmail) { setEmailStatus('Please enter a recipient email address in the "Send to Email" field below.'); return; }
+    if (!recipientEmail) { setEmailStatus('No email address is saved for this customer. Add it in the AMC enrollment first.'); return; }
     setEmailSending(true);
     setEmailStatus('');
     try {
       let pdfBase64 = null;
       if (agreeRef.current) {
-        pdfBase64 = await generatePdfBase64(agreeRef.current, `AMC-Agreement-${agreement.agreementNo}.pdf`);
+        pdfBase64 = await generatePdfBase64(agreeRef.current, agreementFilename, AGREEMENT_PDF_CSS);
       }
       const res = await apiClient.post('/email/amc-agreement', {
         to: recipientEmail,
@@ -626,6 +718,18 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
       setEmailStatus(err?.response?.data?.message || 'Failed to send email. Please try again.');
     } finally {
       setEmailSending(false);
+    }
+  };
+
+  const downloadAgreement = async () => {
+    if (downloading || !agreeRef.current) return;
+    setDownloading(true);
+    try {
+      await downloadPdfFromElement(agreeRef.current, agreementFilename, AGREEMENT_PDF_CSS);
+    } catch (err) {
+      setEmailStatus(err?.response?.data?.message || 'Failed to download agreement. Please try again.');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -677,9 +781,13 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
-          <button className="secondary-button" onClick={handleEmail} disabled={emailSending}>
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !recipientEmail} title={!recipientEmail ? 'Add customer email in AMC enrollment to enable' : ''}>
             <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
           </button>
+          <button className="secondary-button" onClick={downloadAgreement} disabled={downloading}>
+            <Download size={18} /> {downloading ? 'Downloading...' : 'Download'}
+          </button>
+          <button className="secondary-button" onClick={handleDownload} disabled={downloading}><Download size={18} /> {downloading ? 'Downloading...' : 'Download'}</button>
           <button className="secondary-button" onClick={printAgreement}><Printer size={18} /> Print Agreement</button>
           <button className="primary-button" onClick={saveAgreement} disabled={saving}><CheckCircle size={18} /> {saving ? 'Saving...' : 'Save Agreement'}</button>
         </div>
@@ -706,7 +814,17 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Spare Parts Policy</label><textarea className="form-input" style={{ height: 70 }} value={agreement.sparePolicy} onChange={(e) => setAgreementField('sparePolicy', e.target.value)} /></div>
               <div className="form-group"><label>Jurisdiction</label><input className="form-input" value={agreement.jurisdiction} onChange={(e) => setAgreementField('jurisdiction', e.target.value)} /></div>
               <div className="form-group"><label>Special Terms</label><input className="form-input" value={agreement.specialTerms} onChange={(e) => setAgreementField('specialTerms', e.target.value)} /></div>
-              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Send to Email</label><input type="email" className="form-input" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="customer@company.com" /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                <label>Send to Email</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={recipientEmail}
+                  readOnly
+                  placeholder="No customer email saved"
+                  style={{ background: 'var(--slate-50)', color: recipientEmail ? 'var(--text-color)' : 'var(--text-muted)', cursor: 'default' }}
+                />
+              </div>
             </div>
           </div>
         </div>

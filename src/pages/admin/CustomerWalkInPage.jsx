@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BadgeCheck, FilePlus2, PhoneCall, ShieldCheck, Ticket, UserRound, X } from 'lucide-react';
+import { BadgeCheck, FilePlus2, IndianRupee, PhoneCall, ShieldCheck, Ticket, UserRound, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { campaignService, leadService } from '../../services/campaignServices';
@@ -299,7 +299,14 @@ const CustomerWalkInPage = () => {
                 <td>{item.ticketId}</td>
                 <td>{item.jobCardId}</td>
                 <td><span className="status-pill status-assigned">{item.status}</span></td>
-                <td><Link className="btn btn-sm btn-primary" to={`/admin/campaign/jobs/${item.jobCardId}`}>Open Job Detail</Link></td>
+                <td>
+                  <div className="admin-inline-actions">
+                    <Link className="btn btn-sm btn-primary" to={`/admin/campaign/jobs/${item.jobCardId}`}>Open Job Detail</Link>
+                    <Link className="btn btn-sm btn-secondary" to={`/admin/campaign/billing/${item.jobCardId}`} state={{ customer: item }}>
+                      <IndianRupee size={14} /> Billing
+                    </Link>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

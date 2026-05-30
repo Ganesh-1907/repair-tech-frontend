@@ -7,6 +7,7 @@ import {
   Eye,
   FileEdit,
   FileText,
+  IndianRupee,
   MoreVertical,
   Plus,
   Printer,
@@ -19,20 +20,73 @@ import {
 import { api, apiClient } from '../../services/apiClient';
 import rbLogo from '../../assets/Screenshot from 2026-05-29 11-40-17.png';
 
-const generatePdfBase64 = async (element, filename) => {
-  const html2pdf = (await import('html2pdf.js')).default;
-  const styleBlock = `<style>* { box-sizing: border-box; -webkit-print-color-adjust: exact; } body { margin: 0; padding: 0; background: #fff; font-family: "Times New Roman", Times, serif; color: #0f172a; }</style>`;
+const AGREEMENT_PDF_CSS = `
+  .agreement-document {
+    width: 100%;
+    max-width: none;
+    overflow: visible !important;
+    max-height: none !important;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+    background: #fff;
+    line-height: 1.6;
+  }
+  .agreement-section { margin-bottom: 18px; overflow: visible !important; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 700; }
+  p, li { font-size: 12px; line-height: 1.6; }
+`;
+
+const buildPdfStyleBlock = (printCss = '') => `<style>* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; } body { margin: 0; padding: 0; background: #fff; font-family: "Times New Roman", Times, serif; color: #0f172a; } ${printCss}</style>`;
+
+const getPdfOptions = (filename, fullHeight) => ({
+  margin: [10, 12, 10, 12],
+  filename,
+  pagebreak: { mode: ['css', 'legacy'] },
+  html2canvas: {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    windowWidth: 794,
+    windowHeight: fullHeight,
+    height: fullHeight,
+    width: 794,
+  },
+  jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+});
+
+const measurePdfHeight = (element, styleBlock) => {
   const probe = document.createElement('div');
   probe.style.cssText = 'position:absolute;top:0;left:-9999px;width:794px;background:#fff;';
   probe.innerHTML = styleBlock + element.outerHTML;
   document.body.appendChild(probe);
   const fullHeight = probe.scrollHeight;
   document.body.removeChild(probe);
+  return fullHeight;
+};
+
+const generatePdfBase64 = async (element, filename, printCss = '') => {
+  const html2pdf = (await import('html2pdf.js')).default;
+  const styleBlock = buildPdfStyleBlock(printCss);
+  const fullHeight = measurePdfHeight(element, styleBlock);
   const dataUri = await html2pdf()
-    .set({ margin: [10, 12, 10, 12], filename, html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 794, windowHeight: fullHeight, height: fullHeight, width: 794 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } })
+    .set(getPdfOptions(filename, fullHeight))
     .from(styleBlock + element.outerHTML, 'string')
     .outputPdf('datauristring');
   return dataUri.split(',')[1];
+};
+
+const downloadPdfFromElement = async (element, filename, printCss = '') => {
+  const html2pdf = (await import('html2pdf.js')).default;
+  const styleBlock = buildPdfStyleBlock(printCss);
+  const fullHeight = measurePdfHeight(element, styleBlock);
+  await html2pdf()
+    .set(getPdfOptions(filename, fullHeight))
+    .from(styleBlock + element.outerHTML, 'string')
+    .save();
 };
 import SendCredentialsModal from '../../components/common/SendCredentialsModal';
 import './PlansCustomers.css';
@@ -152,6 +206,13 @@ const createBlankDocDevice = () => ({
   securityDeposit: '',
 });
 
+const getCustomerEmail = (customer = {}) => (
+  customer.primaryEmail
+  || customer.cmcDetails?.primaryContact?.email
+  || customer.email
+  || ''
+);
+
 const CMCInventoryPage = () => {
   const navigate = useNavigate();
   const [customers, setCustomers] = useState([]);
@@ -186,6 +247,8 @@ const CMCInventoryPage = () => {
         status: item.status || 'Active',
         authorizedPerson1: item.cmcDetails?.authorizedPerson1 || item.authorizedPerson1,
         authorizedPerson2: item.cmcDetails?.authorizedPerson2 || item.authorizedPerson2,
+        primaryEmail: item.cmcDetails?.primaryContact?.email || item.cmcDetails?.email || item.email,
+        secondaryEmail: item.cmcDetails?.secondaryContact?.email || item.secondaryContact?.email,
         gstin: item.cmcDetails?.gstin || item.gstin,
         address: item.cmcDetails?.address || item.address,
         contact: item.cmcDetails?.contact || item.contact,
@@ -406,6 +469,7 @@ const CMCInventoryPage = () => {
                 <button className="menu-item" onClick={() => navigate(`/admin/cmc/new?id=${c.id}`)}><Edit size={14} /> Edit CMC</button>
                 <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><FileEdit size={14} /> CMC Quotation</button>
                 <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><FileText size={14} /> CMC Agreement</button>
+                <button className="menu-item" onClick={() => { navigate(`/admin/cmc/billing/${c.id}`, { state: { customer: c } }); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><IndianRupee size={14} /> Billing</button>
                 <button className="menu-item" onClick={() => { navigate(`/admin/cmc/repair/${c.contractId || c.id}`); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><Wrench size={14} /> Manage Repair</button>
                 <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><Eye size={14} /> Send Portal Access</button>
                 <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>
@@ -496,12 +560,14 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
   const printRef = useRef(null);
   const currentCustomer = customer || {};
   const saved = currentCustomer.quotation || currentCustomer.cmcDetails?.quotation || {};
+  const savedGstEnabled = saved.gstEnabled ?? (Number(saved.gstPercent ?? 18) > 0);
   const sourceDevices = Array.isArray(currentCustomer.devices) && currentCustomer.devices.length ? currentCustomer.devices : [{}];
   const [quote, setQuote] = useState({
     quoteNo: saved.quoteNo || `CMC-QT-${String(currentCustomer.contractId || '1001').split('-').pop()}`,
     date: saved.date || new Date().toISOString().split('T')[0],
     validity: saved.validity || '30 Days',
-    gstPercent: saved.gstPercent ?? 18,
+    gstEnabled: savedGstEnabled,
+    gstPercent: savedGstEnabled ? 18 : 0,
     minimumPeriod: saved.minimumPeriod || '12 Months',
     paymentTerms: saved.paymentTerms || 'Net 7 Days',
     slaResponse: saved.slaResponse || '24 Hours',
@@ -519,16 +585,17 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
   const [saving, setSaving] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState(currentCustomer.primaryEmail || currentCustomer.email || '');
+  const recipientEmail = getCustomerEmail(currentCustomer);
   const set = (field, val) => setQuote((prev) => ({ ...prev, [field]: val }));
+  const setGstEnabled = (enabled) => setQuote((prev) => ({ ...prev, gstEnabled: enabled, gstPercent: enabled ? 18 : 0 }));
   const updateDevice = (id, value) => setDevices((prev) => prev.map((row) => (row.id === id ? { ...row, monthlyRent: value } : row)));
   const subtotal = () => devices.reduce((sum, row) => sum + Number(row.qty || 0) * Number(row.monthlyRent || 0), 0);
-  const gstAmount = () => Math.round(subtotal() * (Number(quote.gstPercent || 0) / 100));
+  const gstAmount = () => (quote.gstEnabled ? Math.round(subtotal() * 0.18) : 0);
   const grandTotal = () => subtotal() + gstAmount();
 
   const handleEmail = async () => {
     if (emailSending) return;
-    if (!recipientEmail) { setEmailStatus('Please enter a recipient email address in the "Send to Email" field below.'); return; }
+    if (!recipientEmail) { setEmailStatus('No email address is saved for this customer. Add it in the CMC enrollment first.'); return; }
     setEmailSending(true);
     setEmailStatus('');
     try {
@@ -565,6 +632,11 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDownload = async () => {
+    if (!printRef.current) return;
+    await downloadPdfFromElement(printRef.current, `CMC-Quotation-${quote.quoteNo}.pdf`, AGREEMENT_PDF_CSS);
   };
 
   const handlePrint = () => {
@@ -608,9 +680,10 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
-          <button className="secondary-button" onClick={handleEmail} disabled={emailSending}>
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !recipientEmail} title={!recipientEmail ? 'Add customer email in CMC enrollment to enable' : ''}>
             <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
           </button>
+          <button className="secondary-button" onClick={handleDownload}><Download size={18} /> Download</button>
           <button className="secondary-button" onClick={handlePrint}><Printer size={18} /> Print Quote</button>
           <button className="primary-button" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Quotation'}</button>
         </div>
@@ -637,10 +710,12 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
                     <td colSpan={3} style={{ padding: '12px 14px', textAlign: 'right', color: '#64748b', fontSize: 13 }}>Subtotal</td>
                     <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 700 }}>₹{subtotal().toLocaleString('en-IN')}</td>
                   </tr>
-                  <tr>
-                    <td colSpan={3} style={{ padding: '8px 14px', textAlign: 'right', color: '#64748b', fontSize: 13 }}>GST ({quote.gstPercent}%)</td>
-                    <td style={{ padding: '8px 14px', textAlign: 'right', color: '#64748b' }}>₹{gstAmount().toLocaleString('en-IN')}</td>
-                  </tr>
+                  {quote.gstEnabled && (
+                    <tr>
+                      <td colSpan={3} style={{ padding: '8px 14px', textAlign: 'right', color: '#64748b', fontSize: 13 }}>GST (18%)</td>
+                      <td style={{ padding: '8px 14px', textAlign: 'right', color: '#64748b' }}>₹{gstAmount().toLocaleString('en-IN')}</td>
+                    </tr>
+                  )}
                   <tr style={{ background: '#f0fdf4' }}>
                     <td colSpan={3} style={{ padding: '14px', textAlign: 'right', fontWeight: 800, color: '#15803d' }}>Grand Total</td>
                     <td style={{ padding: '14px', textAlign: 'right', fontWeight: 800, color: '#15803d', fontSize: 16 }}>₹{grandTotal().toLocaleString('en-IN')}</td>
@@ -652,14 +727,24 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
           <div className="table-card">
             <div className="card-header"><div className="card-title-area"><h2>Charges &amp; Terms</h2></div></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, padding: '20px 20px 28px' }}>
-              <div className="form-group"><label>GST (%)</label><select className="form-select" value={quote.gstPercent} onChange={(e) => set('gstPercent', e.target.value)}><option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option></select></div>
+              <div className="form-group"><label>GST</label><select className="form-select" value={quote.gstEnabled ? 'yes' : 'no'} onChange={(e) => setGstEnabled(e.target.value === 'yes')}><option value="yes">Yes (18%)</option><option value="no">No</option></select></div>
               <div className="form-group"><label>Validity</label><input className="form-input" value={quote.validity} onChange={(e) => set('validity', e.target.value)} /></div>
               <div className="form-group"><label>Minimum Period</label><input className="form-input" value={quote.minimumPeriod} onChange={(e) => set('minimumPeriod', e.target.value)} /></div>
               <div className="form-group"><label>Payment Terms</label><input className="form-input" value={quote.paymentTerms} onChange={(e) => set('paymentTerms', e.target.value)} /></div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>SLA Response</label><input className="form-input" value={quote.slaResponse} onChange={(e) => set('slaResponse', e.target.value)} /></div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Scope of Work</label><textarea className="form-input" style={{ height: 80 }} value={quote.scope} onChange={(e) => set('scope', e.target.value)} /></div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Exclusions</label><textarea className="form-input" style={{ height: 64 }} value={quote.exclusions} onChange={(e) => set('exclusions', e.target.value)} /></div>
-              <div className="form-group" style={{ gridColumn: '1/-1' }}><label>Send to Email</label><input type="email" className="form-input" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="customer@company.com" /></div>
+              <div className="form-group" style={{ gridColumn: '1/-1' }}>
+                <label>Send to Email</label>
+                <input
+                  type="email"
+                  className="form-input"
+                  value={recipientEmail}
+                  readOnly
+                  placeholder="No customer email saved"
+                  style={{ background: 'var(--slate-50)', color: recipientEmail ? 'var(--text-color)' : 'var(--text-muted)', cursor: 'default' }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -680,15 +765,14 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
               </div>
               <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 110, height: 110, objectFit: 'contain', flexShrink: 0 }} />
             </div>
-            <div style={{ marginBottom: 6 }}>
+            <div style={{ marginBottom: 6, textAlign: 'center' }}>
               <h1 style={{ fontSize: 24, fontWeight: 900, margin: '0 0 4px', letterSpacing: '-0.5px' }}>CMC QUOTATION</h1>
-              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo}</p>
-              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Date: {quote.date} | Valid: {quote.validity}</p>
+              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo} &nbsp;|&nbsp; Date: {quote.date} &nbsp;|&nbsp; Valid: {quote.validity}</p>
             </div>
 
             {/* ── CUSTOMER DETAILS ── */}
             <div style={{ marginBottom: 24 }}>
-              <h2 style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px', paddingBottom: 8, borderBottom: '1px solid #e2e8f0' }}>Customer Details</h2>
+              <h2 style={{ textAlign: 'left', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px', paddingBottom: 8, borderBottom: '1px solid #e2e8f0' }}>Customer Details</h2>
               {[
                 ['Customer Name', customer.name],
                 ['Contact Person', customer.authorizedPerson1],
@@ -709,7 +793,7 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
 
             {/* ── DEVICE & PRICING DETAILS ── */}
             <div style={{ marginBottom: 24 }}>
-              <h2 style={{ textAlign: 'center', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px', paddingBottom: 8, borderBottom: '1px solid #e2e8f0' }}>Device &amp; Pricing Details</h2>
+              <h2 style={{ textAlign: 'left', fontSize: 13, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px', paddingBottom: 8, borderBottom: '1px solid #e2e8f0' }}>Device &amp; Pricing Details</h2>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc' }}>
@@ -732,10 +816,12 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
                     <td colSpan={4} style={{ padding: '10px 8px', border: '1px solid #e2e8f0', textAlign: 'right', color: '#64748b' }}>Subtotal</td>
                     <td style={{ padding: '10px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 700 }}>₹{subtotal().toLocaleString('en-IN')}</td>
                   </tr>
-                  <tr>
-                    <td colSpan={4} style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'right', color: '#64748b' }}>GST ({quote.gstPercent}%)</td>
-                    <td style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'right', color: '#64748b' }}>₹{gstAmount().toLocaleString('en-IN')}</td>
-                  </tr>
+                  {quote.gstEnabled && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'right', color: '#64748b' }}>GST (18%)</td>
+                      <td style={{ padding: '8px', border: '1px solid #e2e8f0', textAlign: 'right', color: '#64748b' }}>₹{gstAmount().toLocaleString('en-IN')}</td>
+                    </tr>
+                  )}
                   <tr style={{ background: '#f0fdf4' }}>
                     <td colSpan={4} style={{ padding: '12px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 800, color: '#15803d' }}>Grand Total</td>
                     <td style={{ padding: '12px 8px', border: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 800, color: '#15803d', fontSize: 14 }}>₹{grandTotal().toLocaleString('en-IN')}</td>
@@ -787,9 +873,10 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
   const agreeRef = useRef(null);
   const [form, setForm] = useState(initialData || createDefaultAgreement(customer));
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [emailSending, setEmailSending] = useState(false);
   const [emailStatus, setEmailStatus] = useState('');
-  const [recipientEmail, setRecipientEmail] = useState(customer?.primaryEmail || customer?.email || '');
+  const recipientEmail = getCustomerEmail(customer || {});
 
   useEffect(() => {
     setForm(initialData || createDefaultAgreement(customer));
@@ -798,6 +885,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
   if (!customer) return null;
 
   const set = (field, val) => setForm((f) => ({ ...f, [field]: val }));
+  const agreementFilename = `CMC-Agreement-${form.agreementNumber || form.agreementNo || customer.contractId || customer.id || 'document'}.pdf`;
 
   const handleSave = () => {
     setSaving(true);
@@ -806,13 +894,13 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
 
   const handleEmail = async () => {
     if (emailSending) return;
-    if (!recipientEmail) { setEmailStatus('Please enter a recipient email address in the "Send to Email" field below.'); return; }
+    if (!recipientEmail) { setEmailStatus('No email address is saved for this customer. Add it in the CMC enrollment first.'); return; }
     setEmailSending(true);
     setEmailStatus('');
     try {
       let pdfBase64 = null;
       if (agreeRef.current) {
-        pdfBase64 = await generatePdfBase64(agreeRef.current, `CMC-Agreement-${form.agreementNumber || form.agreementNo}.pdf`);
+        pdfBase64 = await generatePdfBase64(agreeRef.current, agreementFilename, AGREEMENT_PDF_CSS);
       }
       const res = await apiClient.post('/email/cmc-agreement', {
         to: recipientEmail,
@@ -828,6 +916,18 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
       setEmailStatus(err?.response?.data?.message || 'Failed to send email. Please try again.');
     } finally {
       setEmailSending(false);
+    }
+  };
+
+  const handleDownloadAgreement = async () => {
+    if (downloading || !agreeRef.current) return;
+    setDownloading(true);
+    try {
+      await downloadPdfFromElement(agreeRef.current, agreementFilename, AGREEMENT_PDF_CSS);
+    } catch (err) {
+      setEmailStatus(err?.response?.data?.message || 'Failed to download agreement. Please try again.');
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -849,8 +949,11 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
           <p>For: <strong>{customer.name}</strong></p>
         </div>
         <div className="plans-header-actions">
-          <button className="secondary-button" onClick={handleEmail} disabled={emailSending}>
+          <button className="secondary-button" onClick={handleEmail} disabled={emailSending || !recipientEmail} title={!recipientEmail ? 'Add customer email in CMC enrollment to enable' : ''}>
             <Mail size={18} /> {emailSending ? 'Sending...' : 'Send to Email'}
+          </button>
+          <button className="secondary-button" onClick={handleDownloadAgreement} disabled={downloading}>
+            <Download size={18} /> {downloading ? 'Downloading...' : 'Download'}
           </button>
           <button className="secondary-button" onClick={handlePrintAgreement}><Printer size={18} /> Print Agreement</button>
           <button className="primary-button" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save Agreement'}</button>
@@ -922,7 +1025,14 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
               </div>
               <div className="form-group">
                 <label>Send to Email</label>
-                <input type="email" className="form-input" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} placeholder="customer@company.com" />
+                <input
+                  type="email"
+                  className="form-input"
+                  value={recipientEmail}
+                  readOnly
+                  placeholder="No customer email saved"
+                  style={{ background: 'var(--slate-50)', color: recipientEmail ? 'var(--text-color)' : 'var(--text-muted)', cursor: 'default' }}
+                />
               </div>
             </div>
           </div>
@@ -952,7 +1062,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
             </div>
 
             <div className="agreement-section">
-              <h2>Parties</h2>
+              <h2 style={{ textAlign: 'left' }}>Customer Details</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {[
                   ['Client', form.companyName],
@@ -974,7 +1084,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
             </div>
 
             <div className="agreement-section">
-              <h2>Financial Terms</h2>
+              <h2 style={{ textAlign: 'left' }}>Financial Terms</h2>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {[
                   ['Monthly Rental', `₹${form.monthlyRental || 0}`],
@@ -995,7 +1105,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
             </div>
 
             <div className="agreement-section">
-              <h2>Asset Registry</h2>
+              <h2 style={{ textAlign: 'left' }}>Asset Registry</h2>
               {(() => {
                 const devs = form.devices && form.devices.length > 0 ? form.devices : [createBlankDocDevice()];
                 const sub = devs.reduce((s, d) => s + Number(d.quantity || 1) * Number(d.monthlyRent || 0), 0);
@@ -1043,7 +1153,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
             </div>
 
             <div className="agreement-section">
-              <h2>Service Coverage & Policies</h2>
+              <h2 style={{ textAlign: 'left' }}>Service Coverage & Policies</h2>
               {[
                 ['Maintenance Coverage', form.maintenanceCoverage],
                 ['Replacement Policy', form.replacementPolicy],
@@ -1054,7 +1164,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
                 const items = v.split(/,|\n/).map((s) => s.trim()).filter(Boolean);
                 return (
                   <div key={k} style={{ marginBottom: 12 }}>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: '#475569', margin: '0 0 4px', textTransform: 'uppercase' }}>{k}</p>
+                    <p style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', margin: '0 0 4px', textTransform: 'uppercase' }}>{k}</p>
                     <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                       {items.map((item, i) => (
                         <li key={i} style={{ fontSize: 12, lineHeight: 1.7, display: 'flex', gap: 6 }}>
