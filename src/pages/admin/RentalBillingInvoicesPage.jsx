@@ -23,6 +23,7 @@ import {
   Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { api } from '../../services/apiClient';
 import './RentalBillingInvoices.css';
 
 const RentalBillingInvoicesPage = () => {
@@ -43,6 +44,15 @@ const RentalBillingInvoicesPage = () => {
   // Modal State
   const [activeModal, setActiveModal] = useState(null); // { type: 'Generate'|'Payment'|'Detail', data?: any }
   const [toasts, setToasts] = useState([]);
+
+  // Rental customers (for printer billing)
+  const [rentalCustomers, setRentalCustomers] = useState([]);
+  const [generateForm, setGenerateForm] = useState({ customerId: '', month: new Date().toISOString().slice(0, 7), printerEntries: {} });
+  // printerEntries: { [deviceIdx]: { currentPageCount: '' } }
+
+  useEffect(() => {
+    api.list('rentalCustomers').then((data) => setRentalCustomers(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
 
   // --- Helpers ---
   const addToast = (message, type = 'success') => {
@@ -95,30 +105,70 @@ const RentalBillingInvoicesPage = () => {
     addToast('Filters reset', 'info');
   };
 
-  const handleSaveInvoice = (e) => {
+  const handleSaveInvoice = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     const data = Object.fromEntries(formData.entries());
-    const total = parseFloat(data.total);
+    const printerCharges = parseFloat(data.printerTotal || 0);
+    const total = parseFloat(data.total) + printerCharges;
     const paid = parseFloat(data.paid || 0);
-    
+
+    const selCustomer = rentalCustomers.find((c) => c.id === generateForm.customerId);
+    const customerName = selCustomer ? (selCustomer.companyName || selCustomer.customerName) : data.customer;
+    const printerDevices = selCustomer
+      ? (selCustomer.devices || []).filter((d) => d.type === 'Printer' && d.pageWiseBilling)
+      : [];
+
     const newInvoice = {
       id: activeModal.mode === 'Edit' ? activeModal.data.id : (data.id || `INV-${Math.floor(100000 + Math.random() * 900000)}`),
-      customer: data.customer,
-      month: data.month,
+      customer: customerName,
+      customerId: generateForm.customerId,
+      month: generateForm.month,
       total,
       paid,
       status: data.status,
-      notes: data.notes
+      notes: data.notes,
+      printerBillingEntries: printerDevices.map((d, di) => {
+        const entry = generateForm.printerEntries[di] || {};
+        const last = Number(d.lastBilledPageCount) || Number(d.startPageCount) || 0;
+        const current = Number(entry.currentPageCount) || 0;
+        return {
+          assetTag: d.assetTag || d.assetId,
+          pageRate: d.pageRate,
+          startCount: last,
+          endCount: current,
+          pagesUsed: Math.max(0, current - last),
+          amount: Math.max(0, current - last) * (Number(d.pageRate) || 0),
+        };
+      }),
     };
 
     if (activeModal.mode === 'Edit') {
-      setInvoices(prev => prev.map(i => i.id === newInvoice.id ? newInvoice : i));
+      setInvoices((prev) => prev.map((i) => i.id === newInvoice.id ? newInvoice : i));
       addToast('Invoice updated successfully');
     } else {
-      setInvoices(prev => [newInvoice, ...prev]);
+      setInvoices((prev) => [newInvoice, ...prev]);
       addToast('Invoice generated successfully');
     }
+
+    // Update lastBilledPageCount on each printer device of the customer
+    if (selCustomer && printerDevices.length > 0) {
+      try {
+        const updatedDevices = (selCustomer.devices || []).map((d, di) => {
+          if (d.type === 'Printer' && d.pageWiseBilling) {
+            const printerIdx = printerDevices.findIndex((pd) => pd === d);
+            const entry = generateForm.printerEntries[printerIdx] || {};
+            const current = Number(entry.currentPageCount);
+            if (current > 0) return { ...d, lastBilledPageCount: current };
+          }
+          return d;
+        });
+        await api.patch('rentalCustomers', selCustomer.id, { devices: updatedDevices });
+        setRentalCustomers((prev) => prev.map((c) => c.id === selCustomer.id ? { ...c, devices: updatedDevices } : c));
+      } catch (_) {}
+    }
+
+    setGenerateForm({ customerId: '', month: new Date().toISOString().slice(0, 7), printerEntries: {} });
     setActiveModal(null);
   };
 
@@ -325,53 +375,145 @@ const RentalBillingInvoicesPage = () => {
               className="modal-card" 
               onClick={e => e.stopPropagation()}
             >
-              {activeModal.type === 'Generate' && (
-                <>
-                  <h2>{activeModal.mode} Invoice</h2>
-                  <p>Generate a new rental invoice for asset usage and service billing.</p>
-                  <form onSubmit={handleSaveInvoice}>
-                    <div className="form-grid">
-                      <div className="form-field">
-                        <label>Invoice ID</label>
-                        <input name="id" defaultValue={activeModal.data?.id || ''} placeholder="e.g. INV-260401" />
+              {activeModal.type === 'Generate' && (() => {
+                const selCustomer = rentalCustomers.find((c) => c.id === generateForm.customerId) || null;
+                const printerDevices = selCustomer
+                  ? (selCustomer.devices || []).filter((d) => d.type === 'Printer' && d.pageWiseBilling)
+                  : [];
+
+                const printerTotal = printerDevices.reduce((sum, d, di) => {
+                  const entry = generateForm.printerEntries[di] || {};
+                  return sum + (Number(entry.manualPrice) || 0);
+                }, 0);
+
+                return (
+                  <>
+                    <h2>{activeModal.mode} Invoice</h2>
+                    <p>Generate a new rental invoice for asset usage and service billing.</p>
+                    <form onSubmit={handleSaveInvoice}>
+                      <div className="form-grid">
+                        <div className="form-field">
+                          <label>Invoice ID</label>
+                          <input name="id" defaultValue={activeModal.data?.id || ''} placeholder="e.g. INV-260401" />
+                        </div>
+                        <div className="form-field">
+                          <label>Customer</label>
+                          {rentalCustomers.length > 0 ? (
+                            <select name="customer" required value={generateForm.customerId}
+                              onChange={(e) => {
+                                const cid = e.target.value;
+                                const cust = rentalCustomers.find((c) => c.id === cid);
+                                setGenerateForm((f) => ({ ...f, customerId: cid, printerEntries: {} }));
+                              }}>
+                              <option value="">— Select Customer —</option>
+                              {rentalCustomers.map((c) => (
+                                <option key={c.id} value={c.id}>{c.companyName || c.customerName}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input name="customer" required defaultValue={activeModal.data?.customer || ''} />
+                          )}
+                        </div>
+                        <div className="form-field">
+                          <label>Billing Month</label>
+                          <input name="month" required value={generateForm.month}
+                            onChange={(e) => setGenerateForm((f) => ({ ...f, month: e.target.value }))}
+                            placeholder="YYYY-MM" />
+                        </div>
+                        <div className="form-field">
+                          <label>Total Amount (₹)</label>
+                          <input type="number" step="0.1" name="total" required defaultValue={activeModal.data?.total || ''} />
+                        </div>
+                        <div className="form-field">
+                          <label>Paid Amount (₹)</label>
+                          <input type="number" step="0.1" name="paid" defaultValue={activeModal.data?.paid || 0} />
+                        </div>
+                        <div className="form-field">
+                          <label>Payment Status</label>
+                          <select name="status" defaultValue={activeModal.data?.status || 'Unpaid'}>
+                            <option>Paid</option>
+                            <option>Partially Paid</option>
+                            <option>Unpaid</option>
+                            <option>Overdue</option>
+                          </select>
+                        </div>
+                        <div className="form-field full">
+                          <label>Notes</label>
+                          <textarea name="notes" defaultValue={activeModal.data?.notes || ''}></textarea>
+                        </div>
                       </div>
-                      <div className="form-field">
-                        <label>Customer</label>
-                        <input name="customer" required defaultValue={activeModal.data?.customer || ''} />
+
+                      {/* Printer page-wise billing section */}
+                      {printerDevices.length > 0 && (
+                        <div style={{ marginTop: 20, borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+                          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+                            Printer Page-wise Billing
+                          </div>
+                          {printerDevices.map((d, di) => {
+                            const entry = generateForm.printerEntries[di] || {};
+                            const last = Number(d.lastBilledPageCount) || Number(d.startPageCount) || 0;
+                            const current = Number(entry.currentPageCount) || 0;
+                            const replacementPages = (d.replacementHistory || [])
+                              .filter((r) => r.replacedAt >= generateForm.month + '-01')
+                              .reduce((s, r) => s + Math.max(0, Number(r.oldEndPageCount) - Number(r.oldStartPageCount)), 0);
+                            const totalPages = Math.max(0, current - last) + replacementPages;
+
+                            return (
+                              <div key={di} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 16px', marginBottom: 12 }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.88rem', color: '#0f172a', marginBottom: 10 }}>
+                                  {d.assetTag || d.assetId || 'Printer'} — {d.brand} {d.model}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px 16px', marginBottom: 10 }}>
+                                  <div>
+                                    <div style={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Last Billed Count</div>
+                                    <div style={{ fontWeight: 700, color: '#374151' }}>{last.toLocaleString('en-IN')}</div>
+                                  </div>
+                                  <div className="form-group" style={{ margin: 0 }}>
+                                    <label style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase' }}>Current Page Count (hardware)</label>
+                                    <input className="form-input" type="number" min={last} value={entry.currentPageCount || ''}
+                                      onChange={(e) => setGenerateForm((f) => ({
+                                        ...f,
+                                        printerEntries: { ...f.printerEntries, [di]: { ...entry, currentPageCount: e.target.value } },
+                                      }))}
+                                      placeholder={`Enter reading (> ${last})`} />
+                                  </div>
+                                  <div>
+                                    <div style={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Pages Used</div>
+                                    <div style={{ fontWeight: 700, color: '#374151' }}>{totalPages > 0 ? totalPages.toLocaleString('en-IN') : '-'}</div>
+                                  </div>
+                                </div>
+                                {replacementPages > 0 && (
+                                  <div style={{ fontSize: '0.8rem', color: '#92400e', background: '#fef3c7', padding: '6px 10px', borderRadius: 6, marginBottom: 10 }}>
+                                    Includes {replacementPages.toLocaleString('en-IN')} pages from replaced printer this period
+                                  </div>
+                                )}
+                                <div className="form-group" style={{ margin: 0, maxWidth: 240 }}>
+                                  <label style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase' }}>Printer Charge (₹)</label>
+                                  <input className="form-input" type="number" min="0" step="0.01" value={entry.manualPrice || ''}
+                                    onChange={(e) => setGenerateForm((f) => ({
+                                      ...f,
+                                      printerEntries: { ...f.printerEntries, [di]: { ...entry, manualPrice: e.target.value } },
+                                    }))}
+                                    placeholder="Enter billing amount" />
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '0.95rem', color: '#0f172a' }}>
+                            Total Printer Charges: ₹{printerTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                          </div>
+                          <input type="hidden" name="printerTotal" value={printerTotal} />
+                        </div>
+                      )}
+
+                      <div className="modal-actions">
+                        <button type="button" className="secondary-button" onClick={() => setActiveModal(null)}>Cancel</button>
+                        <button type="submit" className="primary-button">{activeModal.mode} Invoice</button>
                       </div>
-                      <div className="form-field">
-                        <label>Billing Month</label>
-                        <input name="month" required defaultValue={activeModal.data?.month || '2026-04'} placeholder="YYYY-MM" />
-                      </div>
-                      <div className="form-field">
-                        <label>Total Amount (₹)</label>
-                        <input type="number" step="0.1" name="total" required defaultValue={activeModal.data?.total || ''} />
-                      </div>
-                      <div className="form-field">
-                        <label>Paid Amount (₹)</label>
-                        <input type="number" step="0.1" name="paid" defaultValue={activeModal.data?.paid || 0} />
-                      </div>
-                      <div className="form-field">
-                        <label>Payment Status</label>
-                        <select name="status" defaultValue={activeModal.data?.status || 'Unpaid'}>
-                          <option>Paid</option>
-                          <option>Partially Paid</option>
-                          <option>Unpaid</option>
-                          <option>Overdue</option>
-                        </select>
-                      </div>
-                      <div className="form-field full">
-                        <label>Notes</label>
-                        <textarea name="notes" defaultValue={activeModal.data?.notes || ''}></textarea>
-                      </div>
-                    </div>
-                    <div className="modal-actions">
-                      <button type="button" className="secondary-button" onClick={() => setActiveModal(null)}>Cancel</button>
-                      <button type="submit" className="primary-button">{activeModal.mode} Invoice</button>
-                    </div>
-                  </form>
-                </>
-              )}
+                    </form>
+                  </>
+                );
+              })()}
 
               {activeModal.type === 'Payment' && (
                 <>

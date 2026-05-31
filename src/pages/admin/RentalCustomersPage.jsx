@@ -359,25 +359,37 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
 
   const buildDevices = () => {
     const savedDevices = customer.raw?.quotation?.devices;
+    const rawDevices = Array.isArray(customer.raw?.devices) ? customer.raw.devices : [];
     if (Array.isArray(savedDevices) && savedDevices.length) {
-      return savedDevices.map((d) => ({
-        id: Date.now() + Math.random(),
-        device: d.device || 'Printer',
-        model: d.model || '',
-        qty: d.qty || 1,
-        monthlyRent: Number(d.monthlyRent || 0),
-        deposit: 0,
-      }));
+      return savedDevices.map((d, i) => {
+        // Always take pageWiseBilling from live customer device data — it's the source of truth
+        const live = rawDevices.find((r) =>
+          (r.type || r.deviceType || '').toLowerCase() === (d.device || '').toLowerCase()
+        ) || rawDevices[i] || {};
+        return {
+          id: Date.now() + Math.random(),
+          device: d.device || 'Printer',
+          model: d.model || '',
+          qty: d.qty || 1,
+          monthlyRent: Number(d.monthlyRent || 0),
+          deposit: 0,
+          pageWiseBilling: live.pageWiseBilling || d.pageWiseBilling || false,
+          minPages: d.minPages || live.minPages || '',
+          pricePerPage: d.pricePerPage || live.pricePerPage || '',
+        };
+      });
     }
-    const raw = customer.raw?.devices;
-    if (Array.isArray(raw) && raw.length) {
-      return raw.map((d) => ({
+    if (rawDevices.length) {
+      return rawDevices.map((d) => ({
         id: Date.now() + Math.random(),
-        device: d.device || d.deviceType || 'Printer',
+        device: d.device || d.deviceType || d.type || 'Printer',
         model: d.model || d.brand || '',
         qty: 1,
         monthlyRent: Number(d.monthlyRent || 0),
         deposit: 0,
+        pageWiseBilling: d.pageWiseBilling || false,
+        minPages: d.minPages || '',
+        pricePerPage: d.pricePerPage || '',
       }));
     }
     return [newQuoteDevice()];
@@ -551,6 +563,10 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Device Type</th>
                       <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Model / Specs</th>
                       <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0', width: 60 }}>Qty</th>
+                      {devices.some((d) => d.pageWiseBilling) && <>
+                        <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4f46e5', borderBottom: '1px solid #e2e8f0' }}>Min. Pages</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#4f46e5', borderBottom: '1px solid #e2e8f0' }}>Price/Page (₹)</th>
+                      </>}
                       <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Monthly Rent (₹)</th>
                     </tr>
                   </thead>
@@ -560,6 +576,22 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
                         <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 13, color: '#374151', fontWeight: 500 }}>{d.device || '—'}</td>
                         <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', fontSize: 13, color: '#374151' }}>{d.model || '—'}</td>
                         <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'center', fontSize: 13, color: '#374151' }}>{d.qty}</td>
+                        {devices.some((x) => x.pageWiseBilling) && <>
+                          <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
+                            {d.pageWiseBilling ? <input type="number" className="form-input" style={{ height: 38, width: 100, fontSize: 13, textAlign: 'right' }} min={0} value={d.minPages} onChange={(e) => {
+                              const pages = e.target.value;
+                              const rent = (Number(pages) || 0) * (Number(d.pricePerPage) || 0);
+                              setDevices((prev) => prev.map((x) => x.id === d.id ? { ...x, minPages: pages, monthlyRent: rent } : x));
+                            }} placeholder="e.g. 3000" /> : <span style={{ color: '#cbd5e1' }}>—</span>}
+                          </td>
+                          <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
+                            {d.pageWiseBilling ? <input type="number" className="form-input" style={{ height: 38, width: 100, fontSize: 13, textAlign: 'right' }} min={0} step="0.01" value={d.pricePerPage} onChange={(e) => {
+                              const price = e.target.value;
+                              const rent = (Number(d.minPages) || 0) * (Number(price) || 0);
+                              setDevices((prev) => prev.map((x) => x.id === d.id ? { ...x, pricePerPage: price, monthlyRent: rent } : x));
+                            }} placeholder="e.g. 4.00" /> : <span style={{ color: '#cbd5e1' }}>—</span>}
+                          </td>
+                        </>}
                         <td style={{ padding: '10px 16px', borderBottom: '1px solid #f1f5f9', textAlign: 'right' }}>
                           <input type="number" className="form-input" style={{ height: 38, width: 110, fontSize: 13, textAlign: 'right' }} min={0} value={d.monthlyRent} onChange={(e) => updateDevice(d.id, 'monthlyRent', e.target.value)} />
                         </td>
@@ -584,9 +616,10 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
               <div className="form-group"><label>Installation Charges (₹)</label><input type="number" className="form-input" min={0} value={quote.installationCharges} onChange={(e) => set('installationCharges', e.target.value)} /></div>
               <div className="form-group"><label>Delivery Charges (₹)</label><input type="number" className="form-input" min={0} value={quote.deliveryCharges} onChange={(e) => set('deliveryCharges', e.target.value)} /></div>
               <div className="form-group"><label>Security Deposit (₹)</label><input type="number" className="form-input" min={0} value={quote.securityDeposit} onChange={(e) => set('securityDeposit', e.target.value)} /></div>
-              <div className="form-group"><label>GST (%)</label>
+              <div className="form-group"><label>GST</label>
                 <select className="form-select" value={quote.gstPercent} onChange={(e) => set('gstPercent', e.target.value)}>
-                  <option value={0}>0%</option><option value={5}>5%</option><option value={12}>12%</option><option value={18}>18%</option>
+                  <option value={0}>No (0%)</option>
+                  <option value={18}>Yes — 18%</option>
                 </select>
               </div>
               <div className="form-group" style={{ gridColumn: '1/-1' }}><label>SLA Response Time</label><input className="form-input" value={quote.slaResponse} onChange={(e) => set('slaResponse', e.target.value)} /></div>
@@ -646,20 +679,32 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
             <div className="agreement-section">
               <h2>Device & Pricing Details</h2>
               <table className="agreement-table">
-                <thead><tr><th>Device</th><th>Model</th><th>Qty</th><th>Monthly Rent</th><th>Total/Month</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Device</th><th>Model</th><th>Qty</th>
+                    {devices.some((d) => d.pageWiseBilling) && <><th>Min. Pages</th><th>Price/Page</th></>}
+                    <th>Monthly Rent</th><th>Total/Month</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {devices.map((d) => (
                     <tr key={d.id}>
                       <td>{d.device}</td><td>{d.model || '—'}</td><td>{d.qty}</td>
+                      {devices.some((x) => x.pageWiseBilling) && <>
+                        <td>{d.pageWiseBilling ? (d.minPages || '—') : '—'}</td>
+                        <td>{d.pageWiseBilling ? (d.pricePerPage ? `₹${d.pricePerPage}` : '—') : '—'}</td>
+                      </>}
                       <td>₹{fmt(d.monthlyRent)}</td>
                       <td>₹{fmt(Number(d.qty) * Number(d.monthlyRent))}</td>
                     </tr>
                   ))}
-                  <tr><td colSpan={4} style={{ textAlign: 'right' }}><strong>Device Subtotal</strong></td><td><strong>₹{fmt(deviceTotal())}</strong></td></tr>
-                  {Number(quote.installationCharges) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Installation</td><td>₹{fmt(quote.installationCharges)}</td></tr>}
-                  {Number(quote.deliveryCharges) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Delivery</td><td>₹{fmt(quote.deliveryCharges)}</td></tr>}
-                  <tr><td colSpan={4} style={{ textAlign: 'right' }}>GST ({quote.gstPercent}%)</td><td>₹{fmt(gstAmount())}</td></tr>
-                  <tr style={{ background: '#f0fdf4' }}><td colSpan={4} style={{ textAlign: 'right' }}><strong>Grand Total / Month</strong></td><td><strong>₹{fmt(grandTotal())}</strong></td></tr>
+                  {(() => { const cols = devices.some((d) => d.pageWiseBilling) ? 6 : 4; return (<>
+                    <tr><td colSpan={cols} style={{ textAlign: 'right' }}><strong>Device Subtotal</strong></td><td><strong>₹{fmt(deviceTotal())}</strong></td></tr>
+                    {Number(quote.installationCharges) > 0 && <tr><td colSpan={cols} style={{ textAlign: 'right' }}>Installation</td><td>₹{fmt(quote.installationCharges)}</td></tr>}
+                    {Number(quote.deliveryCharges) > 0 && <tr><td colSpan={cols} style={{ textAlign: 'right' }}>Delivery</td><td>₹{fmt(quote.deliveryCharges)}</td></tr>}
+                    {Number(quote.gstPercent) > 0 && <tr><td colSpan={cols} style={{ textAlign: 'right' }}>GST ({quote.gstPercent}%)</td><td>₹{fmt(gstAmount())}</td></tr>}
+                    <tr style={{ background: '#f0fdf4' }}><td colSpan={cols} style={{ textAlign: 'right' }}><strong>Grand Total / Month</strong></td><td><strong>₹{fmt(grandTotal())}</strong></td></tr>
+                  </>); })()}
                   {Number(quote.securityDeposit) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Security Deposit (one-time)</td><td>₹{fmt(quote.securityDeposit)}</td></tr>}
                 </tbody>
               </table>

@@ -536,6 +536,11 @@ const RentalNewCustomerPage = () => {
   const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
   const [addingDevice, setAddingDevice] = useState(false);
   const [newDeviceForm, setNewDeviceForm] = useState({ assetTag: '', type: 'Laptop', brand: '', model: '', serialNumber: '' });
+  const [printerSettings, setPrinterSettings] = useState({});
+  // { [slotIdx]: { pageWiseBilling, pageRate, startPageCount, lastBilledPageCount, replacementHistory, replacePending, replaceForm } }
+
+  const updatePrinterSetting = (slotIdx, field, value) =>
+    setPrinterSettings((p) => ({ ...p, [slotIdx]: { ...(p[slotIdx] || {}), [field]: value } }));
 
   const [form, setForm] = useState({
     companyName: '',
@@ -602,6 +607,23 @@ const RentalNewCustomerPage = () => {
             : []);
           setOriginalAssetIds(loadedIds);
           setDeviceSlots(loadedIds.length > 0 ? loadedIds.map(String) : ['']);
+          if (Array.isArray(existing.devices)) {
+            const ps = {};
+            existing.devices.forEach((d, i) => {
+              if (d.type === 'Printer') {
+                ps[i] = {
+                  pageWiseBilling: d.pageWiseBilling || false,
+                  pageRate: d.pageRate || '',
+                  startPageCount: d.startPageCount || '',
+                  lastBilledPageCount: d.lastBilledPageCount || '',
+                  replacementHistory: d.replacementHistory || [],
+                  replacePending: false,
+                  replaceForm: { oldEndPageCount: '', newAssetId: '', newStartPageCount: '' },
+                };
+              }
+            });
+            setPrinterSettings(ps);
+          }
         }
       } catch (err) {
         console.error('Failed to load rental customer:', err);
@@ -781,7 +803,21 @@ const RentalNewCustomerPage = () => {
         status: 'Active',
         locations,
         selectedAssetIds: form.selectedAssetIds,
-        devices: selectedAssets.map(mapInventoryAssetToRentalDevice),
+        devices: selectedAssets.map((asset, i) => {
+          const base = mapInventoryAssetToRentalDevice(asset);
+          if (asset.type === 'Printer') {
+            const ps = printerSettings[i] || {};
+            return {
+              ...base,
+              pageWiseBilling: ps.pageWiseBilling || false,
+              pageRate: Number(ps.pageRate) || 0,
+              startPageCount: Number(ps.startPageCount) || 0,
+              lastBilledPageCount: Number(ps.lastBilledPageCount) || 0,
+              replacementHistory: ps.replacementHistory || [],
+            };
+          }
+          return base;
+        }),
         planId: form.planId,
         planName: form.planName,
         planDetails: form.planDetails,
@@ -792,7 +828,7 @@ const RentalNewCustomerPage = () => {
         : await api.create(COLLECTION, customerPayload);
 
       const assetPayloads = buildRentalAssetPayloads(selectedAssets, savedCustomer);
-      await Promise.all(assetPayloads.map((asset) => api.create('rentalAssets', asset)));
+      await Promise.allSettled(assetPayloads.map((asset) => api.create('rentalAssets', asset)));
       await Promise.all(selectedAssets.map((asset) => api.patch('assets', asset.id, {
         status: 'Rented',
         assignedCustomer: companyName,
@@ -1062,14 +1098,131 @@ const RentalNewCustomerPage = () => {
                     </div>
 
                     {selected && (
-                      <div style={{ padding: '14px 16px', background: '#f0fdf4', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px 24px' }}>
-                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Device ID</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{getAssetDisplayId(selected)}</p></div>
-                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Serial Number</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selected.serialNumber || '-'}</p></div>
-                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Type</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selected.type || '-'}</p></div>
-                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Brand / Model</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{[selected.brand, selected.model].filter(Boolean).join(' ') || '-'}</p></div>
-                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Configuration</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selected.configuration || selected.configurations || '-'}</p></div>
-                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Status</span><p style={{ margin: '2px 0 0' }}><span className={`status-badge status-${String(selected.status || 'idle').toLowerCase().replace(/\s+/g, '-')}`}>{selected.status || 'Idle'}</span></p></div>
-                      </div>
+                      <>
+                        {/* Device info card */}
+                        <div style={{ padding: '14px 16px', background: '#f0fdf4', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px 24px' }}>
+                          <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Device ID</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{getAssetDisplayId(selected)}</p></div>
+                          <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Serial Number</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selected.serialNumber || '-'}</p></div>
+                          <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Type</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selected.type || '-'}</p></div>
+                          <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Brand / Model</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{[selected.brand, selected.model].filter(Boolean).join(' ') || '-'}</p></div>
+                          <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Configuration</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selected.configuration || selected.configurations || '-'}</p></div>
+                          <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Status</span><p style={{ margin: '2px 0 0' }}><span className={`status-badge status-${String(selected.status || 'idle').toLowerCase().replace(/\s+/g, '-')}`}>{selected.status || 'Idle'}</span></p></div>
+                        </div>
+
+                        {/* Printer-specific settings */}
+                        {selected.type === 'Printer' && (() => {
+                          const ps = printerSettings[slotIdx] || {};
+                          const replaceForm = ps.replaceForm || { oldEndPageCount: '', newAssetId: '', newStartPageCount: '' };
+                          const replaceOptions = availableAssets.filter((a) => a.type === 'Printer' && String(a.id) !== String(slotId));
+
+                          const confirmReplace = () => {
+                            if (!replaceForm.newAssetId) return;
+                            const newAsset = inventoryAssets.find((a) => String(a.id) === replaceForm.newAssetId);
+                            const entry = {
+                              replacedAt: new Date().toISOString().split('T')[0],
+                              oldInventoryAssetId: selected.id,
+                              oldAssetTag: getAssetDisplayId(selected),
+                              oldStartPageCount: Number(ps.startPageCount) || 0,
+                              oldEndPageCount: Number(replaceForm.oldEndPageCount) || 0,
+                              newInventoryAssetId: replaceForm.newAssetId,
+                              newAssetTag: newAsset ? getAssetDisplayId(newAsset) : replaceForm.newAssetId,
+                              newStartPageCount: Number(replaceForm.newStartPageCount) || 0,
+                            };
+                            setPrinterSettings((p) => ({
+                              ...p,
+                              [slotIdx]: {
+                                ...(p[slotIdx] || {}),
+                                startPageCount: replaceForm.newStartPageCount,
+                                replacementHistory: [...(ps.replacementHistory || []), entry],
+                                replacePending: false,
+                                replaceForm: { oldEndPageCount: '', newAssetId: '', newStartPageCount: '' },
+                              },
+                            }));
+                            updateSlot(slotIdx, replaceForm.newAssetId);
+                          };
+
+                          return (
+                            <div style={{ padding: '16px', borderTop: '1px solid #e2e8f0', background: '#fff' }}>
+                              {/* Printer Settings */}
+                              <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>Printer Settings</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 16, flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>Page-wise Billing</span>
+                                  <label style={{ position: 'relative', display: 'inline-block', width: 40, height: 22, cursor: 'pointer' }}>
+                                    <input type="checkbox" checked={!!ps.pageWiseBilling} onChange={(e) => updatePrinterSetting(slotIdx, 'pageWiseBilling', e.target.checked)} style={{ opacity: 0, width: 0, height: 0 }} />
+                                    <span style={{ position: 'absolute', inset: 0, background: ps.pageWiseBilling ? '#4f46e5' : '#cbd5e1', borderRadius: 22, transition: '0.2s' }}>
+                                      <span style={{ position: 'absolute', width: 16, height: 16, borderRadius: '50%', background: '#fff', top: 3, left: ps.pageWiseBilling ? 21 : 3, transition: '0.2s' }} />
+                                    </span>
+                                  </label>
+                                </div>
+                                {ps.pageWiseBilling && (
+                                  <div className="form-group" style={{ margin: 0, minWidth: 200 }}>
+                                    <label style={{ fontSize: '0.78rem' }}>Start Page Count</label>
+                                    <input className="form-input" type="number" min="0" value={ps.startPageCount || ''} onChange={(e) => updatePrinterSetting(slotIdx, 'startPageCount', e.target.value)} placeholder="e.g. 0" />
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Replacement history summary */}
+                              {(ps.replacementHistory || []).length > 0 && (
+                                <div style={{ marginBottom: 14, padding: '10px 14px', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8 }}>
+                                  <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', marginBottom: 6 }}>Replacement History</div>
+                                  {ps.replacementHistory.map((r, ri) => (
+                                    <div key={ri} style={{ fontSize: '0.8rem', color: '#78350f', marginBottom: 2 }}>
+                                      {r.replacedAt}: {r.oldAssetTag} (end: {r.oldEndPageCount} pages) → {r.newAssetTag} (start: {r.newStartPageCount} pages)
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Replace Printer (edit mode only) */}
+                              {editId && (
+                                <div>
+                                  {!ps.replacePending ? (
+                                    <button type="button" onClick={() => updatePrinterSetting(slotIdx, 'replacePending', true)}
+                                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: '1px solid #e0e7ff', background: '#eef2ff', color: '#4f46e5', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}>
+                                      Replace Printer
+                                    </button>
+                                  ) : (
+                                    <div style={{ padding: '14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10 }}>
+                                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#4f46e5', textTransform: 'uppercase', marginBottom: 12 }}>Replace Printer</div>
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px 16px', marginBottom: 12 }}>
+                                        <div className="form-group" style={{ margin: 0 }}>
+                                          <label style={{ fontSize: '0.78rem' }}>Old Printer End Page Count</label>
+                                          <input className="form-input" type="number" min="0" value={replaceForm.oldEndPageCount} onChange={(e) => updatePrinterSetting(slotIdx, 'replaceForm', { ...replaceForm, oldEndPageCount: e.target.value })} placeholder="Final reading" />
+                                        </div>
+                                        <div className="form-group" style={{ margin: 0 }}>
+                                          <label style={{ fontSize: '0.78rem' }}>Select New Printer</label>
+                                          <select className="form-select" value={replaceForm.newAssetId} onChange={(e) => updatePrinterSetting(slotIdx, 'replaceForm', { ...replaceForm, newAssetId: e.target.value })}>
+                                            <option value="">— Select —</option>
+                                            {replaceOptions.map((a) => (
+                                              <option key={a.id} value={String(a.id)}>{getAssetDisplayId(a)}{a.serialNumber ? ` — S/N: ${a.serialNumber}` : ''}{a.model ? ` — ${a.model}` : ''}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        <div className="form-group" style={{ margin: 0 }}>
+                                          <label style={{ fontSize: '0.78rem' }}>New Printer Start Page Count</label>
+                                          <input className="form-input" type="number" min="0" value={replaceForm.newStartPageCount} onChange={(e) => updatePrinterSetting(slotIdx, 'replaceForm', { ...replaceForm, newStartPageCount: e.target.value })} placeholder="Starting reading" />
+                                        </div>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: 8 }}>
+                                        <button type="button" onClick={confirmReplace} disabled={!replaceForm.newAssetId}
+                                          style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#4f46e5', color: '#fff', cursor: replaceForm.newAssetId ? 'pointer' : 'not-allowed', fontWeight: 600, fontSize: '0.82rem', opacity: replaceForm.newAssetId ? 1 : 0.5 }}>
+                                          Confirm Replace
+                                        </button>
+                                        <button type="button" onClick={() => updatePrinterSetting(slotIdx, 'replacePending', false)}
+                                          style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem' }}>
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </>
                     )}
                   </div>
                 );
