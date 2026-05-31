@@ -813,3 +813,47 @@
 .inv-view-field:last-child:nth-child(odd) {
   grid-column: span 2;
 }
+
+.inv-view-field--full {
+  grid-column: span 2;
+}
+
+.inv-view-subsection {
+  grid-column: span 2;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #4f46e5;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 8px 0 2px;
+  border-bottom: 1px solid #e8e6fd;
+  margin-top: 4px;
+}
+
+.inv-view-config-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  font-size: 0.85rem;
+}
+
+.inv-view-config-table th {
+  text-align: left;
+  padding: 5px 10px;
+  background: #f1f0fe;
+  color: #4f46e5;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inv-view-config-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #111827;
+}
+
+.inv-view-config-table tr:last-child td {
+  border-bottom: none;
+}

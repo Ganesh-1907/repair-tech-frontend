@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Trash2, ChevronDown, ChevronUp, ArrowLeft, HardDrive, Save } from 'lucide-react';
 import { api } from '../../services/apiClient';
+import { useToast } from '../../context/ToastContext';
 import './PlansCustomers.css';
 import '../InventoryPremiumStyles.css';
 
@@ -93,7 +94,7 @@ const buildRentalAssetPayloads = (assets, customer) => {
       brand: asset.brand || '',
       model: asset.model || assetType,
       subType: asset.subType || '',
-      serialNumber: asset.serialNumber || '',
+      inventorySerialNumber: asset.serialNumber || '',
       specs: configuration,
       configuration,
       configurations: configuration,
@@ -521,6 +522,7 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
 const RentalNewCustomerPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { addToast } = useToast();
   const queryParams = new URLSearchParams(location.search);
   const editId = queryParams.get('id');
 
@@ -631,9 +633,9 @@ const RentalNewCustomerPage = () => {
 
   const availableAssets = useMemo(() => inventoryAssets.filter((asset) => {
     const status = (asset.status || '').toLowerCase();
-    if (status === 'sold' || status === 'rented' || status === 'in repair' || status === 'replaced') {
-      return form.selectedAssetIds.map(String).includes(String(asset.id));
-    }
+    const alreadySelected = form.selectedAssetIds.map(String).includes(String(asset.id));
+    if (alreadySelected) return true;
+    if (status !== 'active') return false;
     const assignedElsewhere = asset.rentalCustomerId && String(asset.rentalCustomerId) !== String(editId || '');
     return !assignedElsewhere;
   }), [inventoryAssets, form.selectedAssetIds, editId]);
@@ -810,7 +812,7 @@ const RentalNewCustomerPage = () => {
       navigate('/admin/rental/customers');
     } catch (err) {
       console.error('Failed to save rental customer:', err);
-      setErrors({ save: 'Failed to save. Please try again.' });
+      addToast(err.response?.data?.message || 'Failed to save. Please try again.', 'error');
     } finally {
       setSaving(false);
     }
@@ -835,8 +837,8 @@ const RentalNewCustomerPage = () => {
       </div>
 
       <div ref={errorBannerRef}>
-        {(errors.save || errors.general) && (
-          <div className="form-error-banner">{errors.save || errors.general}</div>
+        {errors.general && (
+          <div className="form-error-banner">{errors.general}</div>
         )}
       </div>
 

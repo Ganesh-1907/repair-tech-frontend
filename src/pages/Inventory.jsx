@@ -59,7 +59,6 @@ const InventoryManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [stockType, setStockType] = useState('All');
   const [assetStatus, setAssetStatus] = useState('All');
-  const [viewAsset, setViewAsset] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
   const handleDeleteAsset = (asset) => setConfirmDelete(asset);
@@ -209,7 +208,7 @@ const InventoryManagement = () => {
             </div>
             <AssetTable
               assets={filteredAssets}
-              onView={(asset) => setViewAsset(asset)}
+              onView={(asset) => navigate(`/admin/inventory/assets/${asset.id}/view`)}
               onEdit={(asset) => navigate(`/admin/inventory/assets/${asset.id}/edit`)}
               onDelete={handleDeleteAsset}
             />
@@ -243,13 +242,7 @@ const InventoryManagement = () => {
         </div>
       )}
 
-      {viewAsset && (
-        <ViewAssetModal
-          asset={viewAsset}
-          onClose={() => setViewAsset(null)}
-          onEdit={() => navigate(`/admin/inventory/assets/${viewAsset.id}/edit`)}
-        />
-      )}
+
     </div>
   );
 };
@@ -422,48 +415,6 @@ const StockTable = ({ items, onDelete }) => (
         )}
       </tbody>
     </table>
-  </div>
-);
-
-const VIEW_FIELDS = [
-  { label: 'Device ID', key: (a) => a.assetTag || a.id },
-  { label: 'Serial Number', key: (a) => a.serialNumber },
-  { label: 'Type', key: (a) => a.type },
-  { label: 'Model', key: (a) => a.model },
-  { label: 'Status', key: (a) => normalizeAssetStatus(a.status) },
-  { label: 'Configurations', key: (a) => a.configuration || a.configurations },
-  { label: 'Add-on Parts', key: (a) => a.addOnParts },
-];
-
-const ViewAssetModal = ({ asset, onClose, onEdit }) => (
-  <Modal title="Asset Details" subtitle={asset.assetTag || asset.id} onClose={onClose} onSave={onEdit} saveLabel="Edit">
-    <div className="inv-view-grid">
-      {VIEW_FIELDS.map(({ label, key }) => (
-        <div key={label} className="inv-view-field">
-          <span>{label}</span>
-          <strong>{key(asset) || '-'}</strong>
-        </div>
-      ))}
-    </div>
-  </Modal>
-);
-
-const Modal = ({ title, subtitle, children, onClose, onSave, saveLabel }) => (
-  <div className="inventory-modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-    <div className="inventory-modal" role="dialog" aria-modal="true" aria-labelledby="inventory-modal-title">
-      <header>
-        <div>
-          <h2 id="inventory-modal-title">{title}</h2>
-          <p>{subtitle}</p>
-        </div>
-        <button onClick={onClose} title="Close"><X size={20} /></button>
-      </header>
-      <div className="inventory-modal-body">{children}</div>
-      <footer>
-        <button className="inventory-secondary-button" onClick={onClose}>Cancel</button>
-        <button className="inventory-primary-button" onClick={onSave}>{saveLabel}</button>
-      </footer>
-    </div>
   </div>
 );
 

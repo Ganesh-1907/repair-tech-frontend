@@ -46,6 +46,7 @@ import InventoryDashboardPage from './pages/admin/InventoryDashboardPage';
 import AssetManagementPage from './pages/admin/AssetManagementPage';
 import AssetDetailPage from './pages/admin/AssetDetailPage';
 import InventoryAssetFormPage from './pages/admin/InventoryAssetFormPage';
+import InventoryAssetViewPage from './pages/admin/InventoryAssetViewPage';
 import QuoteApprovalPlaceholderPage from './pages/admin/QuoteApprovalPlaceholderPage';
 import CampaignDashboardPage from './pages/admin/CampaignDashboardPage';
 import CampaignsListingPage from './pages/admin/CampaignsListingPage';
@@ -246,6 +247,7 @@ function App() {
               {/* Explicit Inventory Asset Routes */}
               <Route path="/admin/inventory/assets/new" element={<Layout><InventoryAssetFormPage /></Layout>} />
               <Route path="/admin/inventory/assets/:assetId/edit" element={<Layout><InventoryAssetFormPage /></Layout>} />
+              <Route path="/admin/inventory/assets/:assetId/view" element={<Layout><InventoryAssetViewPage /></Layout>} />
 
               {/* Explicit Campaign Routes */}
               <Route path="/admin/campaign/dashboard" element={<Layout><CampaignDashboardPage /></Layout>} />
