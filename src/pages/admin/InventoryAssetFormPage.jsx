@@ -511,24 +511,7 @@ const DeviceDetailsFields = ({ device, onChange, errors }) => {
     case 'Printer': return <PrinterFields device={device} onChange={update} errors={errors} />;
     case 'CCTV': return <CCTVFields device={device} onChange={update} errors={errors} />;
     case 'VPS': return <VpsFields device={device} onChange={update} errors={errors} />;
-    default: return (
-      <div className="device-fields-section">
-        <div className="device-fields-row">
-          <div className={`form-group${errors.brand ? ' has-error' : ''}`}>
-            <label>Brand *</label>
-            <input className="form-input" value={device.brand || ''} onChange={(e) => update('brand', e.target.value)} />
-          </div>
-          <div className={`form-group${errors.model ? ' has-error' : ''}`}>
-            <label>Model *</label>
-            <input className="form-input" value={device.model || ''} onChange={(e) => update('model', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Location</label>
-            <input className="form-input" value={device.location || ''} onChange={(e) => update('location', e.target.value)} />
-          </div>
-        </div>
-      </div>
-    );
+    default: return <GenericFields device={device} onChange={update} errors={errors} />;
   }
 };
 
