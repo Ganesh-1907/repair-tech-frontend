@@ -3,20 +3,23 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle2,
   Clock,
+  Eye,
   HardDrive,
   Monitor,
+  Pencil,
   Plus,
   Printer,
   QrCode,
   Search,
   Settings2,
+  Trash2,
   Wrench,
 } from 'lucide-react';
 import { assetManagementService } from '../../services/assetManagementService';
 import { useToast } from '../../context/ToastContext';
 import '../InventoryPremiumStyles.css';
 
-const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle'];
+const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle', 'Sold'];
 
 const normalizeAssetStatus = (status) => {
   if (status === 'Available' || status === 'Rented' || status === 'Sold') return 'Active';
@@ -40,6 +43,23 @@ const AssetManagementPage = () => {
   const [assets, setAssets] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
+
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const handleDelete = (asset) => setConfirmDelete(asset);
+
+  const doDelete = async () => {
+    if (!confirmDelete) return;
+    try {
+      await assetManagementService.deleteAsset(confirmDelete.id);
+      addToast('Asset deleted.');
+      setAssets((prev) => prev.filter((a) => a.id !== confirmDelete.id));
+    } catch {
+      addToast('Failed to delete asset.', 'error');
+    } finally {
+      setConfirmDelete(null);
+    }
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -105,6 +125,21 @@ const AssetManagementPage = () => {
         </div>
       </section>
 
+      {confirmDelete && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', maxWidth: 420, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', color: '#0f172a' }}>Delete Asset?</h3>
+            <p style={{ margin: '0 0 20px', fontSize: '0.9rem', color: '#64748b' }}>
+              This will permanently delete <strong>{confirmDelete.assetTag || confirmDelete.id}</strong> (S/N: {confirmDelete.serialNumber || '-'}) from the system. This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmDelete(null)} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>Cancel</button>
+              <button onClick={doDelete} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="inventory-kpis">
         <MetricCard icon={<HardDrive />} label="Total Devices" value={assets.length} tone="indigo" />
         <MetricCard icon={<CheckCircle2 />} label="Active" value={counts.Active} tone="green" />
@@ -138,7 +173,7 @@ const AssetManagementPage = () => {
           ))}
         </div>
 
-        <AssetTable assets={filteredAssets} />
+        <AssetTable assets={filteredAssets} onView={(id) => navigate(`/admin/inventory/assets/view/${id}`)} onEdit={(id) => navigate(`/admin/inventory/assets/${id}`)} onDelete={handleDelete} />
       </section>
     </div>
   );
@@ -161,7 +196,7 @@ const DeviceIcon = ({ type }) => {
   return <HardDrive size={20} />;
 };
 
-const AssetTable = ({ assets }) => (
+const AssetTable = ({ assets, onEdit, onDelete, onView }) => (
   <div className="inventory-table-wrap">
     <table className="inventory-table asset-table">
       <thead>
@@ -172,6 +207,7 @@ const AssetTable = ({ assets }) => (
           <th>Configurations</th>
           <th>Add-on Parts</th>
           <th>Status</th>
+          <th style={{ width: 110 }}>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -191,10 +227,35 @@ const AssetTable = ({ assets }) => (
             <td className="inventory-muted-cell">{asset.configuration || asset.configurations || '-'}</td>
             <td className="inventory-muted-cell">{asset.addOnParts || '-'}</td>
             <td><span className={`inventory-status ${statusTone(asset.status)}`}>{normalizeAssetStatus(asset.status)}</span></td>
+            <td>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={() => onView(asset.id)}
+                  title="View asset"
+                  style={{ display: 'flex', alignItems: 'center', padding: '5px 8px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', color: '#0891b2' }}
+                >
+                  <Eye size={14} />
+                </button>
+                <button
+                  onClick={() => onEdit(asset.id)}
+                  title="Edit asset"
+                  style={{ display: 'flex', alignItems: 'center', padding: '5px 8px', borderRadius: 6, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', color: '#4f46e5' }}
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  onClick={() => onDelete(asset)}
+                  title="Delete asset"
+                  style={{ display: 'flex', alignItems: 'center', padding: '5px 8px', borderRadius: 6, border: '1px solid #fee2e2', background: '#fff5f5', cursor: 'pointer', color: '#ef4444' }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            </td>
           </tr>
         ))}
         {assets.length === 0 && (
-          <tr><td colSpan="6" className="inventory-empty">No assets match this view.</td></tr>
+          <tr><td colSpan="7" className="inventory-empty">No assets match this view.</td></tr>
         )}
       </tbody>
     </table>

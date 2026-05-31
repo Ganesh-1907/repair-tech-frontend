@@ -12,6 +12,8 @@ export const assetManagementService = {
 
   updateAsset: (id, updatedAsset) => api.update('assets', id, updatedAsset),
 
+  deleteAsset: (id) => api.remove('assets', id),
+
   async updateStatus(id, newStatus, assignmentData = {}) {
     const patch = { status: newStatus };
     if (newStatus === 'Available' || newStatus === 'Idle' || newStatus === 'Scrapped') {

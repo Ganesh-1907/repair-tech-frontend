@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, RefreshCw, Check } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Check, Lock } from 'lucide-react';
 import { apiClient } from '../../services/apiClient';
 import { invalidateLeadSettingsCache } from '../../hooks/useLeadSettings';
 import { invalidateExpenseSettingsCache, EXPENSE_SETTINGS_ID } from '../../hooks/useExpenseSettings';
@@ -17,10 +17,12 @@ const COMPANY_DEFAULTS = {
   state: '',
 };
 
+const BUILT_IN_DEVICE_TYPES = ['Laptop', 'Desktop', 'Server', 'Printer', 'CCTV', 'VPS'];
+
 const DEFAULTS = {
   serviceTypes: ['Walk-in', 'Onsite service'],
   sources: ['Google', 'FB', 'Insta', 'Walkin'],
-  devices: ['Laptop', 'Desktop', 'CCTV'],
+  devices: ['Laptop', 'Desktop', 'Server', 'Printer', 'CCTV', 'VPS'],
 };
 
 const EXPENSE_DEFAULTS = {
@@ -36,7 +38,7 @@ const EXPENSE_DEFAULTS = {
   ],
 };
 
-const Section = ({ title, description, items, onAdd, onRemove, saving }) => {
+const Section = ({ title, description, items, onAdd, onRemove, saving, builtIn = [] }) => {
   const [input, setInput] = useState('');
 
   const handleAdd = () => {
@@ -76,24 +78,34 @@ const Section = ({ title, description, items, onAdd, onRemove, saving }) => {
           {items.length === 0 && (
             <span style={{ fontSize: '0.82rem', color: '#94a3b8', alignSelf: 'center' }}>No options yet. Add one below.</span>
           )}
-          {items.map((item) => (
-            <div key={item} style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 10px 5px 14px',
-              background: '#f1f5f9', border: '1px solid #e2e8f0',
-              borderRadius: 99, fontSize: '0.83rem', fontWeight: 600, color: '#334155',
-            }}>
-              {item}
-              <button
-                onClick={() => onRemove(item)}
-                disabled={saving}
-                style={{ display: 'flex', alignItems: 'center', padding: 2, background: 'none', border: 'none', cursor: saving ? 'default' : 'pointer', color: '#ef4444', borderRadius: 4 }}
-                title={`Remove ${item}`}
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-          ))}
+          {items.map((item) => {
+            const isBuiltIn = builtIn.includes(item);
+            return (
+              <div key={item} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 10px 5px 14px',
+                background: isBuiltIn ? '#f0f9ff' : '#f1f5f9',
+                border: `1px solid ${isBuiltIn ? '#bae6fd' : '#e2e8f0'}`,
+                borderRadius: 99, fontSize: '0.83rem', fontWeight: 600, color: '#334155',
+              }}>
+                {item}
+                {isBuiltIn ? (
+                  <span title="Built-in — cannot be removed" style={{ display: 'flex', alignItems: 'center', padding: 2, color: '#94a3b8' }}>
+                    <Lock size={11} />
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => onRemove(item)}
+                    disabled={saving}
+                    style={{ display: 'flex', alignItems: 'center', padding: 2, background: 'none', border: 'none', cursor: saving ? 'default' : 'pointer', color: '#ef4444', borderRadius: 4 }}
+                    title={`Remove ${item}`}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
@@ -166,7 +178,9 @@ const SettingsPage = () => {
           setRecordId(record.id);
           setServiceTypes(record.serviceTypes?.length ? record.serviceTypes : [...DEFAULTS.serviceTypes]);
           setSources(record.sources?.length ? record.sources : [...DEFAULTS.sources]);
-          setDevices(record.devices?.length ? record.devices : [...DEFAULTS.devices]);
+          const saved = record.devices?.length ? record.devices : [];
+          const merged = Array.from(new Set([...BUILT_IN_DEVICE_TYPES, ...saved.filter(d => !BUILT_IN_DEVICE_TYPES.includes(d))]));
+          setDevices(merged);
         } else {
           setServiceTypes([...DEFAULTS.serviceTypes]);
           setSources([...DEFAULTS.sources]);
@@ -274,6 +288,7 @@ const SettingsPage = () => {
     persist(serviceTypes, sources, updated);
   };
   const handleRemoveDevice = (v) => {
+    if (BUILT_IN_DEVICE_TYPES.includes(v)) return;
     const updated = devices.filter((x) => x !== v);
     setDevices(updated);
     persist(serviceTypes, sources, updated);
@@ -467,11 +482,12 @@ const SettingsPage = () => {
         />
         <Section
           title="Devices"
-          description="Options shown in Device dropdown (e.g. Laptop, Desktop, CCTV)"
+          description="Options shown in Device dropdown. Built-in types (locked) cannot be removed."
           items={devices}
           onAdd={handleAddDevice}
           onRemove={handleRemoveDevice}
           saving={saving}
+          builtIn={BUILT_IN_DEVICE_TYPES}
         />
       </div>
 

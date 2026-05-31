@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Plus, Search, RefreshCcw, MoreVertical, ChevronRight, X, Loader2,
-  Wrench, FileText, Truck, CheckCircle2, Send, Download,
+  Wrench, FileText, Truck, CheckCircle2, Download,
   Eye, ClipboardList, IndianRupee, Pencil
 } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
@@ -261,7 +261,7 @@ const CampaignJobsPage = () => {
         </div>
       </section>
 
-      <section className="stats-grid">
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10 }}>
         {[
           { label: 'Total Jobs', value: jobs.length, color: '#4f46e5' },
           { label: 'Received', value: statsByStatus('Received at office'), color: '#3b82f6' },
@@ -270,26 +270,49 @@ const CampaignJobsPage = () => {
           { label: 'Out for Delivery', value: statsByStatus('Out for delivery'), color: '#06b6d4' },
           { label: 'Closed', value: statsByStatus('Closed'), color: '#64748b' },
         ].map((s, i) => (
-          <div key={i} className="stat-card cursor-pointer" onClick={() => setStatusFilter(i === 0 ? 'All' : s.label)}>
-            <span className="stat-label">{s.label}</span>
-            <span className="stat-value" style={{ color: s.color }}>{loading ? '—' : s.value}</span>
+          <div key={i} className="stat-card cursor-pointer" onClick={() => setStatusFilter(i === 0 ? 'All' : s.label)}
+            style={{ padding: '14px 12px', minWidth: 0 }}>
+            <span className="stat-label" style={{ fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</span>
+            <span className="stat-value" style={{ color: s.color, fontSize: 28 }}>{loading ? '—' : s.value}</span>
           </div>
         ))}
       </section>
 
       <section className="table-card">
         <div className="table-toolbar">
-          <div className="relative">
-            <input type="text" placeholder="Search by name, ticket, phone..."
-              className="h-10 pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm w-72"
-              value={search} onChange={(e) => setSearch(e.target.value)}/>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
+            <div style={{ position: 'relative', width: 320 }}>
+              <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                placeholder="Search by name, ticket, phone..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ width: '100%', height: 40, paddingLeft: 36, paddingRight: 14, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: '0.84rem', color: '#0f172a', outline: 'none', boxSizing: 'border-box' }}
+                onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+              />
+            </div>
+            <div style={{ position: 'relative' }}>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                style={{ height: 40, paddingLeft: 14, paddingRight: 36, background: statusFilter !== 'All' ? '#eef2ff' : '#f8fafc', border: `1.5px solid ${statusFilter !== 'All' ? '#6366f1' : '#e2e8f0'}`, borderRadius: 10, fontSize: '0.84rem', color: statusFilter !== 'All' ? '#4f46e5' : '#0f172a', outline: 'none', cursor: 'pointer', appearance: 'none', minWidth: 160, fontWeight: statusFilter !== 'All' ? 700 : 400 }}
+              >
+                <option value="All">All Status</option>
+                {STATUS_ORDER.map((s) => <option key={s}>{s}</option>)}
+              </select>
+              <svg style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#94a3b8' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            {(search || statusFilter !== 'All') && (
+              <button onClick={() => { setSearch(''); setStatusFilter('All'); }} style={{ height: 40, padding: '0 14px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: '0.82rem', fontWeight: 600, color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <X size={13} /> Clear
+              </button>
+            )}
           </div>
-          <select className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm"
-            value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="All">All Status</option>
-            {STATUS_ORDER.map((s) => <option key={s}>{s}</option>)}
-          </select>
+          <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#94a3b8', whiteSpace: 'nowrap' }}>
+            {filtered.length} job{filtered.length !== 1 ? 's' : ''}
+          </span>
         </div>
 
         {loading ? (
@@ -394,13 +417,13 @@ const CampaignJobsPage = () => {
               <div className="action-dropdown-divider"/>
               {(st === 'Received at office' || qs === 'Draft') && (
                 <button className="action-dropdown-item"
-                  onClick={() => { openModal(job, 'quote'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
-                  <Send size={16}/> Send Quote
+                  onClick={() => { setActiveMenu((p) => ({ ...p, open: false, id: null })); navigate(`/admin/campaign/jobs/quotation/${job.id}`, { state: { job } }); }}>
+                  <FileText size={16}/> Create Quotation
                 </button>
               )}
               {qs === 'Approved' && (
                 <button className="action-dropdown-item"
-                  onClick={() => { openModal(job, 'intake'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
+                  onClick={() => { setActiveMenu((p) => ({ ...p, open: false, id: null })); navigate(`/admin/campaign/jobs/intake/${job.id}`, { state: { job } }); }}>
                   <FileText size={16}/> Acknowledge Receipt
                 </button>
               )}

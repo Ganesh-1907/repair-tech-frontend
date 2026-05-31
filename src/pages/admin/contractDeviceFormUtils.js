@@ -20,7 +20,7 @@ const normalizeConfigurations = (device = {}) => {
 export const normalizeContractDevice = (device, createBlankDevice, deviceTypes) => {
   const source = device && typeof device === 'object' ? device : {};
   const sourceType = source.type || source.deviceType;
-  const type = deviceTypes.includes(sourceType) ? sourceType : 'Laptop';
+  const type = (sourceType && deviceTypes.includes(sourceType)) ? sourceType : (sourceType || 'Laptop');
   const blank = createBlankDevice(type);
 
   if (type === 'Laptop') {
@@ -62,6 +62,8 @@ export const normalizeContractDevice = (device, createBlankDevice, deviceTypes) 
       model: pickFirst(source.model, source.brand),
       serialNumber: pickFirst(source.serialNumber, source.serial, source.sn),
       location: pickFirst(source.location, source.branch),
+      notes: pickFirst(source.notes, source.inputField),
+      pageCount: source.pageCount || '',
     };
   }
 
@@ -76,6 +78,26 @@ export const normalizeContractDevice = (device, createBlankDevice, deviceTypes) 
       type,
       serialNumber: pickFirst(source.serialNumber, source.serial, source.sn),
       specs,
+    };
+  }
+
+  if (type === 'VPS') {
+    return {
+      ...blank,
+      ...source,
+      type,
+      serialNumber: pickFirst(source.serialNumber, source.serial, source.sn),
+      configurations: normalizeConfigurations(source),
+    };
+  }
+
+  if (type !== 'Laptop' && type !== 'Desktop' && type !== 'Server' && type !== 'Printer' && type !== 'CCTV' && type !== 'Total Maintenance') {
+    return {
+      ...blank,
+      ...source,
+      type,
+      serialNumber: pickFirst(source.serialNumber, source.serial, source.sn),
+      configurations: normalizeConfigurations(source),
     };
   }
 

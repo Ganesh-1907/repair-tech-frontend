@@ -60,6 +60,22 @@ const InventoryManagement = () => {
   const [stockType, setStockType] = useState('All');
   const [assetStatus, setAssetStatus] = useState('All');
   const [viewAsset, setViewAsset] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const handleDeleteAsset = (asset) => setConfirmDelete(asset);
+
+  const doDeleteAsset = async () => {
+    if (!confirmDelete) return;
+    try {
+      await assetManagementService.deleteAsset(confirmDelete.id);
+      setAssets((prev) => prev.filter((a) => a.id !== confirmDelete.id));
+      addToast('Asset deleted.');
+    } catch {
+      addToast('Failed to delete asset.', 'error');
+    } finally {
+      setConfirmDelete(null);
+    }
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -195,6 +211,7 @@ const InventoryManagement = () => {
               assets={filteredAssets}
               onView={(asset) => setViewAsset(asset)}
               onEdit={(asset) => navigate(`/admin/inventory/assets/${asset.id}/edit`)}
+              onDelete={handleDeleteAsset}
             />
           </>
         ) : (
@@ -210,6 +227,21 @@ const InventoryManagement = () => {
           </>
         )}
       </section>
+
+      {confirmDelete && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', maxWidth: 420, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem', color: '#0f172a' }}>Delete Asset?</h3>
+            <p style={{ margin: '0 0 20px', fontSize: '0.9rem', color: '#64748b' }}>
+              Permanently delete <strong>{confirmDelete.assetTag || confirmDelete.id}</strong> (S/N: {confirmDelete.serialNumber || '-'})? This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfirmDelete(null)} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>Cancel</button>
+              <button onClick={doDeleteAsset} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {viewAsset && (
         <ViewAssetModal
@@ -243,7 +275,7 @@ const DeviceIcon = ({ type }) => {
   return <HardDrive size={20} />;
 };
 
-const AssetRowMenu = ({ asset, onView, onEdit }) => {
+const AssetRowMenu = ({ asset, onView, onEdit, onDelete }) => {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const ref = useRef(null);
@@ -283,13 +315,14 @@ const AssetRowMenu = ({ asset, onView, onEdit }) => {
         <div className="inv-row-menu-dropdown" style={{ top: position.top, left: position.left }}>
           <button onClick={() => { onView(asset); setOpen(false); }}>View</button>
           <button onClick={() => { onEdit(asset); setOpen(false); }}>Edit</button>
+          <button onClick={() => { onDelete(asset); setOpen(false); }} style={{ color: '#ef4444' }}>Delete</button>
         </div>
       )}
     </div>
   );
 };
 
-const AssetTable = ({ assets, onView, onEdit }) => (
+const AssetTable = ({ assets, onView, onEdit, onDelete }) => (
   <div className="inventory-table-wrap">
     <table className="inventory-table asset-table">
       <thead>
@@ -320,7 +353,7 @@ const AssetTable = ({ assets, onView, onEdit }) => (
             <td className="inventory-muted-cell">{asset.configuration || asset.configurations || '-'}</td>
             <td className="inventory-muted-cell">{asset.addOnParts || '-'}</td>
             <td><span className={`inventory-status ${statusTone(asset.status)}`}>{normalizeAssetStatus(asset.status)}</span></td>
-            <td><AssetRowMenu asset={asset} onView={onView} onEdit={onEdit} /></td>
+            <td><AssetRowMenu asset={asset} onView={onView} onEdit={onEdit} onDelete={onDelete} /></td>
           </tr>
         ))}
         {assets.length === 0 && (

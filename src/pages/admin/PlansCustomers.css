@@ -271,6 +271,31 @@
   color: #64748b;
 }
 
+.status-idle {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.status-rented {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-sold {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.status-in-repair {
+  background: #fde8d8;
+  color: #c2410c;
+}
+
+.status-replaced {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
 .plan-badge {
   padding: 4px 10px;
   background: var(--slate-100);

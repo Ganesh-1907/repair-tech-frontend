@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Trash2, ChevronDown, ChevronUp, ArrowLeft, HardDrive, Save, Search } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, ArrowLeft, HardDrive, Save } from 'lucide-react';
 import { api } from '../../services/apiClient';
 import './PlansCustomers.css';
 import '../InventoryPremiumStyles.css';
@@ -25,9 +25,11 @@ const createBlankDevice = (type = 'Laptop') => {
         monitor: { subType: '', brand: '', location: '' },
       };
     case 'Printer':
-      return { type: 'Printer', subType: '', brand: '', model: '', inputField: '', location: '' };
+      return { type: 'Printer', subType: '', brand: '', model: '', serialNumber: '', pageCount: '', notes: '', location: '' };
     case 'CCTV':
       return { type: 'CCTV', subType: '', brand: '', model: '', specs: [''], location: '' };
+    case 'VPS':
+      return { type: 'VPS', brand: '', model: '', serialNumber: '', location: '', configurations: [{ name: '', specification: '', serialNumber: '' }] };
     case 'Total Maintenance':
       return {
         type: 'Total Maintenance',
@@ -35,7 +37,7 @@ const createBlankDevice = (type = 'Laptop') => {
         subDeviceData: createBlankDevice('Laptop'),
       };
     default:
-      return { type, brand: '', model: '', location: '' };
+      return { type, brand: '', model: '', serialNumber: '', location: '', configurations: [{ name: '', specification: '', serialNumber: '' }] };
   }
 };
 
@@ -49,11 +51,8 @@ const getDeviceBase = (device) => (
 
 const getDeviceSummary = (device) => {
   const base = getDeviceBase(device);
-  if (base.type === 'Laptop') return `${base.brand || ''} ${base.model || ''}`.trim() || '';
   if (base.type === 'Desktop' || base.type === 'Server') return `${base.cpu?.brand || ''} ${base.cpu?.model || ''}`.trim() || '';
-  if (base.type === 'Printer') return `${base.brand || ''} ${base.model || ''}`.trim() || '';
-  if (base.type === 'CCTV') return `${base.brand || ''} ${base.model || ''}`.trim() || '';
-  return '';
+  return `${base.brand || ''} ${base.model || ''}`.trim() || '';
 };
 
 const getAssetDisplayId = (asset) => asset.assetTag || asset.assetId || asset.id;
@@ -254,15 +253,25 @@ const PrinterFields = ({ device, onChange, errors = {} }) => (
       </div>
     </div>
     <div className="device-fields-row">
-      <div className={`form-group${errors.inputField ? ' has-error' : ''}`}>
-        <label>Input Field *</label>
-        <input className="form-input" value={device.inputField} onChange={(e) => onChange('inputField', e.target.value)} placeholder="e.g. A4, Legal" />
-        {errors.inputField && <span className="field-error">{errors.inputField}</span>}
+      <div className="form-group">
+        <label>Serial Number</label>
+        <input className="form-input" value={device.serialNumber || ''} onChange={(e) => onChange('serialNumber', e.target.value)} placeholder="S/N" />
+      </div>
+      <div className="form-group">
+        <label>Page Count</label>
+        <input className="form-input" value={device.pageCount || ''} onChange={(e) => onChange('pageCount', e.target.value)} placeholder="e.g. 12500" />
       </div>
       <div className="form-group">
         <label>Location</label>
         <input className="form-input" value={device.location} onChange={(e) => onChange('location', e.target.value)} placeholder="e.g. Reception" />
       </div>
+    </div>
+    <div className="device-fields-row">
+      <div className="form-group">
+        <label>Notes</label>
+        <input className="form-input" value={device.notes || device.inputField || ''} onChange={(e) => onChange('notes', e.target.value)} placeholder="e.g. A4, Legal" />
+      </div>
+      <div className="form-group" />
       <div className="form-group" />
     </div>
   </div>
@@ -324,6 +333,90 @@ const CCTVFields = ({ device, onChange, errors = {} }) => {
   );
 };
 
+const VpsFields = ({ device, onChange, errors = {} }) => {
+  const updateConfig = (idx, field, value) => {
+    const configs = [...device.configurations];
+    configs[idx] = { ...configs[idx], [field]: value };
+    onChange('configurations', configs);
+  };
+  const addConfig = () => onChange('configurations', [...device.configurations, { name: '', specification: '', serialNumber: '' }]);
+  const removeConfig = (idx) => {
+    if (device.configurations.length === 1) return;
+    onChange('configurations', device.configurations.filter((_, i) => i !== idx));
+  };
+  return (
+    <div className="device-fields-section">
+      <div className="device-fields-row">
+        <div className="form-group"><label>Provider / Brand</label><input className="form-input" value={device.brand} onChange={(e) => onChange('brand', e.target.value)} placeholder="e.g. AWS, Azure, DigitalOcean" /></div>
+        <div className="form-group"><label>Plan / Instance Type</label><input className="form-input" value={device.model} onChange={(e) => onChange('model', e.target.value)} placeholder="e.g. t3.medium, B2s" /></div>
+        <div className="form-group"><label>Instance ID / Serial</label><input className="form-input" value={device.serialNumber} onChange={(e) => onChange('serialNumber', e.target.value)} placeholder="e.g. i-1234567890" /></div>
+      </div>
+      <div className="device-fields-row">
+        <div className="form-group"><label>Region / Location</label><input className="form-input" value={device.location} onChange={(e) => onChange('location', e.target.value)} placeholder="e.g. us-east-1, Southeast Asia" /></div>
+        <div className="form-group" /><div className="form-group" />
+      </div>
+      <div className="config-table-section">
+        <div className="config-table-header"><span className="config-table-title">Specifications</span></div>
+        <table className="config-table">
+          <thead><tr><th>Name</th><th>Specification</th><th>Serial / ID</th><th></th></tr></thead>
+          <tbody>{device.configurations.map((conf, idx) => (
+            <tr key={idx}>
+              <td><input className="form-input" value={conf.name} onChange={(e) => updateConfig(idx, 'name', e.target.value)} placeholder="e.g. vCPUs" /></td>
+              <td><input className="form-input" value={conf.specification} onChange={(e) => updateConfig(idx, 'specification', e.target.value)} placeholder="e.g. 4 Cores" /></td>
+              <td><input className="form-input" value={conf.serialNumber} onChange={(e) => updateConfig(idx, 'serialNumber', e.target.value)} placeholder="ID / S/N" /></td>
+              <td><div style={{ display: 'flex', gap: '4px' }}>
+                <button className="device-action-button delete" onClick={() => removeConfig(idx)}><Trash2 size={14} /></button>
+                {idx === device.configurations.length - 1 && <button className="device-action-button add" onClick={addConfig}><Plus size={14} /></button>}
+              </div></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const GenericFields = ({ device, onChange, errors = {} }) => {
+  const configs = device.configurations && device.configurations.length > 0
+    ? device.configurations : [{ name: '', specification: '', serialNumber: '' }];
+  const updateConfig = (idx, field, value) => {
+    const next = [...configs]; next[idx] = { ...next[idx], [field]: value };
+    onChange('configurations', next);
+  };
+  const addConfig = () => onChange('configurations', [...configs, { name: '', specification: '', serialNumber: '' }]);
+  const removeConfig = (idx) => { if (configs.length === 1) return; onChange('configurations', configs.filter((_, i) => i !== idx)); };
+  return (
+    <div className="device-fields-section">
+      <div className="device-fields-row">
+        <div className="form-group"><label>Brand</label><input className="form-input" value={device.brand || ''} onChange={(e) => onChange('brand', e.target.value)} placeholder="e.g. Dell, HP" /></div>
+        <div className="form-group"><label>Model</label><input className="form-input" value={device.model || ''} onChange={(e) => onChange('model', e.target.value)} placeholder="Model / Part number" /></div>
+        <div className="form-group"><label>Serial Number</label><input className="form-input" value={device.serialNumber || ''} onChange={(e) => onChange('serialNumber', e.target.value)} placeholder="S/N" /></div>
+      </div>
+      <div className="device-fields-row">
+        <div className="form-group"><label>Location</label><input className="form-input" value={device.location || ''} onChange={(e) => onChange('location', e.target.value)} placeholder="e.g. Server Room" /></div>
+        <div className="form-group" /><div className="form-group" />
+      </div>
+      <div className="config-table-section">
+        <div className="config-table-header"><span className="config-table-title">Specifications</span></div>
+        <table className="config-table">
+          <thead><tr><th>Name</th><th>Specification</th><th>Serial / ID</th><th></th></tr></thead>
+          <tbody>{configs.map((conf, idx) => (
+            <tr key={idx}>
+              <td><input className="form-input" value={conf.name || ''} onChange={(e) => updateConfig(idx, 'name', e.target.value)} placeholder="e.g. RAM" /></td>
+              <td><input className="form-input" value={conf.specification || ''} onChange={(e) => updateConfig(idx, 'specification', e.target.value)} placeholder="e.g. 16GB" /></td>
+              <td><input className="form-input" value={conf.serialNumber || ''} onChange={(e) => updateConfig(idx, 'serialNumber', e.target.value)} placeholder="S/N" /></td>
+              <td><div style={{ display: 'flex', gap: '4px' }}>
+                <button className="device-action-button delete" onClick={() => removeConfig(idx)}><Trash2 size={14} /></button>
+                {idx === configs.length - 1 && <button className="device-action-button add" onClick={addConfig}><Plus size={14} /></button>}
+              </div></td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const TotalMaintenanceFields = ({ device, onReplace, errors = {}, settings = { devices: ['Laptop', 'Desktop', 'Server', 'Printer', 'CCTV'] } }) => {
   const sub = device.subDeviceType || 'Laptop';
   const subData = device.subDeviceData || createBlankDevice(sub);
@@ -343,7 +436,8 @@ const TotalMaintenanceFields = ({ device, onReplace, errors = {}, settings = { d
       case 'Server': return <DesktopServerFields device={subData} onChange={handleSubFieldChange} errors={errors} />;
       case 'Printer': return <PrinterFields device={subData} onChange={handleSubFieldChange} errors={errors} />;
       case 'CCTV': return <CCTVFields device={subData} onChange={handleSubFieldChange} errors={errors} />;
-      default: return null;
+      case 'VPS': return <VpsFields device={subData} onChange={handleSubFieldChange} errors={errors} />;
+      default: return <GenericFields device={subData} onChange={handleSubFieldChange} errors={errors} />;
     }
   };
 
@@ -376,8 +470,9 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
       case 'Server': return <DesktopServerFields device={device} onChange={onChange} errors={errors} />;
       case 'Printer': return <PrinterFields device={device} onChange={onChange} errors={errors} />;
       case 'CCTV': return <CCTVFields device={device} onChange={onChange} errors={errors} />;
+      case 'VPS': return <VpsFields device={device} onChange={onChange} errors={errors} />;
       case 'Total Maintenance': return <TotalMaintenanceFields device={device} onReplace={(updated) => onUpdate(index, updated)} errors={errors} />;
-      default: return null;
+      default: return <GenericFields device={device} onChange={onChange} errors={errors} />;
     }
   };
 
@@ -434,8 +529,11 @@ const RentalNewCustomerPage = () => {
   const errorBannerRef = useRef(null);
   const [plans, setPlans] = useState([]);
   const [inventoryAssets, setInventoryAssets] = useState([]);
-  const [assetSearch, setAssetSearch] = useState('');
   const [originalAssetIds, setOriginalAssetIds] = useState([]);
+  const [deviceSlots, setDeviceSlots] = useState(['']);
+  const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
+  const [addingDevice, setAddingDevice] = useState(false);
+  const [newDeviceForm, setNewDeviceForm] = useState({ assetTag: '', type: 'Laptop', brand: '', model: '', serialNumber: '' });
 
   const [form, setForm] = useState({
     companyName: '',
@@ -497,9 +595,11 @@ const RentalNewCustomerPage = () => {
               : []),
             devices: Array.isArray(existing.devices) ? existing.devices : [],
           });
-          setOriginalAssetIds(existing.selectedAssetIds || (Array.isArray(existing.devices)
+          const loadedIds = existing.selectedAssetIds || (Array.isArray(existing.devices)
             ? existing.devices.map((d) => d.inventoryAssetId).filter(Boolean)
-            : []));
+            : []);
+          setOriginalAssetIds(loadedIds);
+          setDeviceSlots(loadedIds.length > 0 ? loadedIds.map(String) : ['']);
         }
       } catch (err) {
         console.error('Failed to load rental customer:', err);
@@ -529,23 +629,65 @@ const RentalNewCustomerPage = () => {
       .filter(Boolean)
   ), [form.selectedAssetIds, inventoryAssets]);
 
-  const filteredInventoryAssets = useMemo(() => {
-    const query = assetSearch.trim().toLowerCase();
-    return inventoryAssets.filter((asset) => {
-      const haystack = [
-        asset.assetTag,
-        asset.assetId,
-        asset.id,
-        asset.serialNumber,
-        asset.type,
-        asset.model,
-        asset.configuration,
-        asset.configurations,
-        asset.addOnParts,
-      ].join(' ').toLowerCase();
-      return !query || haystack.includes(query);
-    });
-  }, [assetSearch, inventoryAssets]);
+  const availableAssets = useMemo(() => inventoryAssets.filter((asset) => {
+    const status = (asset.status || '').toLowerCase();
+    if (status === 'sold' || status === 'rented' || status === 'in repair' || status === 'replaced') {
+      return form.selectedAssetIds.map(String).includes(String(asset.id));
+    }
+    const assignedElsewhere = asset.rentalCustomerId && String(asset.rentalCustomerId) !== String(editId || '');
+    return !assignedElsewhere;
+  }), [inventoryAssets, form.selectedAssetIds, editId]);
+
+  const updateSlot = (slotIdx, assetId) => {
+    const next = [...deviceSlots];
+    next[slotIdx] = assetId;
+    setDeviceSlots(next);
+    const ids = next.filter(Boolean);
+    const selectedAssetList = ids.map((id) => inventoryAssets.find((a) => String(a.id) === String(id))).filter(Boolean);
+    setForm((f) => ({ ...f, selectedAssetIds: ids, devices: selectedAssetList.map(mapInventoryAssetToRentalDevice) }));
+    setErrors((e) => ({ ...e, selectedAssetIds: undefined }));
+  };
+
+  const addSlot = () => setDeviceSlots((s) => [...s, '']);
+
+  const removeSlot = (slotIdx) => {
+    const next = deviceSlots.filter((_, i) => i !== slotIdx);
+    const safeNext = next.length === 0 ? [''] : next;
+    setDeviceSlots(safeNext);
+    const ids = safeNext.filter(Boolean);
+    const selectedAssetList = ids.map((id) => inventoryAssets.find((a) => String(a.id) === String(id))).filter(Boolean);
+    setForm((f) => ({ ...f, selectedAssetIds: ids, devices: selectedAssetList.map(mapInventoryAssetToRentalDevice) }));
+  };
+
+  const handleAddDeviceSave = async () => {
+    if (!newDeviceForm.assetTag.trim() || !newDeviceForm.brand.trim() || !newDeviceForm.model.trim()) return;
+    setAddingDevice(true);
+    try {
+      const allAssets = await api.list('assets');
+      const prefix = 'SN-RB-';
+      let max = 0;
+      (Array.isArray(allAssets) ? allAssets : []).forEach((a) => {
+        const sn = a.serialNumber || '';
+        if (sn.startsWith(prefix)) { const n = parseInt(sn.slice(prefix.length), 10); if (!isNaN(n) && n > max) max = n; }
+      });
+      const serial = `${prefix}${String(max + 1).padStart(5, '0')}`;
+      const payload = { assetTag: newDeviceForm.assetTag.trim(), serialNumber: serial, type: newDeviceForm.type, brand: newDeviceForm.brand.trim(), model: newDeviceForm.model.trim(), status: 'Active', configuration: '' };
+      const created = await api.create('assets', payload);
+      const newAsset = { ...payload, id: created.id || created._id || Date.now() };
+      setInventoryAssets((prev) => [...prev, newAsset]);
+      const nextSlots = [...deviceSlots.filter(Boolean), String(newAsset.id)];
+      if (deviceSlots[deviceSlots.length - 1] === '') {
+        nextSlots.unshift('');
+        setDeviceSlots([...deviceSlots.slice(0, -1), String(newAsset.id)]);
+      } else {
+        setDeviceSlots(nextSlots);
+      }
+      const ids = nextSlots.filter(Boolean);
+      setForm((f) => ({ ...f, selectedAssetIds: ids }));
+      setShowAddDeviceModal(false);
+      setNewDeviceForm({ assetTag: '', type: 'Laptop', brand: '', model: '', serialNumber: '' });
+    } catch { /* ignore */ } finally { setAddingDevice(false); }
+  };
 
   const toggleAssetSelection = (asset) => {
     const isAssignedElsewhere = asset.rentalCustomerId && String(asset.rentalCustomerId) !== String(editId || '');
@@ -872,137 +1014,110 @@ const RentalNewCustomerPage = () => {
         <div className="amc-form-card card-devices">
           <div className="amc-form-card-header device-registry-header">
             <div>
-              <h2 className="amc-form-section-title">3. Inventory Assets *</h2>
+              <h2 className="amc-form-section-title">3. Devices *</h2>
               <p style={{ margin: '4px 0 0', color: '#64748b', fontSize: 13 }}>
-                Select devices already registered in Inventory. Rental tracking will use only these assets.
+                Select devices from inventory. Only Active unassigned devices are shown.
               </p>
             </div>
-            <button className="secondary-button" style={{ height: '36px', fontSize: '13px' }} onClick={() => navigate('/admin/inventory/assets/new')}>
-              <Plus size={16} /> Add Inventory Asset
+            <button className="secondary-button" style={{ height: '36px', fontSize: '13px' }} onClick={() => setShowAddDeviceModal(true)}>
+              <Plus size={16} /> Add Device
             </button>
           </div>
           <div className="amc-form-card-body">
-            <div className={`form-group${errors.selectedAssetIds ? ' has-error' : ''}`}>
-              <label>Select Assets From Inventory *</label>
-              <div className="plans-search" style={{ maxWidth: 420, marginBottom: 14 }}>
-                <Search size={16} />
-                <input
-                  value={assetSearch}
-                  onChange={(e) => setAssetSearch(e.target.value)}
-                  placeholder="Search device ID, serial, model..."
-                />
-              </div>
-              {errors.selectedAssetIds && <span className="field-error">{errors.selectedAssetIds}</span>}
+            {errors.selectedAssetIds && <span className="field-error" style={{ marginBottom: 10, display: 'block' }}>{errors.selectedAssetIds}</span>}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {deviceSlots.map((slotId, slotIdx) => {
+                const selected = slotId ? inventoryAssets.find((a) => String(a.id) === String(slotId)) : null;
+                const usedInOtherSlots = deviceSlots.filter((_, i) => i !== slotIdx).filter(Boolean);
+                const options = availableAssets.filter((a) => !usedInOtherSlots.includes(String(a.id)) || String(a.id) === slotId);
+                return (
+                  <div key={slotIdx} style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: '#f8fafc', borderBottom: selected ? '1px solid #e2e8f0' : 'none' }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 6 }}>
+                          Device {slotIdx + 1}
+                        </label>
+                        <select
+                          className="form-select"
+                          value={slotId}
+                          onChange={(e) => updateSlot(slotIdx, e.target.value)}
+                          style={{ maxWidth: 480 }}
+                        >
+                          <option value="">— Select a device —</option>
+                          {options.map((a) => (
+                            <option key={a.id} value={String(a.id)}>
+                              {getAssetDisplayId(a)}{a.serialNumber ? ` — S/N: ${a.serialNumber}` : ''}{a.model ? ` — ${a.model}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {deviceSlots.length > 1 && (
+                        <button onClick={() => removeSlot(slotIdx)} title="Remove this slot" style={{ display: 'flex', alignItems: 'center', padding: '6px 8px', borderRadius: 6, border: '1px solid #fee2e2', background: '#fff5f5', cursor: 'pointer', color: '#ef4444', marginTop: 20 }}>
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+
+                    {selected && (
+                      <div style={{ padding: '14px 16px', background: '#f0fdf4', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px 24px' }}>
+                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Device ID</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{getAssetDisplayId(selected)}</p></div>
+                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Serial Number</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selected.serialNumber || '-'}</p></div>
+                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Type</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selected.type || '-'}</p></div>
+                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Brand / Model</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{[selected.brand, selected.model].filter(Boolean).join(' ') || '-'}</p></div>
+                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Configuration</span><p style={{ margin: '2px 0 0', fontWeight: 700, color: '#0f172a', fontSize: '0.9rem' }}>{selected.configuration || selected.configurations || '-'}</p></div>
+                        <div><span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' }}>Status</span><p style={{ margin: '2px 0 0' }}><span className={`status-badge status-${String(selected.status || 'idle').toLowerCase().replace(/\s+/g, '-')}`}>{selected.status || 'Idle'}</span></p></div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            {inventoryAssets.length === 0 ? (
-              <div className="empty-devices-hint">
-                No inventory assets found. Add devices in Inventory first, then select them here for rental tracking.
-              </div>
-            ) : (
-              <div className="inventory-table-wrap" style={{ borderRadius: 12, border: '1px solid #e2e8f0' }}>
-                <table className="inventory-table asset-table">
-                  <thead>
-                    <tr>
-                      <th style={{ width: 52 }}>Use</th>
-                      <th>Device ID / Serial Number</th>
-                      <th>Type</th>
-                      <th>Model</th>
-                      <th>Configuration</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredInventoryAssets.map((asset) => {
-                      const checked = form.selectedAssetIds.map(String).includes(String(asset.id));
-                      const assignedElsewhere = asset.rentalCustomerId && String(asset.rentalCustomerId) !== String(editId || '');
-                      return (
-                        <tr key={asset.id} className={checked ? 'bg-indigo-50' : ''}>
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              disabled={assignedElsewhere}
-                              onChange={() => toggleAssetSelection(asset)}
-                              style={{ width: 16, height: 16 }}
-                              title={assignedElsewhere ? 'Already assigned to another rental customer' : 'Select asset'}
-                            />
-                          </td>
-                          <td>
-                            <div className="inventory-device-cell">
-                              <div className="inventory-device-icon"><HardDrive size={18} /></div>
-                              <div>
-                                <strong>{getAssetDisplayId(asset)}</strong>
-                                <span>S/N: {asset.serialNumber || '-'}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td>{asset.type || '-'}</td>
-                          <td>{asset.model || '-'}</td>
-                          <td className="inventory-muted-cell">{asset.configuration || asset.configurations || '-'}</td>
-                          <td>
-                            <span className={`status-badge status-${String(asset.status || 'idle').toLowerCase().replace(/\s+/g, '-')}`}>
-                              {assignedElsewhere ? 'Assigned' : asset.status || 'Idle'}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {filteredInventoryAssets.length === 0 && (
-                      <tr><td colSpan={6} className="inventory-empty">No inventory assets match this search.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {selectedAssets.length > 0 && (
-              <div className="device-accordion-list" style={{ marginTop: 18 }}>
-                {selectedAssets.map((asset, index) => (
-                  <div key={asset.id} className="device-accordion open">
-                    <div className="accordion-header">
-                      <div className="accordion-title-area">
-                        <span className="accordion-device-index">Asset {index + 1}</span>
-                        <span className="accordion-device-type-badge">{asset.type || 'Device'}</span>
-                        <span className="accordion-device-summary">{getAssetDisplayId(asset)} · {asset.serialNumber || 'No serial'}</span>
-                      </div>
-                    </div>
-                    <div className="accordion-body">
-                      <div className="device-fields-section">
-                        <div className="device-fields-row">
-                          <div className="form-group">
-                            <label>Model</label>
-                            <input className="form-input" value={asset.model || '-'} readOnly />
-                          </div>
-                          <div className="form-group">
-                            <label>Location</label>
-                            <input className="form-input" value={asset.location || '-'} readOnly />
-                          </div>
-                          <div className="form-group">
-                            <label>Add-on Parts</label>
-                            <input className="form-input" value={asset.addOnParts || '-'} readOnly />
-                          </div>
-                        </div>
-                        <div className="config-table-section">
-                          <div className="config-table-header"><span className="config-table-title">Configuration</span></div>
-                          <table className="config-table">
-                            <thead><tr><th>Name</th><th>Specification</th></tr></thead>
-                            <tbody>
-                              <tr>
-                                <td><input className="form-input" value="Inventory Details" readOnly /></td>
-                                <td><input className="form-input" value={asset.configuration || asset.configurations || '-'} readOnly /></td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <button onClick={addSlot} style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: '1px dashed #6366f1', background: 'transparent', color: '#6366f1', cursor: 'pointer', fontWeight: 600, fontSize: '0.84rem' }}>
+              <Plus size={14} /> Add Another Device
+            </button>
           </div>
         </div>
+
+        {showAddDeviceModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', maxWidth: 480, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', color: '#0f172a' }}>Add New Device</h3>
+              <p style={{ margin: '0 0 20px', fontSize: '0.84rem', color: '#64748b' }}>Device will be saved to Inventory and auto-selected here.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label>Device ID *</label>
+                  <input className="form-input" value={newDeviceForm.assetTag} onChange={(e) => setNewDeviceForm((f) => ({ ...f, assetTag: e.target.value }))} placeholder="e.g. RB-LAP-002" />
+                </div>
+                <div className="form-group">
+                  <label>Type</label>
+                  <select className="form-select" value={newDeviceForm.type} onChange={(e) => setNewDeviceForm((f) => ({ ...f, type: e.target.value }))}>
+                    {['Laptop', 'Desktop', 'Server', 'Printer', 'CCTV', 'VPS'].map((t) => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Brand *</label>
+                  <input className="form-input" value={newDeviceForm.brand} onChange={(e) => setNewDeviceForm((f) => ({ ...f, brand: e.target.value }))} placeholder="e.g. Dell" />
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label>Model *</label>
+                  <input className="form-input" value={newDeviceForm.model} onChange={(e) => setNewDeviceForm((f) => ({ ...f, model: e.target.value }))} placeholder="e.g. Latitude 5420" />
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label>Serial Number <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>(Auto-generated on save)</span></label>
+                  <input className="form-input" value="SN-RB-XXXXX" readOnly style={{ background: '#f8fafc', color: '#94a3b8', cursor: 'default' }} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
+                <button onClick={() => { setShowAddDeviceModal(false); setNewDeviceForm({ assetTag: '', type: 'Laptop', brand: '', model: '', serialNumber: '' }); }} style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>Cancel</button>
+                <button onClick={handleAddDeviceSave} disabled={addingDevice || !newDeviceForm.assetTag.trim() || !newDeviceForm.brand.trim() || !newDeviceForm.model.trim()} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#6366f1', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem', opacity: addingDevice ? 0.7 : 1 }}>
+                  {addingDevice ? 'Saving...' : 'Save & Select'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="amc-form-footer">
           <button className="secondary-button" onClick={() => navigate('/admin/rental/customers')}>Cancel</button>

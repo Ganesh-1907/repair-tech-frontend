@@ -24,9 +24,11 @@ const createBlankDevice = (type = 'Laptop') => {
         monitor: { subType: '', brand: '', serialNumber: '', location: '' },
       };
     case 'Printer':
-      return { type: 'Printer', subType: '', brand: '', model: '', serialNumber: '', inputField: '', location: '' };
+      return { type: 'Printer', subType: '', brand: '', model: '', serialNumber: '', pageCount: '', notes: '', location: '' };
     case 'CCTV':
       return { type: 'CCTV', subType: '', brand: '', model: '', serialNumber: '', specs: [''], location: '' };
+    case 'VPS':
+      return { type: 'VPS', brand: '', model: '', serialNumber: '', location: '', configurations: [{ name: '', specification: '', serialNumber: '' }] };
     case 'Total Maintenance':
       return {
         type: 'Total Maintenance',
@@ -34,17 +36,18 @@ const createBlankDevice = (type = 'Laptop') => {
         subDeviceData: createBlankDevice('Laptop'),
       };
     default:
-      return { type, brand: '', model: '', serialNumber: '', location: '' };
+      return { type, brand: '', model: '', serialNumber: '', location: '', configurations: [{ name: '', specification: '', serialNumber: '' }] };
   }
 };
 
 const getDeviceTypeOptions = (configuredDevices = []) => Array.from(new Set([
-  ...configuredDevices,
   'Laptop',
   'Desktop',
   'Server',
   'Printer',
   'CCTV',
+  'VPS',
+  ...configuredDevices.filter(d => !['Laptop', 'Desktop', 'Server', 'Printer', 'CCTV', 'VPS', 'Total Maintenance'].includes(d)),
   'Total Maintenance',
 ]));
 
@@ -212,13 +215,21 @@ const PrinterFields = ({ device, onChange }) => (
         <input className="form-input" value={device.serialNumber} onChange={e => onChange('serialNumber', e.target.value)} placeholder="S/N" />
       </div>
       <div className="form-group">
-        <label>Input Field</label>
-        <input className="form-input" value={device.inputField} onChange={e => onChange('inputField', e.target.value)} placeholder="e.g. A4, Legal" />
+        <label>Page Count</label>
+        <input className="form-input" value={device.pageCount || ''} onChange={e => onChange('pageCount', e.target.value)} placeholder="e.g. 12500" />
       </div>
       <div className="form-group">
         <label>Location</label>
         <input className="form-input" value={device.location} onChange={e => onChange('location', e.target.value)} placeholder="e.g. Reception" />
       </div>
+    </div>
+    <div className="device-fields-row">
+      <div className="form-group">
+        <label>Notes</label>
+        <input className="form-input" value={device.notes || device.inputField || ''} onChange={e => onChange('notes', e.target.value)} placeholder="e.g. A4, Legal" />
+      </div>
+      <div className="form-group" />
+      <div className="form-group" />
     </div>
   </div>
 );
@@ -279,6 +290,123 @@ const CCTVFields = ({ device, onChange }) => {
   );
 };
 
+const VpsFields = ({ device, onChange }) => {
+  const updateConfig = (idx, field, value) => {
+    const configs = [...device.configurations];
+    configs[idx] = { ...configs[idx], [field]: value };
+    onChange('configurations', configs);
+  };
+  const addConfig = () => onChange('configurations', [...device.configurations, { name: '', specification: '', serialNumber: '' }]);
+  const removeConfig = (idx) => {
+    if (device.configurations.length === 1) return;
+    onChange('configurations', device.configurations.filter((_, i) => i !== idx));
+  };
+  return (
+    <div className="device-fields-section">
+      <div className="device-fields-row">
+        <div className="form-group">
+          <label>Provider / Brand</label>
+          <input className="form-input" value={device.brand} onChange={e => onChange('brand', e.target.value)} placeholder="e.g. AWS, Azure, DigitalOcean" />
+        </div>
+        <div className="form-group">
+          <label>Plan / Instance Type</label>
+          <input className="form-input" value={device.model} onChange={e => onChange('model', e.target.value)} placeholder="e.g. t3.medium, B2s" />
+        </div>
+        <div className="form-group">
+          <label>Instance ID / Serial</label>
+          <input className="form-input" value={device.serialNumber} onChange={e => onChange('serialNumber', e.target.value)} placeholder="e.g. i-1234567890" />
+        </div>
+      </div>
+      <div className="device-fields-row">
+        <div className="form-group">
+          <label>Region / Location</label>
+          <input className="form-input" value={device.location} onChange={e => onChange('location', e.target.value)} placeholder="e.g. us-east-1, Southeast Asia" />
+        </div>
+        <div className="form-group" /><div className="form-group" />
+      </div>
+      <div className="config-table-section">
+        <div className="config-table-header"><span className="config-table-title">Specifications</span></div>
+        <table className="config-table">
+          <thead><tr><th>Name</th><th>Specification</th><th>Serial / ID</th><th></th></tr></thead>
+          <tbody>
+            {device.configurations.map((conf, idx) => (
+              <tr key={idx}>
+                <td><input className="form-input" value={conf.name} onChange={e => updateConfig(idx, 'name', e.target.value)} placeholder="e.g. vCPUs" /></td>
+                <td><input className="form-input" value={conf.specification} onChange={e => updateConfig(idx, 'specification', e.target.value)} placeholder="e.g. 4 Cores" /></td>
+                <td><input className="form-input" value={conf.serialNumber} onChange={e => updateConfig(idx, 'serialNumber', e.target.value)} placeholder="ID / S/N" /></td>
+                <td><div style={{ display: 'flex', gap: '4px' }}>
+                  <button className="device-action-button delete" onClick={() => removeConfig(idx)}><Trash2 size={14} /></button>
+                  {idx === device.configurations.length - 1 && <button className="device-action-button add" onClick={addConfig}><Plus size={14} /></button>}
+                </div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const GenericFields = ({ device, onChange }) => {
+  const configs = device.configurations && device.configurations.length > 0
+    ? device.configurations
+    : [{ name: '', specification: '', serialNumber: '' }];
+  const updateConfig = (idx, field, value) => {
+    const next = [...configs];
+    next[idx] = { ...next[idx], [field]: value };
+    onChange('configurations', next);
+  };
+  const addConfig = () => onChange('configurations', [...configs, { name: '', specification: '', serialNumber: '' }]);
+  const removeConfig = (idx) => {
+    if (configs.length === 1) return;
+    onChange('configurations', configs.filter((_, i) => i !== idx));
+  };
+  return (
+    <div className="device-fields-section">
+      <div className="device-fields-row">
+        <div className="form-group">
+          <label>Brand</label>
+          <input className="form-input" value={device.brand || ''} onChange={e => onChange('brand', e.target.value)} placeholder="e.g. Dell, HP" />
+        </div>
+        <div className="form-group">
+          <label>Model</label>
+          <input className="form-input" value={device.model || ''} onChange={e => onChange('model', e.target.value)} placeholder="Model / Part number" />
+        </div>
+        <div className="form-group">
+          <label>Serial Number</label>
+          <input className="form-input" value={device.serialNumber || ''} onChange={e => onChange('serialNumber', e.target.value)} placeholder="S/N" />
+        </div>
+      </div>
+      <div className="device-fields-row">
+        <div className="form-group">
+          <label>Location</label>
+          <input className="form-input" value={device.location || ''} onChange={e => onChange('location', e.target.value)} placeholder="e.g. Server Room" />
+        </div>
+        <div className="form-group" /><div className="form-group" />
+      </div>
+      <div className="config-table-section">
+        <div className="config-table-header"><span className="config-table-title">Specifications</span></div>
+        <table className="config-table">
+          <thead><tr><th>Name</th><th>Specification</th><th>Serial / ID</th><th></th></tr></thead>
+          <tbody>
+            {configs.map((conf, idx) => (
+              <tr key={idx}>
+                <td><input className="form-input" value={conf.name || ''} onChange={e => updateConfig(idx, 'name', e.target.value)} placeholder="e.g. RAM" /></td>
+                <td><input className="form-input" value={conf.specification || ''} onChange={e => updateConfig(idx, 'specification', e.target.value)} placeholder="e.g. 16GB" /></td>
+                <td><input className="form-input" value={conf.serialNumber || ''} onChange={e => updateConfig(idx, 'serialNumber', e.target.value)} placeholder="S/N" /></td>
+                <td><div style={{ display: 'flex', gap: '4px' }}>
+                  <button className="device-action-button delete" onClick={() => removeConfig(idx)}><Trash2 size={14} /></button>
+                  {idx === configs.length - 1 && <button className="device-action-button add" onClick={addConfig}><Plus size={14} /></button>}
+                </div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const TotalMaintenanceFields = ({ device, onReplace, deviceTypes }) => {
   const sub = device.subDeviceType || 'Laptop';
   const subData = device.subDeviceData || createBlankDevice(sub);
@@ -299,7 +427,8 @@ const TotalMaintenanceFields = ({ device, onReplace, deviceTypes }) => {
       case 'Server': return <DesktopServerFields device={subData} onChange={handleSubFieldChange} />;
       case 'Printer': return <PrinterFields device={subData} onChange={handleSubFieldChange} />;
       case 'CCTV': return <CCTVFields device={subData} onChange={handleSubFieldChange} />;
-      default: return null;
+      case 'VPS': return <VpsFields device={subData} onChange={handleSubFieldChange} />;
+      default: return <GenericFields device={subData} onChange={handleSubFieldChange} />;
     }
   };
 
@@ -319,12 +448,9 @@ const TotalMaintenanceFields = ({ device, onReplace, deviceTypes }) => {
 // ─── Device Accordion ────────────────────────────────────────────────────────
 
 const getDeviceSummary = (d) => {
-  if (d.type === 'Laptop') return `${d.brand || ''} ${d.model || ''}`.trim() || '';
   if (d.type === 'Desktop' || d.type === 'Server') return `${d.cpu?.brand || ''} ${d.cpu?.model || ''}`.trim() || '';
-  if (d.type === 'Printer') return `${d.brand || ''} ${d.model || ''}`.trim() || '';
-  if (d.type === 'CCTV') return `${d.brand || ''} ${d.model || ''}`.trim() || '';
   if (d.type === 'Total Maintenance') return `(${d.subDeviceType || 'Laptop'})`;
-  return '';
+  return `${d.brand || ''} ${d.model || ''}`.trim() || '';
 };
 
 const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, onAdd, deviceTypes }) => {
@@ -343,8 +469,9 @@ const DeviceAccordion = ({ device, index, isOpen, onToggle, onUpdate, onRemove, 
       case 'Server': return <DesktopServerFields device={device} onChange={onChange} />;
       case 'Printer': return <PrinterFields device={device} onChange={onChange} />;
       case 'CCTV': return <CCTVFields device={device} onChange={onChange} />;
+      case 'VPS': return <VpsFields device={device} onChange={onChange} />;
       case 'Total Maintenance': return <TotalMaintenanceFields device={device} onReplace={(updated) => onUpdate(index, updated)} deviceTypes={deviceTypes} />;
-      default: return null;
+      default: return <GenericFields device={device} onChange={onChange} />;
     }
   };
 

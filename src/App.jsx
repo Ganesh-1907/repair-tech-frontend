@@ -18,6 +18,8 @@ import CMCReport from './pages/CMCReport';
 import AMCReport from './pages/AMCReport';
 // Lead Pages
 import LeadQuotationPage from './pages/admin/LeadQuotationPage';
+import CampaignJobQuotationPage from './pages/admin/CampaignJobQuotationPage';
+import CampaignJobIntakePage from './pages/admin/CampaignJobIntakePage';
 import LeadBillingPage from './pages/admin/LeadBillingPage';
 import CreateLeadPage from './pages/admin/CreateLeadPage';
 import SettingsPage from './pages/admin/SettingsPage';
@@ -250,6 +252,8 @@ function App() {
               <Route path="/admin/campaign/campaigns" element={<Layout><CampaignsListingPage /></Layout>} />
               <Route path="/admin/campaign/jobs" element={<Layout><CampaignJobsPage /></Layout>} />
               <Route path="/admin/campaign/billing/:id" element={<Layout><LeadBillingPage moduleType="campaign" /></Layout>} />
+              <Route path="/admin/campaign/jobs/quotation/:id" element={<Layout><CampaignJobQuotationPage /></Layout>} />
+              <Route path="/admin/campaign/jobs/intake/:id" element={<Layout><CampaignJobIntakePage /></Layout>} />
 
               {/* Dynamic Admin Routes */}
               {safeRouteEntries.map((route) => {

@@ -282,11 +282,11 @@ const PlanModal = ({ onClose, onSubmit, editingItem, saving, type }) => {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div className="form-group">
-              <label>Visits per Year</label>
+              <label>Visits per Agreement</label>
               <input className="form-input" value={formData.visits} onChange={e => setFormData({ ...formData, visits: e.target.value })} placeholder="e.g. 4 / Unlimited" />
             </div>
             <div className="form-group">
-              <label>Duration</label>
+              <label>Agreement Duration</label>
               <input className="form-input" value={formData.duration} onChange={e => setFormData({ ...formData, duration: e.target.value })} placeholder="e.g. 12 Months" />
             </div>
           </div>
