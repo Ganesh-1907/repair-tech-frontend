@@ -3,9 +3,11 @@ import { Search, Plus, X, Edit, Eye, MoreVertical, ChevronDown, UploadCloud } fr
 import { useSearchParams } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { usePrivacy } from '../../context/PrivacyContext';
+import { useAuth } from '../../context/AuthContext';
 import { expenseManagementService } from '../../services/expenseManagementService';
 import { api } from '../../services/apiClient';
 import { useExpenseSettings } from '../../hooks/useExpenseSettings';
+import { normalizeRole } from '../../config/roles';
 
 const formatDateLabel = (value) => {
   if (!value) return '-';
@@ -30,6 +32,8 @@ const emptyForm = {
 
 const ExpensesListPage = () => {
   const { formatCurrency } = usePrivacy();
+  const { user } = useAuth();
+  const isCaAdmin = normalizeRole(user?.role) === 'caAdmin';
   const { settings: expenseSettings } = useExpenseSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [expenses, setExpenses] = useState([]);
@@ -87,6 +91,10 @@ const ExpensesListPage = () => {
     const mode = searchParams.get('mode');
     const expenseId = searchParams.get('expenseId');
     if (!mode) return;
+    if (isCaAdmin && mode === 'add') {
+      closeModal();
+      return;
+    }
     if (mode === 'add') {
       openAddModal();
       return;
@@ -264,9 +272,9 @@ const ExpensesListPage = () => {
 
       <AdminPageHeader
         title="Expenses"
-        description="View all admin and staff expenses. Add, edit, or filter by source and category."
-        breadcrumbs={['Admin', 'Expense Management', 'Expenses Listing']}
-        actions={[{ label: 'Add Expense', icon: Plus, onClick: openAddModal }]}
+    description="View all admin and staff expenses. Add, edit, or filter by source and category."
+    breadcrumbs={['Admin', 'Expense Management', 'Expenses Listing']}
+        actions={isCaAdmin ? [] : [{ label: 'Add Expense', icon: Plus, onClick: openAddModal }]}
       />
 
       <div className="card expenses-filter-strip expenses-list-filters-grid">

@@ -1,4 +1,5 @@
 import { api, apiClient } from './apiClient';
+import { normalizeRole } from '../config/roles';
 
 const normalizeStatus = (value) => {
   if (!value) return 'Inactive';
@@ -30,7 +31,7 @@ export const staffManagementService = {
       age: payload.age || '',
       phone: payload.phone,
       email: payload.email || '',
-      role: 'Staff',
+      role: normalizeRole(payload.role) || 'staff',
       department: payload.department || '',
       departmentSkill: payload.department || '',
       designation: payload.designation || '',
@@ -52,7 +53,7 @@ export const staffManagementService = {
     return api.update('staff', staffId, {
       ...payload,
       id: staffId,
-      role: 'Staff',
+      role: normalizeRole(payload.role) || 'staff',
       status: normalizeStatus(payload.status),
     });
   },

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { getRestrictedRoleDefaultPath } from '../config/roles';
 
 const inputStyle = {
   wrapper: { position: 'relative', display: 'flex', alignItems: 'center' },
@@ -41,7 +42,7 @@ const SetNewPassword = () => {
     const result = await setNewPassword(form.password);
     setLoading(false);
     if (result.success) {
-      navigate(result.user?.role === 'staff' ? '/admin/staff-portal' : '/', { replace: true });
+      navigate(getRestrictedRoleDefaultPath(result.user?.role), { replace: true });
     } else {
       setError(result.message);
     }

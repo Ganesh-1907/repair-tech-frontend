@@ -3,8 +3,6 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   CalendarClock,
   ChevronDown,
-  Eye,
-  EyeOff,
   Key,
   LayoutDashboard,
   LogOut,
@@ -18,9 +16,9 @@ import {
   UserCog,
   ReceiptText
 } from 'lucide-react';
-import { usePrivacy } from '../../context/PrivacyContext';
 import { useAuth } from '../../context/AuthContext';
 import { adminSidebarModules } from '../../config/adminModules';
+import { normalizeRole } from '../../config/roles';
 
 const menuIcons = {
   LayoutDashboard,
@@ -71,9 +69,11 @@ const collectActiveBranchIds = (items, pathname, collector = []) => {
   return collector;
 };
 
-const filterItemsByRole = (items, role) => (
-  items.reduce((accumulator, item) => {
-    if (role === 'staff' && !item.roles) return accumulator;
+const filterItemsByRole = (items, rawRole) => {
+  const role = normalizeRole(rawRole);
+  return items.reduce((accumulator, item) => {
+    const restrictedRoles = ['staff', 'sales', 'frontOffice', 'caAdmin'];
+    if (restrictedRoles.includes(role) && !item.roles) return accumulator;
     if (item.roles && !item.roles.includes(role)) return accumulator;
 
     const nextItem = { ...item };
@@ -86,14 +86,14 @@ const filterItemsByRole = (items, role) => (
     }
 
     return accumulator;
-  }, [])
-);
+  }, []);
+};
 
 const Sidebar = ({ isOpen = false, onClose }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isPrivacyOn, togglePrivacy } = usePrivacy();
   const { user, logout } = useAuth();
+  const role = normalizeRole(user?.role);
 
   const sidebarItems = useMemo(
     () => filterItemsByRole(adminSidebarModules, user?.role),
@@ -132,7 +132,7 @@ const Sidebar = ({ isOpen = false, onClose }) => {
     if (nodeHasChildren) {
       const hasOpenOverride = Object.prototype.hasOwnProperty.call(openById, item.id);
       const isForcedOpen = activeBranchIds.includes(item.id);
-      const nodeIsOpen = isForcedOpen || (hasOpenOverride ? openById[item.id] : Boolean(item.defaultOpen));
+      const nodeIsOpen = hasOpenOverride ? openById[item.id] : (isForcedOpen || Boolean(item.defaultOpen));
 
       return (
         <div key={item.id} className={`nav-tree-item depth-${depth} ${itemIsActive ? 'is-active-branch' : ''}`}>
@@ -199,19 +199,12 @@ const Sidebar = ({ isOpen = false, onClose }) => {
       </nav>
 
       <div className="sidebar-footer">
-        <NavLink to="/admin/settings" className={({ isActive }) => `sidebar-btn${isActive ? ' active' : ''}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Settings size={18} />
-          <span>Settings</span>
-        </NavLink>
-
-        <button
-          onClick={togglePrivacy}
-          className={`sidebar-btn privacy-toggle ${isPrivacyOn ? 'active' : ''}`}
-          title={isPrivacyOn ? 'Show values' : 'Hide values'}
-        >
-          {isPrivacyOn ? <Eye size={18} /> : <EyeOff size={18} />}
-          <span>Privacy Mode</span>
-        </button>
+        {role === 'admin' && (
+          <NavLink to="/admin/settings" className={({ isActive }) => `sidebar-btn${isActive ? ' active' : ''}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Settings size={18} />
+            <span>Settings</span>
+          </NavLink>
+        )}
 
         <button onClick={logout} className="sidebar-btn logout">
           <LogOut size={18} />

@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { billingInvoiceService } from '../services/billingInvoiceService';
 import { inventoryService } from '../services/inventoryService';
+import { useAuth } from '../context/AuthContext';
+import { normalizeRole } from '../config/roles';
+import { hasInvoiceGst } from '../utils/gst';
 import {
   AlertCircle,
   CheckCircle,
@@ -67,6 +70,8 @@ const getPaymentStatusClass = (status) => {
 };
 
 const Billing = () => {
+  const { user } = useAuth();
+  const isCaAdmin = normalizeRole(user?.role) === 'caAdmin';
   const [isGstEnabled, setIsGstEnabled] = useState(false);
   const [gstOption, setGstOption] = useState('extra');
   const [customer, setCustomer] = useState({
@@ -103,9 +108,11 @@ const Billing = () => {
   const gstAmount = isGstEnabled ? (gstOption === 'extra' ? subtotal * gstRate : subtotal - (subtotal / (1 + gstRate))) : 0;
   const total = isGstEnabled ? (gstOption === 'extra' ? subtotal + gstAmount : subtotal) : subtotal;
 
+  const visibleInvoices = useMemo(() => (isCaAdmin ? invoices.filter(hasInvoiceGst) : invoices), [invoices, isCaAdmin]);
+
   const customerOptions = useMemo(
-    () => [...new Set(invoices.map((invoice) => invoice.customerName))].sort((a, b) => a.localeCompare(b)),
-    [invoices]
+    () => [...new Set(visibleInvoices.map((invoice) => invoice.customerName))].sort((a, b) => a.localeCompare(b)),
+    [visibleInvoices]
   );
 
   const isDateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
@@ -137,7 +144,7 @@ const Billing = () => {
 
   const filteredInvoices = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return invoices.filter((invoice) => {
+    return visibleInvoices.filter((invoice) => {
       const invoiceDate = new Date(invoice.issueDate);
       const matchesSearch = query.length === 0
         || invoice.invoiceNumber.toLowerCase().includes(query)
@@ -154,24 +161,24 @@ const Billing = () => {
 
       return matchesSearch && matchesStatus && matchesPayment && matchesCustomer && matchesDateRange;
     });
-  }, [customerFilter, dateFrom, dateTo, invoices, isDateRangeInvalid, paymentFilter, searchQuery, statusFilter]);
+  }, [customerFilter, dateFrom, dateTo, visibleInvoices, isDateRangeInvalid, paymentFilter, searchQuery, statusFilter]);
 
   const invoiceSummary = useMemo(() => {
-    const collected = invoices
+    const collected = visibleInvoices
       .filter((invoice) => invoice.paymentStatus === 'Paid')
       .reduce((sum, invoice) => sum + invoice.total, 0);
-    const outstanding = invoices
+    const outstanding = visibleInvoices
       .filter((invoice) => invoice.paymentStatus !== 'Paid')
       .reduce((sum, invoice) => sum + invoice.total, 0);
-    const overdueCount = invoices.filter((invoice) => invoice.status === 'Overdue').length;
+    const overdueCount = visibleInvoices.filter((invoice) => invoice.status === 'Overdue').length;
 
     return {
-      totalInvoices: invoices.length,
+      totalInvoices: visibleInvoices.length,
       collected,
       outstanding,
       overdueCount,
     };
-  }, [invoices]);
+  }, [visibleInvoices]);
 
   useEffect(() => {
     if (!viewingInvoice) return undefined;
@@ -573,7 +580,7 @@ const Billing = () => {
                   <td>
                     <div className="item-cell">
                       <span className="customer-name">{invoice.invoiceNumber}</span>
-                      <span className="company-name">{invoice.items.length} line item{invoice.items.length > 1 ? 's' : ''}</span>
+                      <span className="company-name">{(invoice.items || []).length} line item{(invoice.items || []).length > 1 ? 's' : ''}</span>
                     </div>
                   </td>
                   <td>
@@ -597,14 +604,16 @@ const Billing = () => {
                         <span className="sr-only">Payment status: </span>
                         {invoice.paymentStatus}
                       </span>
-                      <button
-                        className="btn btn-sm btn-ghost"
-                        onClick={() => handlePaymentAction(invoice)}
-                        disabled={!canPaymentAction}
-                        aria-label={`${canPaymentAction ? paymentActionLabel : 'Payment settled'} for ${invoice.invoiceNumber}`}
-                      >
-                        {canPaymentAction ? paymentActionLabel : 'Settled'}
-                      </button>
+                      {!isCaAdmin && (
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          onClick={() => handlePaymentAction(invoice)}
+                          disabled={!canPaymentAction}
+                          aria-label={`${canPaymentAction ? paymentActionLabel : 'Payment settled'} for ${invoice.invoiceNumber}`}
+                        >
+                          {canPaymentAction ? paymentActionLabel : 'Settled'}
+                        </button>
+                      )}
                     </div>
                   </td>
                   <td>
@@ -612,30 +621,36 @@ const Billing = () => {
                       <button className="icon-btn" onClick={() => setViewingInvoice(invoice)} aria-label={`View ${invoice.invoiceNumber}`} title="View Invoice">
                         <Eye size={16} />
                       </button>
-                      <button className="icon-btn" onClick={() => handleEditInvoice(invoice)} aria-label={`Edit ${invoice.invoiceNumber}`} title="Edit Invoice">
-                        <ExternalLink size={16} />
-                      </button>
+                      {!isCaAdmin && (
+                        <button className="icon-btn" onClick={() => handleEditInvoice(invoice)} aria-label={`Edit ${invoice.invoiceNumber}`} title="Edit Invoice">
+                          <ExternalLink size={16} />
+                        </button>
+                      )}
                       <button className="icon-btn" onClick={() => handleDownloadInvoice(invoice)} aria-label={`Download ${invoice.invoiceNumber}`} title="Download Invoice">
                         <Download size={16} />
                       </button>
-                      <button
-                        className="icon-btn"
-                        onClick={() => handleMarkPaid(invoice)}
-                        aria-label={`Mark ${invoice.invoiceNumber} as paid`}
-                        title="Mark Paid"
-                        disabled={invoice.paymentStatus === 'Paid'}
-                      >
-                        <CheckCircle size={16} />
-                      </button>
-                      <button
-                        className="icon-btn"
-                        onClick={() => handleSendReminder(invoice)}
-                        aria-label={`Send reminder for ${invoice.invoiceNumber}`}
-                        title="Send Reminder"
-                        disabled={!canReminder}
-                      >
-                        <MessageSquare size={16} />
-                      </button>
+                      {!isCaAdmin && (
+                        <>
+                          <button
+                            className="icon-btn"
+                            onClick={() => handleMarkPaid(invoice)}
+                            aria-label={`Mark ${invoice.invoiceNumber} as paid`}
+                            title="Mark Paid"
+                            disabled={invoice.paymentStatus === 'Paid'}
+                          >
+                            <CheckCircle size={16} />
+                          </button>
+                          <button
+                            className="icon-btn"
+                            onClick={() => handleSendReminder(invoice)}
+                            aria-label={`Send reminder for ${invoice.invoiceNumber}`}
+                            title="Send Reminder"
+                            disabled={!canReminder}
+                          >
+                            <MessageSquare size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -656,7 +671,7 @@ const Billing = () => {
         </table>
       </div>
 
-      <div className="billing-grid">
+      {!isCaAdmin && <div className="billing-grid">
         <div className="billing-main">
           <div className="card billing-section billing-setup-card">
             <div className="section-header">
@@ -997,7 +1012,7 @@ const Billing = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {viewingInvoice && (
         <div className="modal-overlay" role="presentation" onClick={() => setViewingInvoice(null)}>
@@ -1039,7 +1054,7 @@ const Billing = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {viewingInvoice.items.map((item) => (
+                    {(viewingInvoice.items || []).map((item) => (
                       <tr key={`${viewingInvoice.id}-${item.id}`}>
                         <td>{item.name}</td>
                         <td>{item.qty}</td>
@@ -1055,9 +1070,11 @@ const Billing = () => {
                 <button className="btn btn-secondary" onClick={() => handleDownloadInvoice(viewingInvoice)}>
                   <Download size={16} /> Download
                 </button>
-                <button className="btn btn-secondary" onClick={() => handleEditInvoice(viewingInvoice)}>
-                  <ExternalLink size={16} /> Edit
-                </button>
+                {!isCaAdmin && (
+                  <button className="btn btn-secondary" onClick={() => handleEditInvoice(viewingInvoice)}>
+                    <ExternalLink size={16} /> Edit
+                  </button>
+                )}
                 <button className="btn btn-primary" onClick={() => setViewingInvoice(null)}>Close</button>
               </div>
             </div>

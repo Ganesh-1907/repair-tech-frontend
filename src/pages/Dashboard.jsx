@@ -26,6 +26,7 @@ import {
   Calendar,
   Clock,
   Download,
+  FileText,
   Package,
   Target,
   TrendingDown,
@@ -39,6 +40,7 @@ import { usePrivacy } from '../context/PrivacyContext';
 import { useTheme } from '../context/ThemeContext';
 import AlertsSystem from '../components/dashboard/AlertsSystem';
 import { dashboardService } from '../services/dashboardService';
+import { normalizeRole } from '../config/roles';
 
 ChartJS.register(
   CategoryScale,
@@ -60,6 +62,12 @@ const metricVisuals = {
   'Missed Leads': { icon: AlertCircle, tone: 'rose' },
   'Avg Response Time': { icon: Activity, tone: 'teal' },
   'Active Jobs': { icon: Briefcase, tone: 'indigo' },
+  'Total GST Collected': { icon: Wallet, tone: 'cyan' },
+  'GST Invoice Sales': { icon: FileText, tone: 'violet' },
+  'GST Invoices': { icon: FileText, tone: 'blue' },
+  'Pending GST': { icon: Clock, tone: 'amber' },
+  'Paid GST': { icon: Wallet, tone: 'teal' },
+  'Taxable Base': { icon: Target, tone: 'indigo' },
 };
 
 const metricRoutes = {
@@ -161,7 +169,9 @@ const Dashboard = () => {
   const [notice, setNotice] = React.useState('');
   const [dashboardData, setDashboardData] = React.useState(emptyDashboardData);
 
-  const isStaff = user?.role === 'staff';
+  const role = normalizeRole(user?.role);
+  const isStaff = role === 'staff';
+  const isCaAdmin = role === 'caAdmin';
 
   React.useEffect(() => {
     let mounted = true;
@@ -425,8 +435,8 @@ const Dashboard = () => {
                 <TrendingUp size={20} />
               </div>
               <div>
-                <h3>Revenue vs Target</h3>
-                <p>Monthly revenue performance against planned target.</p>
+                <h3>{isCaAdmin ? 'GST Sales vs GST' : 'Revenue vs Target'}</h3>
+                <p>{isCaAdmin ? 'Monthly GST invoice sales compared with GST collected.' : 'Monthly revenue performance against planned target.'}</p>
               </div>
             </div>
             <div className="card-actions">
@@ -442,8 +452,8 @@ const Dashboard = () => {
           <Motion.div className="card chart-card" variants={itemVariants}>
             <div className="card-header">
               <div>
-                <h3>Lead Distribution</h3>
-                <p>Current lead status mix.</p>
+                <h3>{isCaAdmin ? 'GST Source Distribution' : 'Lead Distribution'}</h3>
+                <p>{isCaAdmin ? 'GST contribution by invoice source.' : 'Current lead status mix.'}</p>
               </div>
             </div>
             <div className={`chart-container pie-chart ${isPrivacyOn ? 'privacy-blur' : ''}`}>
@@ -456,8 +466,8 @@ const Dashboard = () => {
           <Motion.div className="card chart-card" variants={itemVariants}>
             <div className="card-header">
               <div>
-                <h3>Response Time Trend</h3>
-                <p>Average first response time in minutes.</p>
+                <h3>{isCaAdmin ? 'GST Collection Trend' : 'Response Time Trend'}</h3>
+                <p>{isCaAdmin ? 'GST collected across the selected months.' : 'Average first response time in minutes.'}</p>
               </div>
             </div>
             <div className={`chart-container ${isPrivacyOn ? 'privacy-blur' : ''}`}>
@@ -465,7 +475,7 @@ const Dashboard = () => {
                 data={{
                   labels: dashboardData.charts.responseTime.labels,
                   datasets: [{
-                    label: 'Minutes',
+                    label: isCaAdmin ? 'GST' : 'Minutes',
                     data: dashboardData.charts.responseTime.data,
                     borderColor: chartColors.revenue,
                     pointBackgroundColor: chartColors.revenue,
@@ -483,6 +493,7 @@ const Dashboard = () => {
         )}
       </div>
 
+      {!isCaAdmin && (
       <div className="dashboard-ops-grid">
         <Motion.div className="card alert-card reminder-card" variants={itemVariants}>
           <div className="card-header">
@@ -573,7 +584,9 @@ const Dashboard = () => {
           </div>
         </Motion.div>
       </div>
+      )}
 
+      {!isCaAdmin && (
       <div className="dashboard-bottom-grid">
         <Motion.div className="dashboard-alerts-wrap" variants={itemVariants}>
           <AlertsSystem alerts={dashboardData.alerts} onAction={handleAlertAction} />
@@ -606,6 +619,7 @@ const Dashboard = () => {
           </div>
         </Motion.div>
       </div>
+      )}
     </Motion.div>
   );
 };

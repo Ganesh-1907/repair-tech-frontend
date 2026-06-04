@@ -2,9 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, X, Edit, Eye, MoreVertical, UploadCloud } from 'lucide-react';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { usePrivacy } from '../../context/PrivacyContext';
+import { useAuth } from '../../context/AuthContext';
 import { expenseManagementService } from '../../services/expenseManagementService';
 import { api } from '../../services/apiClient';
 import { useExpenseSettings } from '../../hooks/useExpenseSettings';
+import { normalizeRole } from '../../config/roles';
 
 const ActionMenu = ({ items }) => {
   const [open, setOpen] = useState(false);
@@ -83,6 +85,8 @@ const emptyForm = {
 
 const PaymentsListPage = () => {
   const { formatCurrency } = usePrivacy();
+  const { user } = useAuth();
+  const isCaAdmin = normalizeRole(user?.role) === 'caAdmin';
   const { settings: expenseSettings } = useExpenseSettings();
   const [payments, setPayments] = useState([]);
   const [staffList, setStaffList] = useState([]);
@@ -251,7 +255,7 @@ const PaymentsListPage = () => {
         title="Payments"
         description="All income payments — collected by staff or added by admin."
         breadcrumbs={['Admin', 'Expense Management', 'Payments']}
-        actions={[{ label: 'Add Payment', icon: Plus, onClick: openAdd }]}
+        actions={isCaAdmin ? [] : [{ label: 'Add Payment', icon: Plus, onClick: openAdd }]}
       />
 
       {/* Filters */}

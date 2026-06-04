@@ -24,16 +24,26 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
+import { normalizeRole } from '../../config/roles';
+import { hasInvoiceGst } from '../../utils/gst';
 import './RentalBillingInvoices.css';
 
+const normalizeInvoice = (invoice = {}) => ({
+  ...invoice,
+  customer: invoice.customer || invoice.customerName || '-',
+  month: invoice.month || invoice.billingMonth || String(invoice.createdAt || '').slice(0, 7),
+  paid: Number(invoice.paid ?? invoice.paidAmount ?? 0),
+  status: invoice.status || invoice.paymentStatus || 'Unpaid',
+  total: Number(invoice.total || invoice.grandTotal || invoice.amount || 0),
+  notes: invoice.notes || '',
+});
+
 const RentalBillingInvoicesPage = () => {
+  const { user } = useAuth();
+  const isCaAdmin = normalizeRole(user?.role) === 'caAdmin';
   // --- Local State ---
-  const [invoices, setInvoices] = useState([
-    { id: 'INV-260401', customer: 'Global Tech Solutions', month: '2026-04', total: 23151.6, paid: 18000, status: 'Partially Paid', notes: '' },
-    { id: 'INV-260402', customer: 'Stellar Bank', month: '2026-04', total: 42500, paid: 42500, status: 'Paid', notes: 'Full payment received via NEFT.' },
-    { id: 'INV-260403', customer: 'Apex Retail', month: '2026-04', total: 18750, paid: 0, status: 'Overdue', notes: 'Payment follow-up required.' },
-    { id: 'INV-260404', customer: 'Modern School', month: '2026-04', total: 12900, paid: 4000, status: 'Unpaid', notes: '' },
-  ]);
+  const [invoices, setInvoices] = useState([]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -51,7 +61,14 @@ const RentalBillingInvoicesPage = () => {
   // printerEntries: { [deviceIdx]: { currentPageCount: '' } }
 
   useEffect(() => {
-    api.list('rentalCustomers').then((data) => setRentalCustomers(Array.isArray(data) ? data : [])).catch(() => {});
+    Promise.all([
+      api.list('rentalCustomers').catch(() => []),
+      api.list('rentalInvoices').catch(() => []),
+    ]).then(([customers, invoiceRows]) => {
+      setRentalCustomers(Array.isArray(customers) ? customers : []);
+      const rows = Array.isArray(invoiceRows) ? invoiceRows.map(normalizeInvoice) : [];
+      setInvoices(rows);
+    });
   }, []);
 
   // --- Helpers ---
@@ -63,17 +80,22 @@ const RentalBillingInvoicesPage = () => {
 
   const formatCurrency = (val) => `₹${Number(val).toLocaleString('en-IN', { maximumFractionDigits: 1 })}`;
 
+  const visibleInvoices = useMemo(
+    () => (isCaAdmin ? invoices.filter(hasInvoiceGst) : invoices),
+    [invoices, isCaAdmin]
+  );
+
   const stats = useMemo(() => {
     return {
-      totalCount: invoices.length,
-      paidTotal: invoices.reduce((acc, curr) => acc + curr.paid, 0),
-      outstanding: invoices.reduce((acc, curr) => acc + (curr.total - curr.paid), 0),
-      overdue: invoices.filter(i => i.status === 'Overdue').reduce((acc, curr) => acc + (curr.total - curr.paid), 0),
+      totalCount: visibleInvoices.length,
+      paidTotal: visibleInvoices.reduce((acc, curr) => acc + curr.paid, 0),
+      outstanding: visibleInvoices.reduce((acc, curr) => acc + (curr.total - curr.paid), 0),
+      overdue: visibleInvoices.filter(i => i.status === 'Overdue').reduce((acc, curr) => acc + (curr.total - curr.paid), 0),
     };
-  }, [invoices]);
+  }, [visibleInvoices]);
 
   const filteredInvoices = useMemo(() => {
-    return invoices.filter(inv => {
+    return visibleInvoices.filter(inv => {
       const searchStr = `${inv.id} ${inv.customer} ${inv.month} ${inv.status}`.toLowerCase();
       const matchSearch = searchStr.includes(searchTerm.toLowerCase());
       const matchStatus = statusFilter === 'All Status' || inv.status === statusFilter;
@@ -82,7 +104,7 @@ const RentalBillingInvoicesPage = () => {
       
       return matchSearch && matchStatus && matchMonth && matchCust;
     });
-  }, [invoices, searchTerm, statusFilter, monthFilter, customerFilter]);
+  }, [visibleInvoices, searchTerm, statusFilter, monthFilter, customerFilter]);
 
   const handleExport = () => {
     const headers = ['Invoice ID', 'Customer Name', 'Billing Month', 'Total Amount', 'Paid Amount', 'Outstanding', 'Payment Status'];
@@ -214,12 +236,16 @@ const RentalBillingInvoicesPage = () => {
         <h2>Billing & Invoices</h2>
         <p>Comprehensive management of monthly rental invoices, meter billings, and payment collections.</p>
         <div className="billing-actions">
-          <button className="primary-button" onClick={() => setActiveModal({ type: 'Generate', mode: 'Generate' })}>
-            <FilePlus size={18} /> Generate Invoice
-          </button>
-          <button className="secondary-button" onClick={() => setActiveModal({ type: 'Payment' })}>
-            <CreditCard size={18} /> Record Payment
-          </button>
+          {!isCaAdmin && (
+            <>
+              <button className="primary-button" onClick={() => setActiveModal({ type: 'Generate', mode: 'Generate' })}>
+                <FilePlus size={18} /> Generate Invoice
+              </button>
+              <button className="secondary-button" onClick={() => setActiveModal({ type: 'Payment' })}>
+                <CreditCard size={18} /> Record Payment
+              </button>
+            </>
+          )}
           <button className="secondary-button" onClick={handleExport}>
             <Download size={18} /> Export
           </button>
@@ -260,7 +286,7 @@ const RentalBillingInvoicesPage = () => {
         </select>
         <select className="filter-select" value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}>
           <option>All Customers</option>
-          {Array.from(new Set(invoices.map(i => i.customer))).map(c => <option key={c}>{c}</option>)}
+          {Array.from(new Set(visibleInvoices.map(i => i.customer))).map(c => <option key={c}>{c}</option>)}
         </select>
         <button className="icon-button" onClick={resetFilters} title="Reset Filters">
           <RefreshCcw size={18} />
@@ -333,22 +359,30 @@ const RentalBillingInvoicesPage = () => {
                           <button className="menu-item" onClick={() => { setActiveModal({ type: 'Detail', data: row }); setOpenMenuId(null); }}>
                             <Eye size={14} /> View Invoice
                           </button>
-                          <button className="menu-item" onClick={() => { setActiveModal({ type: 'Generate', mode: 'Edit', data: row }); setOpenMenuId(null); }}>
-                            <FileText size={14} /> Edit Invoice
-                          </button>
-                          <button className="menu-item" onClick={() => { setActiveModal({ type: 'Payment', data: row }); setOpenMenuId(null); }}>
-                            <CreditCard size={14} /> Record Payment
-                          </button>
-                          <button className="menu-item" onClick={() => { addToast(`Reminder sent to ${row.customer}`); setOpenMenuId(null); }}>
-                            <BellRing size={14} /> Send Reminder
-                          </button>
+                          {!isCaAdmin && (
+                            <>
+                              <button className="menu-item" onClick={() => { setActiveModal({ type: 'Generate', mode: 'Edit', data: row }); setOpenMenuId(null); }}>
+                                <FileText size={14} /> Edit Invoice
+                              </button>
+                              <button className="menu-item" onClick={() => { setActiveModal({ type: 'Payment', data: row }); setOpenMenuId(null); }}>
+                                <CreditCard size={14} /> Record Payment
+                              </button>
+                              <button className="menu-item" onClick={() => { addToast(`Reminder sent to ${row.customer}`); setOpenMenuId(null); }}>
+                                <BellRing size={14} /> Send Reminder
+                              </button>
+                            </>
+                          )}
                           <button className="menu-item" onClick={() => { addToast('Downloading PDF...'); setOpenMenuId(null); }}>
                             <FileDown size={14} /> Download PDF
                           </button>
-                          <div className="h-px bg-slate-100 my-1"></div>
-                          <button className="menu-item danger" onClick={() => { handleDelete(row.id); setOpenMenuId(null); }}>
-                            <Trash2 size={14} /> Delete
-                          </button>
+                          {!isCaAdmin && (
+                            <>
+                              <div className="h-px bg-slate-100 my-1"></div>
+                              <button className="menu-item danger" onClick={() => { handleDelete(row.id); setOpenMenuId(null); }}>
+                                <Trash2 size={14} /> Delete
+                              </button>
+                            </>
+                          )}
                         </motion.div>
                       )}
                     </div>

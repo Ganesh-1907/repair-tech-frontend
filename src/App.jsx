@@ -110,6 +110,7 @@ const CustomerGuard = ({ children, allowForceChange = false }) => {
 const existingAdminRouteComponents = {
   '/admin/dashboard': Dashboard,
   '/admin/leads': Leads,
+  '/billing': Billing,
   '/admin/expenses/dashboard': ExpensesManagementPage,
   '/admin/expenses/list': ExpensesListPage,
   '/admin/expenses/payments': PaymentsListPage,

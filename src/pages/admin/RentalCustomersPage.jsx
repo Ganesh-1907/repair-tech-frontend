@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { normalizeRole } from '../../config/roles';
 import './RentalCustomerManagement.css';
 import './RentalDocuments.css';
 import './PlansCustomers.css';
@@ -104,6 +106,8 @@ const mapRentalCustomer = (row) => ({
 
 const RentalCustomersPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isCaAdmin = normalizeRole(user?.role) === 'caAdmin';
   const [customers, setCustomers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('All Types');
@@ -174,7 +178,9 @@ const RentalCustomersPage = () => {
     }
   };
 
-  const openCustomerProcess = (customerId) => { navigate(`/admin/rental/customers/${customerId}`); };
+  const openCustomerProcess = (customerId) => {
+    navigate(`/admin/rental/customers/${customerId}`);
+  };
 
   const handleOpenMenu = (event, customer) => {
     event.stopPropagation();
@@ -228,7 +234,7 @@ const RentalCustomersPage = () => {
           <input type="text" className="filter-search" placeholder="Search customer, phone, GST..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
         </div>
-        <button className="primary-button" onClick={() => { navigate('/admin/rental/new'); }}><Plus size={18} /> Add Customer</button>
+        {!isCaAdmin && <button className="primary-button" onClick={() => { navigate('/admin/rental/new'); }}><Plus size={18} /> Add Customer</button>}
         <select className="filter-select" value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
           <option>All Types</option><option>Corporate</option><option>Individual</option>
         </select>
@@ -292,15 +298,15 @@ const RentalCustomersPage = () => {
             if (!c) return null;
             return (
               <>
-                <button className="menu-item" onClick={() => openQuotation(c)}><FileText size={14} /> Create Quotation</button>
-                <button className="menu-item" onClick={() => openAgreement(c)}><ClipboardCheck size={14} /> Create Agreement</button>
-                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/billing/${c.id}`, { state: { customer: c } }); }}><IndianRupee size={14} /> Billing</button>
-                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/repair/${c.id}`); }}><Wrench size={14} /> Manage Repair</button>
-                <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu(prev => ({ ...prev, open: false, id: null })); }}><CheckCircle2 size={14} /> Send Portal Access</button>
                 <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> View Customer</button>
-                <div className="h-px bg-slate-100 my-1"></div>
+                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/billing/${c.id}`, { state: { customer: c } }); }}><IndianRupee size={14} /> Billing</button>
+                {!isCaAdmin && <button className="menu-item" onClick={() => openQuotation(c)}><FileText size={14} /> Create Quotation</button>}
+                {!isCaAdmin && <button className="menu-item" onClick={() => openAgreement(c)}><ClipboardCheck size={14} /> Create Agreement</button>}
+                {!isCaAdmin && <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/repair/${c.id}`); }}><Wrench size={14} /> Manage Repair</button>}
+                {!isCaAdmin && <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu(prev => ({ ...prev, open: false, id: null })); }}><CheckCircle2 size={14} /> Send Portal Access</button>}
+                {!isCaAdmin && <><div className="h-px bg-slate-100 my-1"></div>
                 <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/new?id=${c.id}`); }}><Edit2 size={14} /> Edit Customer</button>
-                <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button>
+                <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button></>}
               </>
             );
           })()}

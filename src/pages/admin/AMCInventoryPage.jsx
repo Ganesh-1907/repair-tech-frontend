@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { normalizeRole } from '../../config/roles';
 import {
   Search, Plus, Filter, Download, MoreVertical,
   Users, Calendar, IndianRupee, Eye, Edit, Trash2, FileText, FileEdit, RefreshCw,
@@ -88,6 +90,8 @@ const getCustomerEmail = (customer = {}) => (
 
 const AMCInventoryPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isCaAdmin = normalizeRole(user?.role) === 'caAdmin';
   const [customers, setCustomers] = useState([]);
   const [amcPlans, setAmcPlans] = useState([]);
 
@@ -281,9 +285,11 @@ const AMCInventoryPage = () => {
           <p>Registry of all active AMC contracts, customers, and associated assets.</p>
         </div>
         <div className="plans-header-actions">
-           <button className="primary-button" onClick={() => navigate('/admin/amc/new')}>
+          {!isCaAdmin && (
+            <button className="primary-button" onClick={() => navigate('/admin/amc/new')}>
               <Plus size={18} /> Add New AMC
             </button>
+          )}
         </div>
       </header>
 
@@ -357,13 +363,13 @@ const AMCInventoryPage = () => {
             return (
               <>
                 <button className="menu-item" onClick={() => navigate(`/admin/amc/view/${c.id}`)}><Eye size={14} /> View AMC</button>
-                <button className="menu-item" onClick={() => navigate(`/admin/amc/new?id=${c.id}`)}><Edit size={14} /> Edit AMC</button>
-                <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileEdit size={14} /> AMC Quotation</button>
-                <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileText size={14} /> AMC Agreement</button>
+                {!isCaAdmin && <button className="menu-item" onClick={() => navigate(`/admin/amc/new?id=${c.id}`)}><Edit size={14} /> Edit AMC</button>}
+                {!isCaAdmin && <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileEdit size={14} /> AMC Quotation</button>}
+                {!isCaAdmin && <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><FileText size={14} /> AMC Agreement</button>}
                 <button className="menu-item" onClick={() => { navigate(`/admin/amc/billing/${c.id}`, { state: { customer: c } }); setActiveMenu(p => ({ ...p, open: false, id: null })); }}><IndianRupee size={14} /> Billing</button>
-                <button className="menu-item" onClick={() => navigate(`/admin/amc/repair/${c.contractId || c.id}`)}><Wrench size={14} /> Manage Repair</button>
-                <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><CheckCircle size={14} /> Send Portal Access</button>
-                <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>
+                {!isCaAdmin && <button className="menu-item" onClick={() => navigate(`/admin/amc/repair/${c.contractId || c.id}`)}><Wrench size={14} /> Manage Repair</button>}
+                {!isCaAdmin && <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><CheckCircle size={14} /> Send Portal Access</button>}
+                {!isCaAdmin && <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>}
               </>
             );
           })()}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { Lock, Mail, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { getRestrictedRoleDefaultPath } from '../config/roles';
 
 const fieldStyle = {
   wrapper: {
@@ -73,7 +74,7 @@ const Login = () => {
       navigate('/set-new-password', { replace: true });
       return;
     }
-    navigate(result.user?.role === 'staff' ? '/admin/staff-portal' : '/');
+    navigate(getRestrictedRoleDefaultPath(result.user?.role), { replace: true });
   };
 
   return (

@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { normalizeRole } from '../../config/roles';
 import {
   ArrowLeft,
   Download,
@@ -215,6 +217,8 @@ const getCustomerEmail = (customer = {}) => (
 
 const CMCInventoryPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isCaAdmin = normalizeRole(user?.role) === 'caAdmin';
   const [customers, setCustomers] = useState([]);
   const [cmcPlans, setCmcPlans]   = useState([]);
   const [viewMode, setViewMode] = useState('list');
@@ -391,9 +395,11 @@ const CMCInventoryPage = () => {
           <p>Registry of all active CMC contracts, customers, and associated assets.</p>
         </div>
         <div className="plans-header-actions">
-          <button className="primary-button" onClick={() => navigate('/admin/cmc/new')}>
-            <Plus size={18} /> Add New CMC
-          </button>
+          {!isCaAdmin && (
+            <button className="primary-button" onClick={() => navigate('/admin/cmc/new')}>
+              <Plus size={18} /> Add New CMC
+            </button>
+          )}
         </div>
       </header>
 
@@ -466,13 +472,13 @@ const CMCInventoryPage = () => {
             return (
               <>
                 <button className="menu-item" onClick={() => navigate(`/admin/cmc/view/${c.id}`)}><Eye size={14} /> View CMC</button>
-                <button className="menu-item" onClick={() => navigate(`/admin/cmc/new?id=${c.id}`)}><Edit size={14} /> Edit CMC</button>
-                <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><FileEdit size={14} /> CMC Quotation</button>
-                <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><FileText size={14} /> CMC Agreement</button>
+                {!isCaAdmin && <button className="menu-item" onClick={() => navigate(`/admin/cmc/new?id=${c.id}`)}><Edit size={14} /> Edit CMC</button>}
+                {!isCaAdmin && <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('quotation'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><FileEdit size={14} /> CMC Quotation</button>}
+                {!isCaAdmin && <button className="menu-item" onClick={() => { setSelectedCustomer(c); setViewMode('agreement'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><FileText size={14} /> CMC Agreement</button>}
                 <button className="menu-item" onClick={() => { navigate(`/admin/cmc/billing/${c.id}`, { state: { customer: c } }); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><IndianRupee size={14} /> Billing</button>
-                <button className="menu-item" onClick={() => { navigate(`/admin/cmc/repair/${c.contractId || c.id}`); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><Wrench size={14} /> Manage Repair</button>
-                <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><Eye size={14} /> Send Portal Access</button>
-                <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>
+                {!isCaAdmin && <button className="menu-item" onClick={() => { navigate(`/admin/cmc/repair/${c.contractId || c.id}`); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><Wrench size={14} /> Manage Repair</button>}
+                {!isCaAdmin && <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}><Eye size={14} /> Send Portal Access</button>}
+                {!isCaAdmin && <button className="menu-item" style={{ color: '#dc2626' }} onClick={() => { void handleDelete(c.id); }}><Trash2 size={14} /> Delete</button>}
               </>
             );
           })()}

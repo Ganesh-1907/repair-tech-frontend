@@ -16,6 +16,8 @@ import {
 import { usePrivacy } from '../context/PrivacyContext';
 import { billingInvoiceService } from '../services/billingInvoiceService';
 import { expenseManagementService } from '../services/expenseManagementService';
+import { api } from '../services/apiClient';
+import { getInvoiceGstAmount, hasInvoiceGst } from '../utils/gst';
 
 const CAPortal = () => {
   const { formatCurrency, isPrivacyOn } = usePrivacy();
@@ -26,9 +28,19 @@ const CAPortal = () => {
   useEffect(() => {
     Promise.all([
       billingInvoiceService.listInvoices(),
+      api.list('leadBillings').catch(() => []),
+      api.list('rentalInvoices').catch(() => []),
+      api.list('amcInvoices').catch(() => []),
+      api.list('cmcInvoices').catch(() => []),
       expenseManagementService.getExpenses(),
-    ]).then(([nextInvoices, nextExpenses]) => {
-      setInvoices(nextInvoices);
+    ]).then(([generalInvoices, leadBillings, rentalInvoices, amcInvoices, cmcInvoices, nextExpenses]) => {
+      setInvoices([
+        ...generalInvoices,
+        ...leadBillings,
+        ...rentalInvoices,
+        ...amcInvoices,
+        ...cmcInvoices,
+      ].filter(hasInvoiceGst));
       setExpenses(nextExpenses);
     });
   }, []);
@@ -42,7 +54,7 @@ const CAPortal = () => {
 
   const financialSummary = useMemo(() => {
     const sales = invoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
-    const gst = invoices.reduce((sum, invoice) => sum + Number(invoice.gstAmount || invoice.gst || 0), 0);
+    const gst = invoices.reduce((sum, invoice) => sum + getInvoiceGstAmount(invoice), 0);
     const outgoing = expenses.filter((row) => row.flowType !== 'Income').reduce((sum, row) => sum + Number(row.amount || 0), 0);
     return [
       { label: 'Total Sales (FY 2026)', value: sales, color: 'primary' },

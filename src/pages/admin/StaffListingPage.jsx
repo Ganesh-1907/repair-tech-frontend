@@ -3,6 +3,8 @@ import { Edit, Eye, MapPin, MoreVertical, Plus, Search, Target, X } from 'lucide
 import { useLocation, useNavigate } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { staffManagementService } from '../../services/staffManagementService';
+import { getRoleLabel, normalizeRole, ROLE_OPTIONS } from '../../config/roles';
+import { useAuth } from '../../context/AuthContext';
 
 const emptyForm = {
   name: '',
@@ -42,6 +44,11 @@ const formatAdminTime = (value) => {
 const StaffListingPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = normalizeRole(user?.role);
+  const isSales = role === 'sales';
+  const isCaAdmin = role === 'caAdmin';
+  const canManageStaff = !isSales && !isCaAdmin;
   const initialMode = new URLSearchParams(location.search).get('mode') === 'add' || new URLSearchParams(location.search).get('add') === '1' ? 'add' : '';
   const [staff, setStaff] = useState([]);
   const [staffTargets, setStaffTargets] = useState([]);
@@ -148,7 +155,7 @@ const StaffListingPage = () => {
       age: row.age || '',
       phone: row.phone || '',
       email: row.email || '',
-      role: 'Staff',
+      role: normalizeRole(row.role) || 'staff',
       department: row.department || row.departmentSkill || '',
       designation: row.designation || '',
       salary: row.salary || '',
@@ -215,11 +222,12 @@ const StaffListingPage = () => {
 
   const saveStaff = async () => {
     if (!validateStaff()) return;
+    const payload = { ...form, role: normalizeRole(form.role) || 'staff' };
     if (modalMode === 'edit' && selectedStaff) {
-      await staffManagementService.updateStaff(selectedStaff.id, form);
+      await staffManagementService.updateStaff(selectedStaff.id, payload);
       setNotice(`Staff ${selectedStaff.id} updated.`);
     } else {
-      const created = await staffManagementService.createStaff(form);
+      const created = await staffManagementService.createStaff(payload);
       setNotice(`Staff ${created.id} created.`);
     }
     await loadData();
@@ -246,7 +254,7 @@ const StaffListingPage = () => {
         title="Staff Listing"
         description="Search and manage staff with login access, job assignment, and attendance status."
         breadcrumbs={['Admin', 'Staff Management', 'Staff Listing']}
-        actions={[{ label: 'Add Staff', icon: Plus, onClick: openAdd }]}
+        actions={canManageStaff ? [{ label: 'Add Staff', icon: Plus, onClick: openAdd }] : []}
       />
 
       <div className="card" style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 2fr) repeat(2, minmax(180px, 1fr))', gap: '16px', padding: '16px', marginBottom: '24px', alignItems: 'center' }}>
@@ -302,6 +310,7 @@ const StaffListingPage = () => {
               <th>Name</th>
               <th>Phone</th>
               <th>Email</th>
+              <th>Role</th>
               <th>Department / Skill</th>
               <th>Status</th>
               <th>Assigned Jobs</th>
@@ -316,6 +325,7 @@ const StaffListingPage = () => {
                 <td>{row.name}</td>
                 <td>{row.phone}</td>
                 <td>{row.email || '-'}</td>
+                <td>{getRoleLabel(row.role)}</td>
                 <td>{row.departmentSkill || row.department || '-'}</td>
                 <td>
                   <span className={`status-pill status-${row.status === 'Active' ? 'success' : 'danger'}`}>
@@ -348,15 +358,19 @@ const StaffListingPage = () => {
                         <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openView(row); }}>
                           <Eye size={14} className="icon-muted" /> View
                         </button>
-                        <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openEdit(row); }}>
-                          <Edit size={14} className="icon-muted" /> Edit
-                        </button>
-                        <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openTarget(row); }}>
-                          <Target size={14} className="icon-muted" /> Set Target
-                        </button>
-                        <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openTracking(row); }}>
-                          <MapPin size={14} className="icon-muted" /> Location Tracking
-                        </button>
+                        {canManageStaff && (
+                          <>
+                            <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openEdit(row); }}>
+                              <Edit size={14} className="icon-muted" /> Edit
+                            </button>
+                            <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openTarget(row); }}>
+                              <Target size={14} className="icon-muted" /> Set Target
+                            </button>
+                            <button type="button" className="account-menu-item" onClick={() => { setActiveDropdownId(null); openTracking(row); }}>
+                              <MapPin size={14} className="icon-muted" /> Location Tracking
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -364,7 +378,7 @@ const StaffListingPage = () => {
               </tr>
             ))}
             {filteredStaff.length === 0 && (
-              <tr><td colSpan="9" className="text-muted">No staff found.</td></tr>
+              <tr><td colSpan="10" className="text-muted">No staff found.</td></tr>
             )}
           </tbody>
         </table>
@@ -390,6 +404,12 @@ const StaffListingPage = () => {
                 <div className="form-group"><label>Age</label><input type="number" min="18" placeholder="Enter age" value={form.age} onChange={(event) => updateStaffForm('age', event.target.value)} />{errors.age && <span className="form-error">{errors.age}</span>}</div>
                 <div className="form-group"><label>Mobile</label><input placeholder="Enter mobile number" value={form.phone} onChange={(event) => updateStaffForm('phone', event.target.value.replace(/\D/g, '').slice(0, 10))} />{errors.phone && <span className="form-error">{errors.phone}</span>}</div>
                 <div className="form-group"><label>Email</label><input type="email" placeholder="Enter email address" value={form.email} onChange={(event) => updateStaffForm('email', event.target.value)} />{errors.email && <span className="form-error">{errors.email}</span>}</div>
+                <div className="form-group">
+                  <label>Role</label>
+                  <select value={form.role} onChange={(e) => updateStaffForm('role', e.target.value)}>
+                    {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+                  </select>
+                </div>
                 <div className="form-group"><label>Department</label><input placeholder="Enter department" value={form.department} onChange={(event) => updateStaffForm('department', event.target.value)} />{errors.department && <span className="form-error">{errors.department}</span>}</div>
                 <div className="form-group"><label>Designation</label><input placeholder="Enter designation" value={form.designation} onChange={(event) => updateStaffForm('designation', event.target.value)} />{errors.designation && <span className="form-error">{errors.designation}</span>}</div>
                 <div className="form-group"><label>Salary</label><input type="number" min="0" placeholder="Enter salary" value={form.salary} onChange={(event) => updateStaffForm('salary', event.target.value)} />{errors.salary && <span className="form-error">{errors.salary}</span>}</div>
@@ -427,6 +447,7 @@ const StaffListingPage = () => {
                 <div><span>Age</span><strong>{selectedStaff.age || '-'}</strong></div>
                 <div><span>Phone</span><strong>{selectedStaff.phone}</strong></div>
                 <div><span>Email</span><strong>{selectedStaff.email || '-'}</strong></div>
+                <div><span>Role</span><strong style={{ color: '#4f46e5' }}>{getRoleLabel(selectedStaff.role)}</strong></div>
                 <div><span>Department / Skill</span><strong>{selectedStaff.department || selectedStaff.departmentSkill || '-'}</strong></div>
                 <div><span>Designation</span><strong>{selectedStaff.designation || '-'}</strong></div>
                 <div><span>Salary</span><strong>{selectedStaff.salary || '-'}</strong></div>
@@ -443,7 +464,7 @@ const StaffListingPage = () => {
               </div>
               <div className="modal-actions">
                 <button className="btn btn-secondary" type="button" onClick={closeModal}>Close</button>
-                <button className="btn btn-primary" type="button" onClick={() => openEdit(selectedStaff)}>Edit Staff</button>
+                {canManageStaff && <button className="btn btn-primary" type="button" onClick={() => openEdit(selectedStaff)}>Edit Staff</button>}
               </div>
             </div>
           </div>

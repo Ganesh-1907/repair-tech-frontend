@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import {
   Activity,
   AlertTriangle,
@@ -27,6 +28,7 @@ import {
 import { inventoryService } from '../services/inventoryService';
 import { assetManagementService } from '../services/assetManagementService';
 import { useToast } from '../context/ToastContext';
+import { normalizeRole } from '../config/roles';
 import './InventoryPremiumStyles.css';
 
 const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle'];
@@ -51,6 +53,10 @@ const statusTone = (status) => {
 
 const InventoryManagement = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = normalizeRole(user?.role);
+  const canManageInventory = role !== 'sales';
+  const canViewInventoryDetails = true;
   const { addToast } = useToast();
   const [items, setItems] = useState([]);
   const [assets, setAssets] = useState([]);
@@ -158,12 +164,16 @@ const InventoryManagement = () => {
           <h1>Device assets and stock listing</h1>
         </div>
         <div className="inventory-hero-actions">
-          <button className="inventory-icon-button" onClick={handleReset} title="Reset stock inventory">
-            <RefreshCcw size={18} />
-          </button>
-          <button className="inventory-primary-button" onClick={() => navigate('/admin/inventory/assets/new')}>
-            <Plus size={17} /> Add Asset
-          </button>
+          {canManageInventory && (
+            <button className="inventory-icon-button" onClick={handleReset} title="Reset stock inventory">
+              <RefreshCcw size={18} />
+            </button>
+          )}
+          {canManageInventory && (
+            <button className="inventory-primary-button" onClick={() => navigate('/admin/inventory/assets/new')}>
+              <Plus size={17} /> Add Asset
+            </button>
+          )}
         </div>
       </section>
 
@@ -211,6 +221,8 @@ const InventoryManagement = () => {
               onView={(asset) => navigate(`/admin/inventory/assets/${asset.id}/view`)}
               onEdit={(asset) => navigate(`/admin/inventory/assets/${asset.id}/edit`)}
               onDelete={handleDeleteAsset}
+              canManage={canManageInventory}
+              canViewDetails={canViewInventoryDetails}
             />
           </>
         ) : (
@@ -222,7 +234,7 @@ const InventoryManagement = () => {
                 </button>
               ))}
             </div>
-            <StockTable items={filteredItems} onDelete={handleDeleteItem} />
+            <StockTable items={filteredItems} onDelete={handleDeleteItem} canManage={canManageInventory} />
           </>
         )}
       </section>
@@ -268,7 +280,7 @@ const DeviceIcon = ({ type }) => {
   return <HardDrive size={20} />;
 };
 
-const AssetRowMenu = ({ asset, onView, onEdit, onDelete }) => {
+const AssetRowMenu = ({ asset, onView, onEdit, onDelete, canManage, canViewDetails }) => {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const ref = useRef(null);
@@ -306,16 +318,16 @@ const AssetRowMenu = ({ asset, onView, onEdit, onDelete }) => {
       </button>
       {open && (
         <div className="inv-row-menu-dropdown" style={{ top: position.top, left: position.left }}>
-          <button onClick={() => { onView(asset); setOpen(false); }}>View</button>
-          <button onClick={() => { onEdit(asset); setOpen(false); }}>Edit</button>
-          <button onClick={() => { onDelete(asset); setOpen(false); }} style={{ color: '#ef4444' }}>Delete</button>
+          {canViewDetails && <button onClick={() => { onView(asset); setOpen(false); }}>View</button>}
+          {canManage && <button onClick={() => { onEdit(asset); setOpen(false); }}>Edit</button>}
+          {canManage && <button onClick={() => { onDelete(asset); setOpen(false); }} style={{ color: '#ef4444' }}>Delete</button>}
         </div>
       )}
     </div>
   );
 };
 
-const AssetTable = ({ assets, onView, onEdit, onDelete }) => (
+const AssetTable = ({ assets, onView, onEdit, onDelete, canManage, canViewDetails }) => (
   <div className="inventory-table-wrap">
     <table className="inventory-table asset-table">
       <thead>
@@ -326,7 +338,7 @@ const AssetTable = ({ assets, onView, onEdit, onDelete }) => (
           <th>Configurations</th>
           <th>Add-on Parts</th>
           <th>Status</th>
-          <th></th>
+          {(canViewDetails || canManage) && <th></th>}
         </tr>
       </thead>
       <tbody>
@@ -346,18 +358,20 @@ const AssetTable = ({ assets, onView, onEdit, onDelete }) => (
             <td className="inventory-muted-cell">{asset.configuration || asset.configurations || '-'}</td>
             <td className="inventory-muted-cell">{asset.addOnParts || '-'}</td>
             <td><span className={`inventory-status ${statusTone(asset.status)}`}>{normalizeAssetStatus(asset.status)}</span></td>
-            <td><AssetRowMenu asset={asset} onView={onView} onEdit={onEdit} onDelete={onDelete} /></td>
+            {(canViewDetails || canManage) && (
+              <td><AssetRowMenu asset={asset} onView={onView} onEdit={onEdit} onDelete={onDelete} canManage={canManage} canViewDetails={canViewDetails} /></td>
+            )}
           </tr>
         ))}
         {assets.length === 0 && (
-          <tr><td colSpan="7" className="inventory-empty">No assets match this view.</td></tr>
+          <tr><td colSpan={canViewDetails || canManage ? 7 : 6} className="inventory-empty">No assets match this view.</td></tr>
         )}
       </tbody>
     </table>
   </div>
 );
 
-const StockTable = ({ items, onDelete }) => (
+const StockTable = ({ items, onDelete, canManage }) => (
   <div className="inventory-table-wrap">
     <table className="inventory-table">
       <thead>
@@ -367,7 +381,7 @@ const StockTable = ({ items, onDelete }) => (
           <th>Price</th>
           <th>Stock</th>
           <th>Status</th>
-          <th>Action</th>
+          {canManage && <th>Action</th>}
         </tr>
       </thead>
       <tbody>
@@ -402,16 +416,18 @@ const StockTable = ({ items, onDelete }) => (
                 )}
               </td>
               <td><span className={`inventory-status ${isLow ? 'red' : 'green'}`}>{isLow ? 'Low stock' : item.status || 'Active'}</span></td>
-              <td>
-                <button className="inventory-danger-button" onClick={() => onDelete(item.id)} title="Delete item">
-                  <Trash2 size={16} />
-                </button>
-              </td>
+              {canManage && (
+                <td>
+                  <button className="inventory-danger-button" onClick={() => onDelete(item.id)} title="Delete item">
+                    <Trash2 size={16} />
+                  </button>
+                </td>
+              )}
             </tr>
           );
         })}
         {items.length === 0 && (
-          <tr><td colSpan="6" className="inventory-empty">No inventory items match this view.</td></tr>
+          <tr><td colSpan={canManage ? 6 : 5} className="inventory-empty">No inventory items match this view.</td></tr>
         )}
       </tbody>
     </table>

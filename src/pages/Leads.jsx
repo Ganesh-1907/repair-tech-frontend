@@ -22,6 +22,8 @@ import { staffManagementService } from '../services/staffManagementService';
 import { useLeadSettings } from '../hooks/useLeadSettings';
 import { sendOutboundMessage } from '../services/communicationService';
 import SendCredentialsModal from '../components/common/SendCredentialsModal';
+import { normalizeRole } from '../config/roles';
+import { useAuth } from '../context/AuthContext';
 
 const initialLeadForm = {
   customerName: '',
@@ -676,9 +678,11 @@ const ViewLeadModal = ({ lead, onClose, onEdit }) => {
         {/* ── Footer ── */}
         <div className="modal-actions" style={{ margin: 0, padding: '14px 24px', borderTop: '1px solid var(--border-light, #e2e8f0)', flexShrink: 0 }}>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
-          <button type="button" className="btn btn-primary" onClick={onEdit}>
-            <Edit size={15} /> Edit Lead
-          </button>
+          {onEdit && (
+            <button type="button" className="btn btn-primary" onClick={onEdit}>
+              <Edit size={15} /> Edit Lead
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1104,6 +1108,10 @@ const InstantMessageModal = ({ lead, onClose, onSent }) => {
 const Leads = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const role = normalizeRole(user?.role);
+  const isSales = role === 'sales';
+  const canManageLeads = !isSales;
   const [searchParams, setSearchParams] = useSearchParams();
   const { settings } = useLeadSettings();
   const serviceTypeOptions = settings.serviceTypes;
@@ -1142,7 +1150,7 @@ const Leads = () => {
 
   const loadTechnicians = () => {
     staffManagementService.getStaffList()
-      .then((data) => setTechnicians(data.filter((staff) => staff.status !== 'Inactive')))
+      .then((data) => setTechnicians(data.filter((s) => s.status !== 'Inactive' && (normalizeRole(s.role) === 'staff' || !s.role))))
       .catch((error) => {
         console.error('Failed to load technicians.', error);
         setNotice(error.response?.data?.message || error.message || 'Technicians failed to load. Please check that the backend is running.');
@@ -1174,7 +1182,7 @@ const Leads = () => {
   const statusParam = searchParams.get('status');
   const searchTerm = searchParams.get('q') || '';
   const activeCategory = categories.includes(statusParam) ? statusParam : 'All';
-  const isLeadModalOpen = isManualModalOpen || searchParams.get('add') === '1';
+  const isLeadModalOpen = canManageLeads && (isManualModalOpen || searchParams.get('add') === '1');
 
   const filteredLeads = leads.filter((lead) => {
     const query = searchTerm.toLowerCase();
@@ -1392,10 +1400,12 @@ const Leads = () => {
           ))}
         </div>
 
-        <button className="btn btn-primary" type="button" onClick={() => navigate('/admin/leads/create')}>
-          <Plus size={16} />
-          Add Lead
-        </button>
+        {canManageLeads && (
+          <button className="btn btn-primary" type="button" onClick={() => navigate('/admin/leads/create')}>
+            <Plus size={16} />
+            Add Lead
+          </button>
+        )}
       </div>
 
       <div className="leads-table-container card">
@@ -1477,7 +1487,7 @@ const Leads = () => {
                   <div className="empty-state">
                     <h3>No leads found</h3>
                     <p>Adjust your search or create a new lead to continue.</p>
-                    <button className="btn btn-primary" onClick={() => navigate('/admin/leads/create')}>Create Lead</button>
+                    {canManageLeads && <button className="btn btn-primary" onClick={() => navigate('/admin/leads/create')}>Create Lead</button>}
                   </div>
                 </td>
               </tr>
@@ -1502,31 +1512,35 @@ const Leads = () => {
           <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setViewingLead(activeMenuLead); }}>
             <Eye size={14} className="icon-muted" /> View Details
           </button>
-          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setEditingLead(activeMenuLead); }}>
-            <Edit size={14} className="icon-muted" /> Edit Lead
-          </button>
-          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setAssigningLead(activeMenuLead); }}>
-            <UserPlus size={14} className="icon-muted" /> Assign Technician
-          </button>
-          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setMessagingLead(activeMenuLead); }}>
-            <MessageCircleMore size={14} className="icon-muted" /> Instant Message
-          </button>
-          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/quotation/${activeMenuLead.id}`, { state: { lead: activeMenuLead } }); }}>
-            <FileText size={14} className="icon-muted" /> Create Quotation
-          </button>
-          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/billing/${activeMenuLead.id}`, { state: { lead: activeMenuLead } }); }}>
-            <FileText size={14} className="icon-muted" /> Billing
-          </button>
-          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/repair/${activeMenuLead.id}`); }}>
-            <Wrench size={14} className="icon-muted" /> Manage Repair
-          </button>
-          <button type="button" className="account-menu-item" onClick={() => { setCredentialsTarget(activeMenuLead); setActiveLeadMenu(null); }}>
-            <Wrench size={14} className="icon-muted" /> Send Portal Access
-          </button>
-          {activeMenuLead.assignedTechnician && (
-            <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setTrackingLead(activeMenuLead); }}>
-              <Zap size={14} className="icon-muted" /> Track Progress
-            </button>
+          {canManageLeads && (
+            <>
+              <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setEditingLead(activeMenuLead); }}>
+                <Edit size={14} className="icon-muted" /> Edit Lead
+              </button>
+              <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setAssigningLead(activeMenuLead); }}>
+                <UserPlus size={14} className="icon-muted" /> Assign Technician
+              </button>
+              <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setMessagingLead(activeMenuLead); }}>
+                <MessageCircleMore size={14} className="icon-muted" /> Instant Message
+              </button>
+              <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/quotation/${activeMenuLead.id}`, { state: { lead: activeMenuLead } }); }}>
+                <FileText size={14} className="icon-muted" /> Create Quotation
+              </button>
+              <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/billing/${activeMenuLead.id}`, { state: { lead: activeMenuLead } }); }}>
+                <FileText size={14} className="icon-muted" /> Billing
+              </button>
+              <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/repair/${activeMenuLead.id}`); }}>
+                <Wrench size={14} className="icon-muted" /> Manage Repair
+              </button>
+              <button type="button" className="account-menu-item" onClick={() => { setCredentialsTarget(activeMenuLead); setActiveLeadMenu(null); }}>
+                <Wrench size={14} className="icon-muted" /> Send Portal Access
+              </button>
+              {activeMenuLead.assignedTechnician && (
+                <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setTrackingLead(activeMenuLead); }}>
+                  <Zap size={14} className="icon-muted" /> Track Progress
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -1562,7 +1576,7 @@ const Leads = () => {
         <ViewLeadModal
           lead={viewingLead}
           onClose={() => setViewingLead(null)}
-          onEdit={() => { setViewingLead(null); setEditingLead(viewingLead); }}
+          onEdit={canManageLeads ? () => { setViewingLead(null); setEditingLead(viewingLead); } : null}
         />
       )}
 

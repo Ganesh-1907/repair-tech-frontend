@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { normalizeRole } from '../../config/roles';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Plus, Search, RefreshCcw, MoreVertical, ChevronRight, X, Loader2,
@@ -63,6 +65,8 @@ const useToast = () => {
 
 const CampaignJobsPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isCaAdmin = normalizeRole(user?.role) === 'caAdmin';
   const [searchParams] = useSearchParams();
   const campaignFilter = searchParams.get('campaign');
   const { settings } = useLeadSettings();
@@ -254,9 +258,11 @@ const CampaignJobsPage = () => {
           </div>
           <div className="flex gap-3">
             <button className="icon-button" onClick={loadJobs}><RefreshCcw size={18} className={loading ? 'animate-spin' : ''}/></button>
-            <button className="primary-button" onClick={openQeForCreate}>
-              <Plus size={18}/> Quick Entry
-            </button>
+            {!isCaAdmin && (
+              <button className="primary-button" onClick={openQeForCreate}>
+                <Plus size={18}/> Quick Entry
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -322,8 +328,8 @@ const CampaignJobsPage = () => {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400">
             <ClipboardList size={36} className="mb-2 opacity-30"/>
-            <p className="text-sm font-semibold">No jobs found. Use Quick Entry to add your first walk-in.</p>
-            <button className="primary-button mt-4" onClick={openQeForCreate}><Plus size={16}/> Quick Entry</button>
+            <p className="text-sm font-semibold">No jobs found.{!isCaAdmin && ' Use Quick Entry to add your first walk-in.'}</p>
+            {!isCaAdmin && <button className="primary-button mt-4" onClick={openQeForCreate}><Plus size={16}/> Quick Entry</button>}
           </div>
         ) : (
           <div className="campaign-table-scroll">
@@ -406,34 +412,36 @@ const CampaignJobsPage = () => {
                 onClick={() => { openModal(job, 'view'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
                 <Eye size={16}/> View Details
               </button>
-              <button className="action-dropdown-item"
-                onClick={() => { openQeForEdit(job); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
-                <Pencil size={16}/> Edit Job
-              </button>
+              {!isCaAdmin && (
+                <button className="action-dropdown-item"
+                  onClick={() => { openQeForEdit(job); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
+                  <Pencil size={16}/> Edit Job
+                </button>
+              )}
               <button className="action-dropdown-item"
                 onClick={() => { navigate(`/admin/campaign/billing/${job.id}`, { state: { customer: job } }); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
                 <IndianRupee size={16}/> Billing
               </button>
-              <div className="action-dropdown-divider"/>
-              {(st === 'Received at office' || qs === 'Draft') && (
+              {!isCaAdmin && <div className="action-dropdown-divider"/>}
+              {!isCaAdmin && (st === 'Received at office' || qs === 'Draft') && (
                 <button className="action-dropdown-item"
                   onClick={() => { setActiveMenu((p) => ({ ...p, open: false, id: null })); navigate(`/admin/campaign/jobs/quotation/${job.id}`, { state: { job } }); }}>
                   <FileText size={16}/> Create Quotation
                 </button>
               )}
-              {qs === 'Approved' && (
+              {!isCaAdmin && qs === 'Approved' && (
                 <button className="action-dropdown-item"
                   onClick={() => { setActiveMenu((p) => ({ ...p, open: false, id: null })); navigate(`/admin/campaign/jobs/intake/${job.id}`, { state: { job } }); }}>
                   <FileText size={16}/> Acknowledge Receipt
                 </button>
               )}
-              {(st === 'Diagnosis in progress' || st === 'Repair in progress' || st === 'Waiting for parts') && (
+              {!isCaAdmin && (st === 'Diagnosis in progress' || st === 'Repair in progress' || st === 'Waiting for parts') && (
                 <button className="action-dropdown-item"
                   onClick={() => { openModal(job, 'repair'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
                   <Wrench size={16}/> Manage Repair
                 </button>
               )}
-              {st === 'Repair completed' && (
+              {!isCaAdmin && st === 'Repair completed' && (
                 <button className="action-dropdown-item"
                   onClick={() => { openModal(job, 'delivery'); setActiveMenu((p) => ({ ...p, open: false, id: null })); }}>
                   <Truck size={16}/> Plan Delivery

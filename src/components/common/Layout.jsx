@@ -5,6 +5,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ChevronDown, FileText, LogOut, Moon, Plus, Sun, Menu } from 'lucide-react';
 import { getPageMetadata } from '../../config/pageMetadata';
+import { getRestrictedRoleDefaultPath, isRestrictedRolePathAllowed, normalizeRole } from '../../config/roles';
 
 const actionIcons = {
   fileText: FileText,
@@ -20,8 +21,6 @@ const Layout = ({ children }) => {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
   const pageMeta = useMemo(() => getPageMetadata(location.pathname), [location.pathname]);
-  const primaryAction = pageMeta.primaryAction;
-  const PrimaryActionIcon = actionIcons[primaryAction?.icon] || Plus;
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -38,9 +37,12 @@ const Layout = ({ children }) => {
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (user?.role === 'customer') return <Navigate to="/customer/dashboard" replace />;
   if (user?.forcePasswordChange) return <Navigate to="/set-new-password" replace />;
-  if (user?.role === 'staff' && !location.pathname.startsWith('/admin/staff-portal')) {
-    return <Navigate to="/admin/staff-portal" replace />;
+  const role = normalizeRole(user?.role);
+  if (!isRestrictedRolePathAllowed(role, location.pathname)) {
+    return <Navigate to={getRestrictedRoleDefaultPath(role)} replace />;
   }
+  const primaryAction = role === 'caAdmin' ? null : pageMeta.primaryAction;
+  const PrimaryActionIcon = actionIcons[primaryAction?.icon] || Plus;
 
   const handlePrimaryAction = () => {
     if (!primaryAction?.to) return;
