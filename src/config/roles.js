@@ -61,10 +61,15 @@ export const isRestrictedRolePathAllowed = (role, pathname) => {
       '/admin/leads',
       '/admin/inventory',
       '/inventory',
+      '/admin/staff-portal',
     ].some((prefix) => pathname.startsWith(prefix));
   }
   if (normalized === 'frontOffice') {
-    return ['/admin/dashboard', '/admin/leads'].some((prefix) => pathname.startsWith(prefix));
+    return [
+      '/admin/dashboard',
+      '/admin/leads',
+      '/admin/staff-portal',
+    ].some((prefix) => pathname.startsWith(prefix));
   }
   if (normalized === 'caAdmin') return CA_ADMIN_ALLOWED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
   return true;

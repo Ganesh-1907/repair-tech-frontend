@@ -47,17 +47,160 @@ const formatTrackDate = (value) => {
   return new Date(y, m - 1, day).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-const buildCalendarDays = () => {
-  const days = [];
-  const today = new Date();
-  for (let i = 0; i < 30; i += 1) {
-    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-    days.push(d.toISOString().slice(0, 10));
-  }
-  return days;
+const isoToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-const CALENDAR_DAYS = buildCalendarDays();
+const TODAY_STR = isoToday();
+
+const getCutoffStr = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 39);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const CUTOFF_STR = getCutoffStr();
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_ABBR = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+const CalendarPicker = ({ history, selectedDate, onSelectDate }) => {
+  const now = new Date();
+  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewMonth, setViewMonth] = useState(now.getMonth());
+
+  const cutoff = new Date(CUTOFF_STR + 'T12:00:00');
+  const canPrev = viewYear > cutoff.getFullYear() || (viewYear === cutoff.getFullYear() && viewMonth > cutoff.getMonth());
+  const canNext = viewYear < now.getFullYear() || (viewYear === now.getFullYear() && viewMonth < now.getMonth());
+
+  const goPrev = () => {
+    if (!canPrev) return;
+    if (viewMonth === 0) { setViewYear((y) => y - 1); setViewMonth(11); }
+    else setViewMonth((m) => m - 1);
+  };
+
+  const goNext = () => {
+    if (!canNext) return;
+    if (viewMonth === 11) { setViewYear((y) => y + 1); setViewMonth(0); }
+    else setViewMonth((m) => m + 1);
+  };
+
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+
+  const rows = [];
+  let cursor = 1 - firstDow;
+  for (let r = 0; r < 6; r++) {
+    const week = [];
+    let hasAny = false;
+    for (let c = 0; c < 7; c++, cursor++) {
+      if (cursor >= 1 && cursor <= daysInMonth) {
+        const ds = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(cursor).padStart(2, '0')}`;
+        week.push({ n: cursor, ds });
+        hasAny = true;
+      } else {
+        week.push(null);
+      }
+    }
+    if (hasAny) rows.push(week);
+  }
+
+  const navBtnStyle = (enabled) => ({
+    background: 'none', border: 'none', padding: '4px 12px',
+    cursor: enabled ? 'pointer' : 'default',
+    fontSize: 22, color: enabled ? '#374151' : '#d1d5db',
+    borderRadius: 6, lineHeight: 1,
+  });
+
+  return (
+    <div style={{ userSelect: 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <button type="button" onClick={goPrev} disabled={!canPrev} style={navBtnStyle(canPrev)}>‹</button>
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-main, #111827)' }}>
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </span>
+        <button type="button" onClick={goNext} disabled={!canNext} style={navBtnStyle(canNext)}>›</button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
+        {DAY_ABBR.map((lbl) => (
+          <div key={lbl} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#9ca3af', padding: '2px 0' }}>{lbl}</div>
+        ))}
+      </div>
+
+      {rows.map((week, ri) => (
+        <div key={ri} style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 3 }}>
+          {week.map((cell, ci) => {
+            if (!cell) return <div key={ci} style={{ aspectRatio: '1/1' }} />;
+            const { n, ds } = cell;
+            const inRange = ds >= CUTOFF_STR && ds <= TODAY_STR;
+            const isToday = ds === TODAY_STR;
+            const isSel = ds === selectedDate;
+            const hasData = inRange && Boolean(history?.history?.[ds]);
+            const isAbsent = inRange && !hasData;
+
+            let bg, txtColor, borderColor, fw;
+            if (isSel || isToday) {
+              bg = '#16a34a'; txtColor = '#fff'; borderColor = '#16a34a'; fw = 700;
+            } else if (!inRange) {
+              bg = 'transparent'; txtColor = '#d1d5db'; borderColor = 'transparent'; fw = 400;
+            } else if (isAbsent) {
+              bg = '#fef2f2'; txtColor = '#dc2626'; borderColor = '#fca5a5'; fw = 600;
+            } else {
+              bg = '#fff'; txtColor = '#374151'; borderColor = '#e5e7eb'; fw = 500;
+            }
+
+            return (
+              <button
+                key={ci}
+                type="button"
+                onClick={() => { if (inRange) onSelectDate(ds); }}
+                title={
+                  !inRange ? ''
+                  : hasData ? `${formatTrackDate(ds)} — ${history.history[ds].count} location(s)`
+                  : `${formatTrackDate(ds)} — Absent / No Clock-In`
+                }
+                style={{
+                  aspectRatio: '1/1',
+                  width: '100%',
+                  border: `1.5px solid ${borderColor}`,
+                  borderRadius: 6,
+                  background: bg,
+                  color: txtColor,
+                  fontSize: 12,
+                  fontWeight: fw,
+                  cursor: inRange ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                }}
+              >
+                {n}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+
+      <div style={{ marginTop: 10, display: 'flex', gap: 12, fontSize: 11, color: '#6b7280', flexWrap: 'wrap' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#16a34a', display: 'inline-block' }} />
+          Today / Selected
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#fff', border: '1px solid #e5e7eb', display: 'inline-block' }} />
+          Clocked In
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#fef2f2', border: '1px solid #fca5a5', display: 'inline-block' }} />
+          Absent
+        </span>
+      </div>
+    </div>
+  );
+};
 
 const initials = (name = '') => name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('');
 
@@ -135,7 +278,7 @@ const LiveTrackingPage = () => {
         .then((data) => {
           if (!mounted) return;
           setHistory(data);
-          setSelectedDate(data.datesWithData?.[0] || null);
+          setSelectedDate(TODAY_STR);
         })
         .catch((err) => {
           if (!mounted) return;
@@ -402,7 +545,7 @@ const LiveTrackingPage = () => {
                 Location History — {selectedName}
               </h3>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-sub, #6b7280)' }}>
-                Last 30 days · {history ? `${history.datesWithData?.length || 0} day(s) with GPS data` : 'Loading history'}
+                Last 40 days · {history ? `${history.datesWithData?.length || 0} day(s) with GPS data` : 'Loading history'}
               </p>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--text-sub, #6b7280)' }}>
@@ -431,46 +574,11 @@ const LiveTrackingPage = () => {
           {!historyLoading && history && (
             <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) 1fr', gap: 20 }}>
               <div>
-                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-sub, #6b7280)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-                  Select a date
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(48px, 1fr))', gap: 6 }}>
-                  {CALENDAR_DAYS.map((dateStr) => {
-                    const hasData = Boolean(history.history?.[dateStr]);
-                    const isSelected = selectedDate === dateStr;
-                    const [, , d] = dateStr.split('-');
-                    return (
-                      <button
-                        key={dateStr}
-                        type="button"
-                        disabled={!hasData}
-                        onClick={() => setSelectedDate(dateStr)}
-                        title={hasData ? `${formatTrackDate(dateStr)} - ${history.history[dateStr].count} location(s)` : formatTrackDate(dateStr)}
-                        style={{
-                          minHeight: 56,
-                          padding: '6px 4px',
-                          border: `1.5px solid ${isSelected ? '#2563eb' : hasData ? '#93c5fd' : '#e5e7eb'}`,
-                          borderRadius: 8,
-                          background: isSelected ? '#2563eb' : hasData ? '#eff6ff' : '#f9fafb',
-                          color: isSelected ? '#fff' : hasData ? '#1d4ed8' : '#9ca3af',
-                          cursor: hasData ? 'pointer' : 'not-allowed',
-                          fontSize: 12,
-                          fontWeight: hasData ? 700 : 400,
-                          textAlign: 'center',
-                          lineHeight: 1.3,
-                        }}
-                      >
-                        <div style={{ fontSize: 11, opacity: 0.8 }}>
-                          {new Date(dateStr + 'T12:00:00').toLocaleDateString('en-IN', { month: 'short' })}
-                        </div>
-                        <div style={{ fontSize: 16 }}>{d}</div>
-                        {hasData && !isSelected && (
-                          <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#2563eb', margin: '2px auto 0' }} />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+                <CalendarPicker
+                  history={history}
+                  selectedDate={selectedDate}
+                  onSelectDate={setSelectedDate}
+                />
 
                 <div style={{ marginTop: 18, padding: 14, background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 8 }}>
                   <div style={{ fontSize: 12, color: 'var(--text-sub, #6b7280)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>
@@ -483,7 +591,7 @@ const LiveTrackingPage = () => {
                     </>
                   ) : (
                     <div style={{ fontSize: 13, color: 'var(--text-sub, #6b7280)' }}>
-                      {history.datesWithData?.length ? 'Choose a highlighted date.' : 'No location data in the last 30 days.'}
+                      {history.datesWithData?.length ? 'Choose a highlighted date.' : 'No location data in the last 40 days.'}
                     </div>
                   )}
                 </div>

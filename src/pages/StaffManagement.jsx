@@ -100,7 +100,9 @@ const exportRows = (rows) => {
 const StaffManagement = () => {
   const { user } = useAuth();
 
-  if (user?.role === 'staff') {
+  const normalizedRole = (user?.role || '').toLowerCase().replace(/\s/g, '');
+  const isPortalRole = normalizedRole === 'staff' || normalizedRole === 'sales' || normalizedRole === 'frontoffice' || normalizedRole === 'salesperson';
+  if (isPortalRole) {
     return <StaffPortalDashboard />;
   }
 

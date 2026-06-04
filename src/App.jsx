@@ -42,6 +42,7 @@ import StaffListingPage from './pages/admin/StaffListingPage';
 import StaffPortalTasksPage from './pages/admin/StaffPortalTasksPage';
 import StaffProfilePage from './pages/admin/StaffProfilePage';
 import LiveTrackingPage from './pages/admin/LiveTrackingPage';
+import StaffIndividualTrackingPage from './pages/admin/StaffIndividualTrackingPage';
 import InventoryDashboardPage from './pages/admin/InventoryDashboardPage';
 import AssetManagementPage from './pages/admin/AssetManagementPage';
 import AssetDetailPage from './pages/admin/AssetDetailPage';
@@ -288,6 +289,7 @@ function App() {
               <Route path="/amc" element={<Layout><AMCReport /></Layout>} />
               <Route path="/expenses" element={<Layout><Expenses /></Layout>} />
               <Route path="/staff" element={<Layout><StaffManagement /></Layout>} />
+              <Route path="/admin/staff/tracking/:staffId" element={<Layout><StaffIndividualTrackingPage /></Layout>} />
               <Route path="/ca-portal" element={<Layout><CAPortal /></Layout>} />
               
               {/* Fallback */}

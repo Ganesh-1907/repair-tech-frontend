@@ -43,7 +43,10 @@ const isPathActive = (itemPath, pathname) => {
 };
 
 const isItemActive = (item, pathname) => {
-  if (item.path && isPathActive(item.path, pathname)) return true;
+  if (item.path) {
+    const matches = item.exact ? item.path === pathname : isPathActive(item.path, pathname);
+    if (matches) return true;
+  }
   if (!hasChildren(item)) return false;
   return item.children.some((child) => isItemActive(child, pathname));
 };

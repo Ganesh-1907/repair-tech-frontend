@@ -160,6 +160,44 @@ const StaffProfilePage = () => {
     }
   };
 
+  const captureLocation = () => new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve({ location: null });
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ location: { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy } }),
+      () => resolve({ location: null }),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }
+    );
+  });
+
+  const handleClockIn = async () => {
+    setSubmitting(true);
+    try {
+      const { location } = await captureLocation();
+      if (!location) { setNotice('Location permission is required to clock in.'); return; }
+      await staffManagementService.clockIn(location);
+      setNotice('Clocked in successfully.');
+      await loadSummary();
+    } catch (error) {
+      setNotice(error.response?.data?.message || error.message || 'Clock-in failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleClockOut = async () => {
+    setSubmitting(true);
+    try {
+      const { location } = await captureLocation();
+      await staffManagementService.clockOut({ ...(location || {}) });
+      setNotice('Clocked out successfully.');
+      await loadSummary();
+    } catch (error) {
+      setNotice(error.response?.data?.message || error.message || 'Clock-out failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleRegularizationRequest = async (payload) => {
     setSubmitting(true);
     try {
@@ -233,6 +271,9 @@ const StaffProfilePage = () => {
               todayLogs={summary.todayAttendance}
               requests={summary.regularizationRequests}
               onSelectDay={(day) => setModal({ type: 'attendance-day', day })}
+              onClockIn={handleClockIn}
+              onClockOut={handleClockOut}
+              submitting={submitting}
             />
           )}
           {activeTab === 'payments' && (
@@ -343,15 +384,20 @@ const buildMonthDays = (logs = [], requests = [], baseDate = new Date()) => {
     const outAt = clockOut ? new Date(clockOut.loggedAt || clockOut.createdAt) : null;
     const workedMinutes = inAt && outAt ? Math.max(Math.floor((outAt - inAt) / 60000), 0) : 0;
     const isShort = Boolean(clockIn && clockOut && workedMinutes < WORKDAY_MINUTES);
-    const isMissedClockOut = Boolean(clockIn && !clockOut && date < new Date(new Date().toDateString()));
-    const status = approvedRequest ? 'regularized'
-      : pendingRequest ? 'pending'
-        : rejectedRequest ? 'rejected'
-          : isMissedClockOut ? 'missed'
-            : isShort ? 'short'
-              : clockIn && clockOut ? 'complete'
-                : clockIn ? 'open'
-                  : 'empty';
+    const todayMidnight = new Date(new Date().toDateString());
+    const isFuture = date > todayMidnight;
+    const isMissedClockOut = Boolean(clockIn && !clockOut && date < todayMidnight);
+    const status = isFuture ? 'future'
+      : approvedRequest ? 'regularized'
+        : pendingRequest ? 'pending'
+          : rejectedRequest ? 'rejected'
+            : isMissedClockOut ? 'missed'
+              : isShort ? 'short'
+                : clockIn && clockOut ? 'complete'
+                  : clockIn ? 'open'
+                    : 'empty';
+
+    const isLate = Boolean(clockIn && Number(clockIn.lateMinutes) > 0);
 
     return {
       date,
@@ -361,6 +407,7 @@ const buildMonthDays = (logs = [], requests = [], baseDate = new Date()) => {
       clockOut,
       workedMinutes,
       isShort,
+      isLate,
       isMissedClockOut,
       pendingRequest,
       approvedRequest,
@@ -370,71 +417,178 @@ const buildMonthDays = (logs = [], requests = [], baseDate = new Date()) => {
   });
 };
 
-const AttendancePanel = ({ logs, todayLogs, requests, onSelectDay }) => {
+const AttendancePanel = ({ logs, todayLogs, requests, onSelectDay, onClockIn, onClockOut, submitting }) => {
   const [monthDate, setMonthDate] = useState(new Date());
+  const [now, setNow] = useState(new Date());
+
+  const todayClockIn = todayLogs.find((l) => l.action === 'Clock In');
+  const todayClockOut = todayLogs.find((l) => l.action === 'Clock Out');
+
+  useEffect(() => {
+    if (!todayClockIn || todayClockOut) return undefined;
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, [todayClockIn, todayClockOut]);
+
   const monthDays = buildMonthDays(logs, requests, monthDate);
+  const today = new Date();
+  const pastDays = monthDays.filter((day) => day.date <= today);
+  const totalDaysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
   const completeDays = monthDays.filter((day) => day.status === 'complete' || day.status === 'regularized').length;
-  const shortDays = monthDays.filter((day) => day.status === 'short').length;
-  const pendingDays = monthDays.filter((day) => day.status === 'pending').length;
+  const absentDays = pastDays.filter((day) => ['empty', 'missed', 'rejected'].includes(day.status)).length;
+  const lateDays = monthDays.filter((day) => day.isLate).length;
+  const pendingRegularizations = monthDays.filter((day) => day.pendingRequest).length;
+  const approvedRegularizations = monthDays.filter((day) => day.approvedRequest).length;
 
   const shiftMonth = (offset) => {
     setMonthDate((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
   };
 
+  const clockInTs = todayClockIn ? new Date(todayClockIn.loggedAt || todayClockIn.createdAt) : null;
+  const clockOutTs = todayClockOut ? new Date(todayClockOut.loggedAt || todayClockOut.createdAt) : null;
+  const workedMs = clockInTs ? Math.max((clockOutTs || now) - clockInTs, 0) : 0;
+  const workedH = Math.floor(workedMs / 3600000);
+  const workedM = Math.floor((workedMs % 3600000) / 60000);
+
+  const statCards = [
+    { label: 'Present', value: completeDays, total: totalDaysInMonth, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0' },
+    { label: 'Absent', value: absentDays, total: totalDaysInMonth, color: '#dc2626', bg: '#fef2f2', border: '#fca5a5' },
+    { label: 'Late Clock-In', value: lateDays, total: totalDaysInMonth, color: '#d97706', bg: '#fffbeb', border: '#fde68a' },
+    { label: 'Reg. Pending', value: pendingRegularizations, total: null, color: '#7c3aed', bg: '#faf5ff', border: '#e9d5ff' },
+    { label: 'Reg. Approved', value: approvedRegularizations, total: null, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc' },
+  ];
+
   return (
     <div className="staff-attendance-panel">
-      <div className="staff-ledger-summary">
-        <div><span>Today Logs</span><strong>{todayLogs.length}</strong></div>
-        <div><span>Complete Days</span><strong>{completeDays}</strong></div>
-        <div><span>Short Days</span><strong>{shortDays}</strong></div>
-        <div><span>Pending Regularise</span><strong>{pendingDays}</strong></div>
-      </div>
 
-      <div className="staff-calendar-card">
-        <div className="staff-calendar-header">
-          <button type="button" onClick={() => shiftMonth(-1)}>Prev</button>
-          <h3>{monthTitle(monthDate)}</h3>
-          <button type="button" onClick={() => shiftMonth(1)}>Next</button>
-        </div>
-        <div className="staff-calendar-weekdays">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => <span key={day}>{day}</span>)}
-        </div>
-        <div className="staff-calendar-grid">
-          {Array.from({ length: monthDays[0]?.date.getDay() || 0 }, (_, index) => <span key={`blank-${index}`} className="staff-calendar-blank" />)}
-          {monthDays.map((day) => (
-            <button
-              key={day.key}
-              type="button"
-              className={`staff-calendar-day status-${day.status}`}
-              onClick={() => onSelectDay(day)}
-            >
-              <strong>{day.date.getDate()}</strong>
-              <span>{day.clockIn && !day.clockOut ? `In ${formatTime(day.clockIn.loggedAt || day.clockIn.createdAt)}` : formatHours(day.workedMinutes)}</span>
-            </button>
-          ))}
-        </div>
-        <div className="staff-calendar-legend">
-          <span className="complete">Complete</span>
-          <span className="open">Clocked in</span>
-          <span className="short">Less than 9 hrs</span>
-          <span className="missed">Missed clock-out</span>
-          <span className="pending">Pending</span>
-          <span className="regularized">Regularized</span>
-        </div>
-      </div>
-
-      <div className="staff-log-list">
-        {logs.slice(0, 10).map((log) => (
-          <div key={log.id} className="staff-log-row">
-            <div>
-              <strong>{log.action || log.status}</strong>
-              <span>{log.location || log.notes || '-'}</span>
+      {/* Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, marginBottom: 20 }}>
+        {statCards.map((c) => (
+          <div key={c.label} style={{ background: c.bg, border: `1.5px solid ${c.border}`, borderRadius: 10, padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{c.label}</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: c.color, lineHeight: 1 }}>
+              {c.value}
+              {c.total != null && <span style={{ fontSize: 13, fontWeight: 500, color: '#9ca3af' }}>/{c.total}</span>}
             </div>
-            <small>{formatDateTime(log.loggedAt || log.createdAt)}</small>
           </div>
         ))}
-        {logs.length === 0 && <div className="staff-empty-state">No attendance logs found.</div>}
       </div>
+
+      {/* Two-column: Calendar left + Today info right */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, alignItems: 'stretch' }}>
+
+        {/* Right: Today's Attendance (rendered second but placed right via grid order) */}
+        <div style={{ order: 2, background: 'var(--bg-card, #fff)', border: '1px solid var(--border, #e5e7eb)', borderRadius: 12, padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main, #111827)' }}>Today's Attendance</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              {today.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+            </div>
+          </div>
+
+          {clockInTs ? (
+            <>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 36, fontWeight: 800, color: 'var(--text-main, #111827)', letterSpacing: '-0.5px' }}>
+                  {String(workedH).padStart(2, '0')}:{String(workedM).padStart(2, '0')}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>Hours Worked Today</div>
+              </div>
+
+              {/* Progress bar */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
+                  <span>In: {formatTime(clockInTs)}</span>
+                  <span>{clockOutTs ? formatTime(clockOutTs) : '—'}</span>
+                </div>
+                <div style={{ background: '#e5e7eb', borderRadius: 99, height: 8, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 99,
+                    background: clockOutTs ? '#16a34a' : '#3b82f6',
+                    width: `${Math.min((workedH * 60 + workedM) / (9 * 60) * 100, 100)}%`,
+                    transition: 'width 0.5s',
+                  }} />
+                </div>
+                <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', marginTop: 4 }}>
+                  Target: 9 hrs
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13, padding: '12px 0' }}>Not clocked in yet today</div>
+          )}
+
+          {/* Clock In / Out badges */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '8px 12px' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#16a34a' }}>● Clock In</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#15803d' }}>{clockInTs ? formatTime(clockInTs) : '—'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#dc2626' }}>● Clock Out</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#b91c1c' }}>{clockOutTs ? formatTime(clockOutTs) : '—'}</span>
+            </div>
+          </div>
+
+          {/* Action button */}
+          {!clockInTs && (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={onClockIn}
+              style={{ width: '100%', padding: '10px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 700, fontSize: 14, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1 }}
+            >
+              {submitting ? 'Processing…' : '→ Clock In'}
+            </button>
+          )}
+          {clockInTs && !clockOutTs && (
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={onClockOut}
+              style={{ width: '100%', padding: '10px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 700, fontSize: 14, cursor: submitting ? 'not-allowed' : 'pointer', opacity: submitting ? 0.7 : 1 }}
+            >
+              {submitting ? 'Processing…' : '■ Clock Out'}
+            </button>
+          )}
+        </div>
+
+        {/* Left: Calendar */}
+        <div className="staff-calendar-card" style={{ order: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '8px 0 8px', borderBottom: '1px solid var(--border, #e5e7eb)', marginBottom: 6 }}>
+            <button type="button" onClick={() => shiftMonth(-1)} style={{ background: 'var(--bg-sub, #f3f4f6)', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 18, color: '#374151', lineHeight: 1 }}>‹</button>
+            <span style={{ fontWeight: 700, fontSize: 14, minWidth: 120, textAlign: 'center', color: 'var(--text-main, #111827)' }}>{monthTitle(monthDate)}</span>
+            <button type="button" onClick={() => shiftMonth(1)} style={{ background: 'var(--bg-sub, #f3f4f6)', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 18, color: '#374151', lineHeight: 1 }}>›</button>
+          </div>
+          <div className="staff-calendar-weekdays">
+            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => <span key={d}>{d}</span>)}
+          </div>
+          <div className="staff-calendar-grid">
+            {Array.from({ length: monthDays[0]?.date.getDay() || 0 }, (_, i) => <span key={`blank-${i}`} className="staff-calendar-blank" />)}
+            {monthDays.map((day) => (
+              <button
+                key={day.key}
+                type="button"
+                className={`staff-calendar-day status-${day.status}`}
+                onClick={() => day.status !== 'future' && onSelectDay(day)}
+                style={{ cursor: day.status === 'future' ? 'default' : 'pointer' }}
+              >
+                <strong>{day.date.getDate()}</strong>
+                <span>{day.clockIn && !day.clockOut ? `In ${formatTime(day.clockIn.loggedAt || day.clockIn.createdAt)}` : formatHours(day.workedMinutes)}</span>
+              </button>
+            ))}
+          </div>
+          <div className="staff-calendar-legend">
+            <span className="complete">Present</span>
+            <span className="regularized">Regularized</span>
+            <span className="open">Active</span>
+            <span className="absent">Absent</span>
+            <span className="short">Short Hrs</span>
+            <span className="pending">Pending</span>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 };
@@ -595,42 +749,47 @@ const ExpenseModal = ({ tasks, submitting, onClose, onSubmit }) => {
 };
 
 const AttendanceDayModal = ({ day, submitting, onClose, onRegularize }) => {
+  const isAbsent = day.status === 'empty';
+  const isMissedOut = day.status === 'missed' || day.status === 'open';
+  const canRegularize = (isAbsent || isMissedOut) && !day.pendingRequest && !day.approvedRequest;
+
   const [form, setForm] = useState({
+    clockInTime: day.key ? `${day.key}T09:00` : '',
     clockOutTime: day.key ? `${day.key}T18:00` : '',
     reason: '',
   });
   const [error, setError] = useState('');
 
+  const set = (field) => (e) => { setForm((f) => ({ ...f, [field]: e.target.value })); setError(''); };
+
   const handleSubmit = (event) => {
     event.preventDefault();
-    if (!form.clockOutTime) {
-      setError('Clock-out time is required.');
-      return;
-    }
-    if (!form.reason.trim()) {
-      setError('Reason is required.');
-      return;
-    }
+    if (isAbsent && !form.clockInTime) { setError('Clock-in time is required.'); return; }
+    if (!form.clockOutTime) { setError('Clock-out time is required.'); return; }
+    if (!form.reason.trim()) { setError('Reason is required.'); return; }
     onRegularize({
       date: day.key,
+      ...(isAbsent ? { clockInTime: new Date(form.clockInTime).toISOString() } : {}),
       clockOutTime: new Date(form.clockOutTime).toISOString(),
       reason: form.reason.trim(),
     });
   };
 
+  const statusLabel = { empty: 'Absent', missed: 'Missed Clock-Out', open: 'No Clock-Out', complete: 'Present', regularized: 'Regularized', pending: 'Pending', rejected: 'Rejected', short: 'Short Hours' };
+
   return (
-    <ModalShell title={`Attendance - ${formatDate(day.date)}`} onClose={onClose}>
+    <ModalShell title={`Attendance — ${formatDate(day.date)}`} onClose={onClose}>
       <div className="staff-attendance-day-detail">
-        <div><span>Clock In</span><strong>{formatTime(day.clockIn?.loggedAt || day.clockIn?.createdAt)}</strong></div>
-        <div><span>Clock Out</span><strong>{formatTime(day.clockOut?.loggedAt || day.clockOut?.createdAt)}</strong></div>
-        <div><span>Worked Hours</span><strong className={day.isShort ? 'danger' : ''}>{day.clockIn && !day.clockOut ? 'Running' : formatHours(day.workedMinutes)}</strong></div>
-        <div><span>Status</span><strong>{day.status === 'open' ? 'Clocked in' : day.status}</strong></div>
+        <div><span>Clock In</span><strong>{formatTime(day.clockIn?.loggedAt || day.clockIn?.createdAt) || '—'}</strong></div>
+        <div><span>Clock Out</span><strong>{formatTime(day.clockOut?.loggedAt || day.clockOut?.createdAt) || '—'}</strong></div>
+        <div><span>Hours</span><strong>{day.clockIn && !day.clockOut ? 'Running' : formatHours(day.workedMinutes)}</strong></div>
+        <div><span>Status</span><strong>{statusLabel[day.status] || day.status}</strong></div>
       </div>
 
       {day.pendingRequest && (
         <div className="staff-attendance-request-note pending">
           <AlertCircle size={16} />
-          <span>Regularization request is pending with admin.</span>
+          <span>Regularization request pending with admin.</span>
         </div>
       )}
       {day.approvedRequest && (
@@ -642,28 +801,34 @@ const AttendanceDayModal = ({ day, submitting, onClose, onRegularize }) => {
       {day.rejectedRequest && (
         <div className="staff-attendance-request-note rejected">
           <AlertCircle size={16} />
-          <span>Regularization rejected: {day.rejectedRequest.adminNotes || '-'}</span>
+          <span>Rejected: {day.rejectedRequest.adminNotes || 'No reason given.'}</span>
         </div>
       )}
 
-      {day.isMissedClockOut && !day.pendingRequest && !day.approvedRequest && (
+      {canRegularize && (
         <form className="staff-form" onSubmit={handleSubmit}>
           <div className="staff-form-wide staff-overtime-note">
             <AlertCircle size={18} />
-            <span>Clock-out was missed. Submit time and reason for admin regularization.</span>
+            <span>{isAbsent ? 'You were marked absent. Submit actual timings to request regularization.' : 'Clock-out was missed. Submit your actual clock-out time.'}</span>
           </div>
+          {isAbsent && (
+            <label>
+              <span>Clock-In Time</span>
+              <input type="datetime-local" value={form.clockInTime} onChange={set('clockInTime')} />
+            </label>
+          )}
           <label>
-            <span>Clock-out Time</span>
-            <input type="datetime-local" value={form.clockOutTime} onChange={(event) => { setForm((current) => ({ ...current, clockOutTime: event.target.value })); setError(''); }} />
+            <span>Clock-Out Time</span>
+            <input type="datetime-local" value={form.clockOutTime} onChange={set('clockOutTime')} />
           </label>
           <label className="staff-form-wide">
             <span>Reason</span>
-            <textarea rows="3" value={form.reason} onChange={(event) => { setForm((current) => ({ ...current, reason: event.target.value })); setError(''); }} placeholder="Why clock-out was missed?" />
+            <textarea rows="3" value={form.reason} onChange={set('reason')} placeholder="Explain why regularization is needed…" />
             {error && <small className="staff-form-error">{error}</small>}
           </label>
           <div className="staff-form-actions">
             <button type="button" onClick={onClose}>Cancel</button>
-            <button type="submit" disabled={submitting}>{submitting ? 'Sending...' : 'Submit Regularise Request'}</button>
+            <button type="submit" disabled={submitting}>{submitting ? 'Sending…' : 'Request Regularization'}</button>
           </div>
         </form>
       )}

@@ -134,7 +134,7 @@ const StaffListingPage = () => {
   };
 
   const openTracking = (row) => {
-    navigate(`/admin/staff/live-tracking?staffId=${encodeURIComponent(row.id)}`);
+    navigate(`/admin/staff/tracking/${encodeURIComponent(row.id)}`);
   };
 
   const openAdd = () => {

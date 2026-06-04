@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react';
 import { staffManagementService } from '../services/staffManagementService';
+import { useAuth } from '../context/AuthContext';
 
 const WORKFLOW_STEPS = [
   'Technician Assigned',
@@ -134,6 +135,9 @@ const captureLocation = ({ required = false } = {}) =>
 const LOCATION_PING_INTERVAL_MS = 5 * 60 * 1000;
 
 const StaffPortalDashboard = () => {
+  const { user } = useAuth();
+  const normalizedRole = (user?.role || '').toLowerCase().replace(/\s/g, '');
+  const showTasks = normalizedRole === 'staff';
   const [summary, setSummary] = useState(emptySummary);
   const [activeTask, setActiveTask] = useState(null);
   const [modal, setModal] = useState(null);
@@ -163,7 +167,8 @@ const StaffPortalDashboard = () => {
     if (!force && now - lastLocationPingAtRef.current < LOCATION_PING_INTERVAL_MS) return;
 
     const { location } = await captureLocation();
-    if (!location) return;
+    // Skip pings with no GPS lock (accuracy > 500m is network/IP fallback, not real position)
+    if (!location || location.accuracy > 500) return;
 
     lastLocationPingAtRef.current = now;
     staffManagementService.sendLocationPing(location).catch(() => null);
@@ -334,7 +339,7 @@ const StaffPortalDashboard = () => {
           <div className="staff-hero-meta">
             <span><Calendar size={15} /> {formatDate(summary.today, { weekday: 'short' })}</span>
             <span><UserCheck size={15} /> {attendance.status || profile.attendanceStatus || 'Not clocked in'}</span>
-            <span><Briefcase size={15} /> {stats.assignedTasks || 0} assigned</span>
+            {showTasks && <span><Briefcase size={15} /> {stats.assignedTasks || 0} assigned</span>}
           </div>
         </div>
       </section>
@@ -349,9 +354,9 @@ const StaffPortalDashboard = () => {
       />
 
       <section className="staff-stat-grid">
-        <StatCard icon={Briefcase} label="Assigned" value={stats.assignedTasks} meta={`${stats.todayAssigned || 0} today`} tone="blue" />
-        <StatCard icon={CheckCircle2} label="Completed" value={stats.completedTasks} meta="Closed jobs" tone="green" />
-        <StatCard icon={AlertCircle} label="Pending" value={stats.pendingTasks} meta={`${stats.inProgressTasks || 0} in progress`} tone="amber" />
+        {showTasks && <StatCard icon={Briefcase} label="Assigned" value={stats.assignedTasks} meta={`${stats.todayAssigned || 0} today`} tone="blue" />}
+        {showTasks && <StatCard icon={CheckCircle2} label="Completed" value={stats.completedTasks} meta="Closed jobs" tone="green" />}
+        {showTasks && <StatCard icon={AlertCircle} label="Pending" value={stats.pendingTasks} meta={`${stats.inProgressTasks || 0} in progress`} tone="amber" />}
         <StatCard icon={Wallet} label="Today Payments" value={formatCurrency(stats.todayPayments)} meta={`${formatCurrency(totalCollection)} total`} tone="teal" />
         <StatCard icon={ReceiptText} label="Daily Expenses" value={formatCurrency(stats.todayExpenses)} meta={`${formatCurrency(totalExpenses)} total`} tone="rose" />
       </section>
@@ -360,19 +365,21 @@ const StaffPortalDashboard = () => {
         <TargetProgressCard target={summary.target} formatCurrency={formatCurrency} />
       )}
 
-      <div className="card" style={{ padding: '24px' }}>
-        <div className="staff-panel-header" style={{ marginBottom: '24px' }}>
-          <div>
-            <h2>Assigned Tasks</h2>
-            <span>{formatDate(summary.today)}</span>
+      {showTasks && (
+        <div className="card" style={{ padding: '24px' }}>
+          <div className="staff-panel-header" style={{ marginBottom: '24px' }}>
+            <div>
+              <h2>Assigned Tasks</h2>
+              <span>{formatDate(summary.today)}</span>
+            </div>
           </div>
+          <TasksPanel
+            tasks={summary.tasks}
+            activeTask={activeTask}
+            onSelect={setActiveTask}
+          />
         </div>
-        <TasksPanel
-          tasks={summary.tasks}
-          activeTask={activeTask}
-          onSelect={setActiveTask}
-        />
-      </div>
+      )}
 
       {modal?.type === 'close' && (
         <CloseJobModal
