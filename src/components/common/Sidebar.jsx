@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   CalendarClock,
   ChevronDown,
+  Globe,
   Key,
   LayoutDashboard,
   LogOut,
@@ -203,10 +204,16 @@ const Sidebar = ({ isOpen = false, onClose }) => {
 
       <div className="sidebar-footer">
         {role === 'admin' && (
-          <NavLink to="/admin/settings" className={({ isActive }) => `sidebar-btn${isActive ? ' active' : ''}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Settings size={18} />
-            <span>Settings</span>
-          </NavLink>
+          <>
+            <NavLink to="/admin/website-features" className={({ isActive }) => `sidebar-btn${isActive ? ' active' : ''}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Globe size={18} />
+              <span>Website Features</span>
+            </NavLink>
+            <NavLink to="/admin/settings" className={({ isActive }) => `sidebar-btn${isActive ? ' active' : ''}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <Settings size={18} />
+              <span>Settings</span>
+            </NavLink>
+          </>
         )}
 
         <button onClick={logout} className="sidebar-btn logout">

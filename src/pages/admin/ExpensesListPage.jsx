@@ -5,6 +5,8 @@ import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { usePrivacy } from '../../context/PrivacyContext';
 import { useAuth } from '../../context/AuthContext';
 import { expenseManagementService } from '../../services/expenseManagementService';
+import { uploadFileToR2 } from '../../services/uploadService';
+import FileViewer from '../../components/common/FileViewer';
 import { api } from '../../services/apiClient';
 import { useExpenseSettings } from '../../hooks/useExpenseSettings';
 import { normalizeRole } from '../../config/roles';
@@ -28,6 +30,7 @@ const emptyForm = {
   referenceNumber: '',
   notes: '',
   receiptName: '',
+  receipt: null,
 };
 
 const ExpensesListPage = () => {
@@ -53,6 +56,7 @@ const ExpensesListPage = () => {
   const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
   const [vendorSearch, setVendorSearch] = useState('');
   const [vendorPanelPos, setVendorPanelPos] = useState({});
+  const [uploading, setUploading] = useState(false);
   const vendorDropdownRef = useRef(null);
   const vendorTriggerRef = useRef(null);
 
@@ -174,6 +178,7 @@ const ExpensesListPage = () => {
       referenceNumber: expense.referenceNumber || '',
       notes: expense.notes || '',
       receiptName: expense.receiptName || '',
+      receipt: expense.receipt || (expense.receiptPhoto && !String(expense.receiptPhoto).startsWith('data:') ? { url: expense.receiptPhoto, name: expense.receiptName } : null),
     });
     setModalMode(mode);
     setErrors({});
@@ -203,6 +208,7 @@ const ExpensesListPage = () => {
       referenceNumber: expense.referenceNumber || '',
       notes: expense.notes || '',
       receiptName: expense.receiptName || '',
+      receipt: expense.receipt || (expense.receiptPhoto && !String(expense.receiptPhoto).startsWith('data:') ? { url: expense.receiptPhoto, name: expense.receiptName } : null),
     });
     setModalMode('edit');
     setErrors({});
@@ -234,7 +240,8 @@ const ExpensesListPage = () => {
       vendorPayee: form.vendorPayee.trim(),
       referenceNumber: form.referenceNumber.trim(),
       notes: form.notes.trim(),
-      receiptName: form.receiptName.trim(),
+      receiptName: form.receipt?.name || form.receiptName.trim(),
+      receipt: form.receipt || null,
     };
     if (modalMode === 'edit' && selectedExpense?.id) {
       await expenseManagementService.updateExpense(selectedExpense.id, payload);
@@ -519,22 +526,32 @@ const ExpensesListPage = () => {
                 <div className="form-group form-group-full expense-attachment-grid">
                   <div className="expense-attachment-field">
                     <label>Receipt Upload</label>
-                    <label className="file-upload-box expense-receipt-upload">
+                    <label className={`file-upload-box expense-receipt-upload${uploading ? ' uploading' : ''}`}>
                       <input
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png,.webp"
                         style={{ display: 'none' }}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
-                          setForm((c) => ({ ...c, receiptName: file ? file.name : '' }));
+                          if (!file) return;
+                          setUploading(true);
+                          try {
+                            const r2 = await uploadFileToR2(file);
+                            setForm((c) => ({ ...c, receipt: r2, receiptName: r2.name || file.name }));
+                          } catch {
+                            // silently ignore
+                          } finally {
+                            setUploading(false);
+                          }
                         }}
                       />
                       <UploadCloud size={24} />
                       <span className="expense-receipt-title">
-                        {form.receiptName || 'Click to upload receipt'}
+                        {uploading ? 'Uploading...' : (form.receipt?.name || form.receiptName || 'Click to upload receipt')}
                       </span>
-                      {!form.receiptName && <span className="expense-receipt-meta">PDF, JPG, PNG</span>}
+                      {!form.receipt?.name && !form.receiptName && !uploading && <span className="expense-receipt-meta">PDF, JPG, PNG</span>}
                     </label>
+                    <FileViewer files={form.receipt} />
                   </div>
                   <div className="expense-attachment-field">
                     <label>Notes</label>
@@ -578,6 +595,8 @@ const ExpensesListPage = () => {
                 )}
                 <div><span>Reference Number</span><strong>{selectedExpense.referenceNumber || '-'}</strong></div>
                 <div><span>Notes</span><strong>{selectedExpense.notes || '-'}</strong></div>
+                <div><span>Receipt</span><strong>{selectedExpense.receiptName || '-'}</strong></div>
+                <FileViewer files={selectedExpense.receipt || (selectedExpense.receiptPhoto && !String(selectedExpense.receiptPhoto).startsWith('data:') ? { url: selectedExpense.receiptPhoto, name: selectedExpense.receiptName } : null)} />
                 <div><span>Added By</span><strong>{selectedExpense.createdBy || selectedExpense.staffName || '-'}</strong></div>
                 <div><span>Created Date</span><strong>{formatDateLabel(selectedExpense.createdDate || selectedExpense.spentOn)}</strong></div>
               </div>

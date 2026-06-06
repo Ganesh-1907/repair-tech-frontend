@@ -17,7 +17,9 @@ import {
   X,
 } from 'lucide-react';
 import { staffManagementService } from '../services/staffManagementService';
+import { uploadFileToR2 } from '../services/uploadService';
 import { useAuth } from '../context/AuthContext';
+import FileViewer from '../components/common/FileViewer';
 
 const WORKFLOW_STEPS = [
   'Technician Assigned',
@@ -94,13 +96,6 @@ const getStatusTone = (status = '') => {
   if (value.includes('cancel') || value.includes('missed')) return 'danger';
   return 'neutral';
 };
-
-const fileToDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = reject;
-  reader.readAsDataURL(file);
-});
 
 const captureLocation = ({ required = false } = {}) =>
   new Promise((resolve) => {
@@ -522,27 +517,40 @@ const CloseJobModal = ({ task, submitting, onClose, onSubmit }) => {
   const [form, setForm] = useState({
     taskId: task?.id || '',
     customerName: task?.customerName || '',
-    beforeJobPhoto: '',
-    beforeJobPhotoName: '',
-    afterJobPhoto: '',
-    afterJobPhotoName: '',
+    beforeJobPhoto: null,
+    afterJobPhoto: null,
     customerSignature: '',
-    customerSignatureName: '',
-    customerSignatureImage: '',
-    customerSignatureImageName: '',
+    customerSignatureImage: null,
     workSummary: '',
   });
+  const [uploadingField, setUploadingField] = useState(null);
 
   const handleFile = async (field, event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    setForm((current) => ({ ...current, [field]: dataUrl, [`${field}Name`]: file.name }));
+    setUploadingField(field);
+    try {
+      const result = await uploadFileToR2(file);
+      setForm((current) => ({ ...current, [field]: result }));
+    } finally {
+      setUploadingField(null);
+    }
   };
 
   return (
     <ModalShell title="Close Job" onClose={onClose}>
-      <form className="staff-form" onSubmit={(event) => { event.preventDefault(); onSubmit(form); }}>
+      <form className="staff-form" onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit({
+          taskId: form.taskId,
+          customerName: form.customerName,
+          beforeJobPhoto: form.beforeJobPhoto?.url || form.beforeJobPhoto?.key || '',
+          afterJobPhoto: form.afterJobPhoto?.url || form.afterJobPhoto?.key || '',
+          customerSignature: form.customerSignature,
+          customerSignatureImage: form.customerSignatureImage?.url || form.customerSignatureImage?.key || '',
+          workSummary: form.workSummary,
+        });
+      }}>
         <label className="staff-form-wide">
           <span>Customer</span>
           <input value={form.customerName} onChange={(event) => setForm((current) => ({ ...current, customerName: event.target.value }))} required />
@@ -550,12 +558,14 @@ const CloseJobModal = ({ task, submitting, onClose, onSubmit }) => {
         <label className="staff-file-input">
           <span>Before Photo</span>
           <input type="file" accept="image/*" capture="environment" onChange={(event) => handleFile('beforeJobPhoto', event)} />
-          <em><Camera size={15} /> {form.beforeJobPhotoName || 'Upload before photo'}</em>
+          <em><Camera size={15} /> {uploadingField === 'beforeJobPhoto' ? 'Uploading...' : form.beforeJobPhoto?.name || 'Upload before photo'}</em>
+          {form.beforeJobPhoto && <FileViewer files={form.beforeJobPhoto} size={64} />}
         </label>
         <label className="staff-file-input">
           <span>After Photo</span>
           <input type="file" accept="image/*" capture="environment" onChange={(event) => handleFile('afterJobPhoto', event)} />
-          <em><Camera size={15} /> {form.afterJobPhotoName || 'Upload after photo'}</em>
+          <em><Camera size={15} /> {uploadingField === 'afterJobPhoto' ? 'Uploading...' : form.afterJobPhoto?.name || 'Upload after photo'}</em>
+          {form.afterJobPhoto && <FileViewer files={form.afterJobPhoto} size={64} />}
         </label>
         <label>
           <span>Signature Text</span>
@@ -564,7 +574,8 @@ const CloseJobModal = ({ task, submitting, onClose, onSubmit }) => {
         <label className="staff-file-input">
           <span>Signature Image</span>
           <input type="file" accept="image/*" onChange={(event) => handleFile('customerSignatureImage', event)} />
-          <em><PenLine size={15} /> {form.customerSignatureImageName || 'Optional image'}</em>
+          <em><PenLine size={15} /> {uploadingField === 'customerSignatureImage' ? 'Uploading...' : form.customerSignatureImage?.name || 'Optional image'}</em>
+          {form.customerSignatureImage && <FileViewer files={form.customerSignatureImage} size={64} />}
         </label>
         <label className="staff-form-wide">
           <span>Work Summary</span>
@@ -572,7 +583,7 @@ const CloseJobModal = ({ task, submitting, onClose, onSubmit }) => {
         </label>
         <div className="staff-form-actions">
           <button type="button" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={submitting}>{submitting ? 'Closing...' : 'Close Job'}</button>
+          <button type="submit" disabled={submitting || !!uploadingField}>{submitting ? 'Closing...' : 'Close Job'}</button>
         </div>
       </form>
     </ModalShell>

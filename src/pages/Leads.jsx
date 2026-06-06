@@ -22,6 +22,8 @@ import { staffManagementService } from '../services/staffManagementService';
 import { useLeadSettings } from '../hooks/useLeadSettings';
 import { sendOutboundMessage } from '../services/communicationService';
 import SendCredentialsModal from '../components/common/SendCredentialsModal';
+import FileViewer from '../components/common/FileViewer';
+import { uploadFileToR2 } from '../services/uploadService';
 import { normalizeRole } from '../config/roles';
 import { useAuth } from '../context/AuthContext';
 
@@ -49,8 +51,6 @@ const initialLeadForm = {
   onsiteImages: [],
   category: 'Pending',
 };
-
-const categories = ['All', 'Pending', 'Completed', 'Assigned', 'Missed'];
 
 const ADMIN_TRACKER_STEPS = ['Lead Captured', 'Assign to Technician'];
 
@@ -135,33 +135,42 @@ const prepareMessage = (template, lead) => template.content
   .replaceAll('{{lead_status}}', lead?.category || 'Pending')
   .replaceAll('{{technician}}', lead?.assignedTechnician || 'Not assigned');
 
-const fileToDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve({ name: file.name, dataUrl: reader.result });
-  reader.onerror = reject;
-  reader.readAsDataURL(file);
-});
-
 const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceTypeOptions, sourceOptions, deviceOptions }) => {
   const [form, setForm] = useState(initialLeadForm);
   const [errors, setErrors] = useState({});
+  const [uploading, setUploading] = useState(false);
 
   const updateForm = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: '' }));
   };
 
-  const handleFiles = async (field, event) => {
-    const files = Array.from(event.target.files || []);
-    const images = await Promise.all(files.map(fileToDataUrl));
-    updateForm(field, images);
-  };
-
   const handleSingleFile = async (field, event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const image = await fileToDataUrl(file);
-    updateForm(field, image);
+    setUploading(true);
+    try {
+      const image = await uploadFileToR2(file);
+      updateForm(field, image);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSlotFile = async (field, index, event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const image = await uploadFileToR2(file);
+      setForm((prev) => {
+        const arr = [...(prev[field] || [])];
+        arr[index] = image;
+        return { ...prev, [field]: arr };
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
   const selectedServiceType = normalizeServiceType(form.serviceType);
@@ -169,7 +178,7 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (submitting) return;
+    if (submitting || uploading) return;
 
     const nextErrors = {};
     if (!form.company.trim()) nextErrors.company = 'Company is required.';
@@ -392,12 +401,9 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
                     { key: 'problemInwardImage3', label: 'Image 3', value: form.problemInwardImage3 },
                   ].map(({ key, label, value }) => (
                     <label key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', minHeight: '110px', padding: '14px 10px', border: `2px dashed ${value ? '#6366f1' : '#cbd5e1'}`, borderRadius: '12px', background: value ? '#eef2ff' : '#f8fafc', cursor: 'pointer', transition: 'all 0.18s', textAlign: 'center' }}>
-                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(event) => handleSingleFile(key, event)} />
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(event) => handleSingleFile(key, event)} disabled={uploading} />
                       {value ? (
-                        <>
-                          <img src={value.dataUrl} alt={label} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: '8px', border: '2px solid #6366f1' }} />
-                          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#4f46e5', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value.name}</span>
-                        </>
+                        <FileViewer files={[value]} size={52} />
                       ) : (
                         <>
                           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -413,49 +419,40 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
               <>
                 <div className="form-group form-group-full">
                   <label htmlFor="lead-device-check">Device Check / Internal Report</label>
-                  <textarea
-                    id="lead-device-check"
-                    value={form.deviceCheckNote}
-                    onChange={(event) => updateForm('deviceCheckNote', event.target.value)}
-                    rows={3}
-                    placeholder="Internal report / problem inward"
-                  />
-                  <input type="file" accept="image/*" multiple onChange={(event) => handleFiles('deviceCheckImages', event)} />
-                  <span className="field-hint">{form.deviceCheckImages.length} device check image(s) selected</span>
+                  <textarea id="lead-device-check" value={form.deviceCheckNote} onChange={(event) => updateForm('deviceCheckNote', event.target.value)} rows={3} placeholder="Internal report / problem inward" />
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} style={{ flex: '1 1 150px', minWidth: 140 }}>
+                        <label style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginBottom: 4, display: 'block' }}>Image {i + 1}</label>
+                        <input type="file" accept="image/*" onChange={(e) => handleSlotFile('deviceCheckImages', i, e)} disabled={uploading} />
+                        {form.deviceCheckImages?.[i] && <FileViewer files={form.deviceCheckImages[i]} size={52} />}
+                      </div>
+                    ))}
+                  </div>
+                  <span className="field-hint">{form.deviceCheckImages?.filter(Boolean).length || 0} image(s)</span>
                 </div>
-
                 <div className="form-group form-group-full">
-                  <label htmlFor="lead-onsite-images">Images Upload</label>
-                  <input id="lead-onsite-images" type="file" accept="image/*" multiple onChange={(event) => handleFiles('onsiteImages', event)} />
-                  <span className="field-hint">At least 3 images required. {form.onsiteImages.length} selected</span>
+                  <label htmlFor="lead-onsite-images">Onsite Images</label>
+                  <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} style={{ flex: '1 1 150px', minWidth: 140 }}>
+                        <label style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginBottom: 4, display: 'block' }}>Image {i + 1}</label>
+                        <input type="file" accept="image/*" onChange={(e) => handleSlotFile('onsiteImages', i, e)} disabled={uploading} />
+                        {form.onsiteImages?.[i] && <FileViewer files={form.onsiteImages[i]} size={52} />}
+                      </div>
+                    ))}
+                  </div>
+                  <span className="field-hint">At least 3 images required. {form.onsiteImages?.filter(Boolean).length || 0} selected</span>
                   {errors.onsiteImages && <span className="form-error">{errors.onsiteImages}</span>}
                 </div>
-
-                <label className="lead-check-row">
-                  <input
-                    type="checkbox"
-                    checked={form.deviceReceiveConfirmed}
-                    onChange={(event) => updateForm('deviceReceiveConfirmed', event.target.checked)}
-                  />
-                  Device receive confirmation needed in Customer Portal
-                </label>
-
-                <label className="lead-check-row">
-                  <input
-                    type="checkbox"
-                    checked={form.deviceDeliveryConfirmed}
-                    onChange={(event) => updateForm('deviceDeliveryConfirmed', event.target.checked)}
-                  />
-                  Device delivery confirmation needed in Customer Portal
-                </label>
               </>
             )}
           </div>
 
           <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? 'Submitting...' : 'Click to Submit'}
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting || uploading}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={submitting || uploading}>
+              {uploading ? 'Uploading...' : submitting ? 'Submitting...' : 'Click to Submit'}
             </button>
           </div>
         </form>
@@ -1124,133 +1121,53 @@ const Leads = () => {
   const [trackingLead, setTrackingLead] = useState(null);
   const [updatingTracker, setUpdatingTracker] = useState(null);
   const [messagingLead, setMessagingLead] = useState(null);
-  const [viewingLead, setViewingLead] = useState(null);
-  const [editingLead, setEditingLead] = useState(null);
   const [activeLeadMenu, setActiveLeadMenu] = useState(null);
   const [credentialsTarget, setCredentialsTarget] = useState(null);
   const [notice, setNotice] = useState('');
   const [creatingLead, setCreatingLead] = useState(false);
-  const [savingLead, setSavingLead] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeCategory, setActiveCategory] = useState('All');
 
-  useEffect(() => {
-    if (location.state?.notice) {
-      setNotice(location.state.notice);
-      window.history.replaceState({}, '');
-    }
-  }, [location.state]);
+  const categories = ['All', 'Pending', 'Assigned', 'Missed', 'Completed', 'Delivered & Closed'];
 
-  const loadLeads = () => {
-    leadManagementService.listLeads()
-      .then(setLeads)
-      .catch((error) => {
-        console.error('Leads failed to load.', error);
-        setNotice(error.response?.data?.message || error.message || 'Leads failed to load. Please check that the backend is running.');
-      });
+  const handleSearchTermChange = (value) => setSearchTerm(value);
+  const handleCategoryChange = (cat) => setActiveCategory(cat);
+
+  const loadLeads = async () => {
+    try {
+      const data = await leadManagementService.listLeads();
+      setLeads(Array.isArray(data) ? data : []);
+    } catch { /* silent */ }
   };
 
-  const loadTechnicians = () => {
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const data = await leadManagementService.listLeads();
+        if (cancelled) return;
+        setLeads(Array.isArray(data) ? data : []);
+      } catch { /* silent */ }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
     staffManagementService.getStaffList()
-      .then((data) => setTechnicians(data.filter((s) => s.status !== 'Inactive' && (normalizeRole(s.role) === 'staff' || !s.role))))
-      .catch((error) => {
-        console.error('Failed to load technicians.', error);
-        setNotice(error.response?.data?.message || error.message || 'Technicians failed to load. Please check that the backend is running.');
-      });
-  };
-
-  useEffect(() => {
-    loadLeads();
-    loadTechnicians();
+      .then((data) => setTechnicians(Array.isArray(data) ? data.filter((s) => s.status !== 'Inactive') : []))
+      .catch(() => {});
   }, []);
-
-  useEffect(() => {
-    const closeMenu = (event) => {
-      if (event.target.closest('.member-action-menu') || event.target.closest('.action-trigger-btn')) return;
-      setActiveLeadMenu(null);
-    };
-    const closeOnViewportChange = () => setActiveLeadMenu(null);
-
-    document.addEventListener('mousedown', closeMenu);
-    window.addEventListener('scroll', closeOnViewportChange, true);
-    window.addEventListener('resize', closeOnViewportChange);
-    return () => {
-      document.removeEventListener('mousedown', closeMenu);
-      window.removeEventListener('scroll', closeOnViewportChange, true);
-      window.removeEventListener('resize', closeOnViewportChange);
-    };
-  }, []);
-
-  const statusParam = searchParams.get('status');
-  const searchTerm = searchParams.get('q') || '';
-  const activeCategory = categories.includes(statusParam) ? statusParam : 'All';
-  const isLeadModalOpen = canManageLeads && (isManualModalOpen || searchParams.get('add') === '1');
 
   const filteredLeads = leads.filter((lead) => {
-    const query = searchTerm.toLowerCase();
-    const matchesSearch = (lead.customerName || '').toLowerCase().includes(query)
-      || (lead.company || '').toLowerCase().includes(query)
-      || (lead.mobileNumber || '').includes(searchTerm);
-    const matchesCategory = activeCategory === 'All' || lead.category === activeCategory;
+    const matchesSearch = !searchTerm || 
+      (lead.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.mobileNumber || '').includes(searchTerm);
+    const matchesCategory = activeCategory === 'All' || 
+      (lead.category || lead.status) === activeCategory;
     return matchesSearch && matchesCategory;
   });
-
-  const closeLeadModal = () => {
-    setIsManualModalOpen(false);
-    if (searchParams.get('add')) {
-      const nextParams = new URLSearchParams(searchParams);
-      nextParams.delete('add');
-      setSearchParams(nextParams);
-    }
-  };
-
-  const handleCategoryChange = (category) => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (category === 'All') {
-      nextParams.delete('status');
-    } else {
-      nextParams.set('status', category);
-    }
-    setSearchParams(nextParams);
-  };
-
-  const handleSearchTermChange = (value) => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (!value) {
-      nextParams.delete('q');
-    } else {
-      nextParams.set('q', value);
-    }
-    setSearchParams(nextParams);
-  };
-
-  const handleCreateLead = async (lead) => {
-    if (creatingLead) return;
-    setCreatingLead(true);
-    try {
-      const created = await leadManagementService.createLead(lead);
-      setLeads((current) => [created, ...current]);
-      setNotice(`Lead created for ${created.customerName}.`);
-      closeLeadModal();
-    } catch (error) {
-      setNotice(error.response?.data?.message || error.message || 'Lead creation failed.');
-    } finally {
-      setCreatingLead(false);
-    }
-  };
-
-  const handleUpdateLead = async (updates) => {
-    if (savingLead || !editingLead) return;
-    setSavingLead(true);
-    try {
-      await leadManagementService.updateLead(editingLead.id, updates);
-      setNotice(`Lead updated for ${updates.customerName}.`);
-      setEditingLead(null);
-      loadLeads();
-    } catch (error) {
-      setNotice(error.response?.data?.message || error.message || 'Lead update failed.');
-    } finally {
-      setSavingLead(false);
-    }
-  };
 
   const handleAssignTechnician = async (tech) => {
     const leadId = assigningLead.id;
@@ -1509,12 +1426,12 @@ const Leads = () => {
           }}
           onClick={(event) => event.stopPropagation()}
         >
-          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setViewingLead(activeMenuLead); }}>
+          <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/view/${activeMenuLead.id}`); }}>
             <Eye size={14} className="icon-muted" /> View Details
           </button>
           {canManageLeads && (
             <>
-              <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setEditingLead(activeMenuLead); }}>
+              <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); navigate(`/admin/leads/edit/${activeMenuLead.id}`); }}>
                 <Edit size={14} className="icon-muted" /> Edit Lead
               </button>
               <button type="button" className="account-menu-item" onClick={() => { setActiveLeadMenu(null); setAssigningLead(activeMenuLead); }}>
@@ -1571,28 +1488,6 @@ const Leads = () => {
           onSent={setNotice}
         />
       )}
-
-      {viewingLead && (
-        <ViewLeadModal
-          lead={viewingLead}
-          onClose={() => setViewingLead(null)}
-          onEdit={canManageLeads ? () => { setViewingLead(null); setEditingLead(viewingLead); } : null}
-        />
-      )}
-
-      {editingLead && (
-        <EditLeadModal
-          lead={editingLead}
-          technicians={technicians}
-          submitting={savingLead}
-          onClose={() => setEditingLead(null)}
-          onUpdate={handleUpdateLead}
-          serviceTypeOptions={serviceTypeOptions}
-          sourceOptions={sourceOptions}
-          deviceOptions={deviceOptions}
-        />
-      )}
-
       {credentialsTarget && (
         <SendCredentialsModal
           contractId={credentialsTarget.id}

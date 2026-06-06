@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { staffManagementService } from '../../services/staffManagementService';
+import { uploadFileToR2 } from '../../services/uploadService';
+import FileViewer from '../../components/common/FileViewer';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 
 const emptySummary = {
@@ -91,13 +93,6 @@ const getInitials = (name = '') => {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return parts.length ? parts.slice(0, 2).map((part) => part[0]).join('').toUpperCase() : 'S';
 };
-
-const fileToDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = reject;
-  reader.readAsDataURL(file);
-});
 
 const StaffProfilePage = () => {
   const location = useLocation();
@@ -692,21 +687,39 @@ const ExpenseModal = ({ tasks, submitting, onClose, onSubmit }) => {
     category: 'Fuel',
     amount: '',
     mode: 'Cash',
-    receiptPhoto: '',
-    receiptPhotoName: '',
+    receipt: null,
     notes: '',
   });
+  const [uploading, setUploading] = useState(false);
 
   const handleFile = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    setForm((current) => ({ ...current, receiptPhoto: dataUrl, receiptPhotoName: file.name }));
+    setUploading(true);
+    try {
+      const r2 = await uploadFileToR2(file);
+      setForm((current) => ({ ...current, receipt: r2 }));
+    } catch {
+      // silently ignore upload errors
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const payload = {
+      ...form,
+      receiptPhoto: form.receipt?.url || form.receipt?.key || '',
+      receiptPhotoName: form.receipt?.name || '',
+    };
+    delete payload.receipt;
+    onSubmit(payload);
   };
 
   return (
     <ModalShell title="Add Expense" onClose={onClose}>
-      <form className="staff-form" onSubmit={(event) => { event.preventDefault(); onSubmit(form); }}>
+      <form className="staff-form" onSubmit={handleSubmit}>
         <label>
           <span>Category</span>
           <select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>
@@ -733,15 +746,16 @@ const ExpenseModal = ({ tasks, submitting, onClose, onSubmit }) => {
         <label className="staff-file-input">
           <span>Receipt</span>
           <input type="file" accept="image/*" onChange={handleFile} />
-          <em><Upload size={15} /> {form.receiptPhotoName || 'Upload image'}</em>
+          <em><Upload size={15} /> {uploading ? 'Uploading...' : (form.receipt?.name || 'Upload image')}</em>
         </label>
+        <FileViewer files={form.receipt} />
         <label className="staff-form-wide">
           <span>Notes</span>
           <textarea rows="3" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
         </label>
         <div className="staff-form-actions">
           <button type="button" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={submitting}>{submitting ? 'Saving...' : 'Save Expense'}</button>
+          <button type="submit" disabled={submitting || uploading}>{submitting ? 'Saving...' : 'Save Expense'}</button>
         </div>
       </form>
     </ModalShell>

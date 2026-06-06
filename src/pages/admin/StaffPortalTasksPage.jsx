@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { staffManagementService } from '../../services/staffManagementService';
+import { uploadFileToR2 } from '../../services/uploadService';
+import FileViewer from '../../components/common/FileViewer';
 import { useAuth } from '../../context/AuthContext';
 
 const WORKFLOW_STEPS = [
@@ -65,13 +67,6 @@ const getTaskAmount = (task = {}) => {
   const partsTotal = (task.partsUsed || []).reduce((total, part) => total + Number(part.quantity || 0) * Number(part.unitPrice || 0), 0);
   return Number(task.quote?.estimate || task.quote?.amount || task.amount || partsTotal + Number(task.labourCharge || 0) + Number(task.tax || 0) - Number(task.discount || 0) || 0);
 };
-
-const fileToDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = reject;
-  reader.readAsDataURL(file);
-});
 
 const StaffPortalTasksPage = () => {
   const { user } = useAuth();
@@ -573,21 +568,39 @@ const ExpenseModal = ({ task, submitting, onClose, onSubmit }) => {
     category: 'Fuel',
     amount: '',
     mode: 'Cash',
-    receiptPhoto: '',
-    receiptPhotoName: '',
+    receipt: null,
     notes: '',
   });
+  const [uploading, setUploading] = useState(false);
 
   const handleFile = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    setForm((current) => ({ ...current, receiptPhoto: dataUrl, receiptPhotoName: file.name }));
+    setUploading(true);
+    try {
+      const r2 = await uploadFileToR2(file);
+      setForm((current) => ({ ...current, receipt: r2 }));
+    } catch {
+      // silently ignore upload errors
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    const payload = {
+      ...form,
+      receiptPhoto: form.receipt?.url || form.receipt?.key || '',
+      receiptPhotoName: form.receipt?.name || '',
+    };
+    delete payload.receipt;
+    onSubmit(payload);
   };
 
   return (
     <ModalShell title="Add Expense" subtitle={`${task.ticketId || task.id} - ${task.customerName}`} onClose={onClose}>
-      <form className="staff-task-form" onSubmit={(event) => { event.preventDefault(); onSubmit(form); }}>
+      <form className="staff-task-form" onSubmit={handleSubmit}>
         <label>
           <span>Category</span>
           <select value={form.category} onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}>
@@ -607,15 +620,16 @@ const ExpenseModal = ({ task, submitting, onClose, onSubmit }) => {
         <label>
           <span>Receipt</span>
           <input type="file" accept="image/*" onChange={handleFile} />
-          <small>{form.receiptPhotoName || 'Optional'}</small>
+          <small>{uploading ? 'Uploading...' : (form.receipt?.name || 'Optional')}</small>
         </label>
+        <FileViewer files={form.receipt} />
         <label className="staff-task-form-wide">
           <span>Notes</span>
           <textarea rows="3" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
         </label>
         <div className="staff-task-form-actions">
           <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? 'Saving...' : 'Save Expense'}</button>
+          <button type="submit" className="btn btn-primary" disabled={submitting || uploading}>{submitting ? 'Saving...' : 'Save Expense'}</button>
         </div>
       </form>
     </ModalShell>

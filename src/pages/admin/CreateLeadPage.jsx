@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { leadManagementService } from '../../services/leadManagementService';
 import { staffManagementService } from '../../services/staffManagementService';
+import { uploadFileToR2, uploadFilesToR2 } from '../../services/uploadService';
 import { useLeadSettings } from '../../hooks/useLeadSettings';
+import FileViewer from '../../components/common/FileViewer';
 
 const initialForm = {
   customerName: '',
@@ -32,14 +34,6 @@ const initialForm = {
 const normalizeServiceType = (value = '') =>
   String(value).toLowerCase().includes('onsite') ? 'Onsite service' : 'Walk-in';
 
-const fileToDataUrl = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve({ name: file.name, dataUrl: reader.result });
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
 const buildLeadTracker = (serviceType, assigned = false) => {
   const steps = ['Lead Captured', 'Assign to Technician'];
   return steps.map((step, index) => ({
@@ -61,6 +55,7 @@ const CreateLeadPage = () => {
   const [technicians, setTechnicians] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState('');
+  const [uploadingFields, setUploadingFields] = useState(new Set());
 
   useEffect(() => {
     staffManagementService
@@ -76,15 +71,55 @@ const CreateLeadPage = () => {
 
   const handleFiles = async (field, event) => {
     const files = Array.from(event.target.files || []);
-    const images = await Promise.all(files.map(fileToDataUrl));
-    updateForm(field, images);
+    if (files.length === 0) return;
+    setUploadingFields((prev) => new Set(prev).add(field));
+    try {
+      const images = await uploadFilesToR2(files);
+      updateForm(field, [...(form[field] || []), ...images]);
+    } finally {
+      setUploadingFields((prev) => {
+        const next = new Set(prev);
+        next.delete(field);
+        return next;
+      });
+    }
+  };
+
+  const handleSlotFile = async (field, index, event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const slotKey = `${field}-${index}`;
+    setUploadingFields((prev) => new Set(prev).add(slotKey));
+    try {
+      const image = await uploadFileToR2(file);
+      setForm((prev) => {
+        const arr = [...(prev[field] || [])];
+        arr[index] = image;
+        return { ...prev, [field]: arr };
+      });
+    } finally {
+      setUploadingFields((prev) => {
+        const next = new Set(prev);
+        next.delete(slotKey);
+        return next;
+      });
+    }
   };
 
   const handleSingleFile = async (field, event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const image = await fileToDataUrl(file);
-    updateForm(field, image);
+    setUploadingFields((prev) => new Set(prev).add(field));
+    try {
+      const image = await uploadFileToR2(file);
+      updateForm(field, image);
+    } finally {
+      setUploadingFields((prev) => {
+        const next = new Set(prev);
+        next.delete(field);
+        return next;
+      });
+    }
   };
 
   const selectedServiceType = normalizeServiceType(form.serviceType);
@@ -338,82 +373,50 @@ const CreateLeadPage = () => {
           {selectedServiceType === 'Walk-in' ? (
             <div className="form-group form-group-full">
               <label htmlFor="lead-problem-note">Problem Inward</label>
-              <textarea
-                id="lead-problem-note"
-                value={form.problemInwardNote}
-                onChange={(e) => updateForm('problemInwardNote', e.target.value)}
-                rows={3}
-                placeholder="Problem reported during inward"
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <label style={{ minWidth: '60px', fontSize: '0.82rem', color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>Image 1</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleSingleFile('problemInwardImage1', e)} />
-                  {form.problemInwardImage1 && <span className="field-hint" style={{ marginTop: 0 }}>{form.problemInwardImage1.name}</span>}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <label style={{ minWidth: '60px', fontSize: '0.82rem', color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>Image 2</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleSingleFile('problemInwardImage2', e)} />
-                  {form.problemInwardImage2 && <span className="field-hint" style={{ marginTop: 0 }}>{form.problemInwardImage2.name}</span>}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <label style={{ minWidth: '60px', fontSize: '0.82rem', color: 'var(--text-muted, #64748b)', fontWeight: 600 }}>Image 3</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleSingleFile('problemInwardImage3', e)} />
-                  {form.problemInwardImage3 && <span className="field-hint" style={{ marginTop: 0 }}>{form.problemInwardImage3.name}</span>}
-                </div>
+              <textarea id="lead-problem-note" value={form.problemInwardNote} onChange={(e) => updateForm('problemInwardNote', e.target.value)} rows={3} placeholder="Problem reported during inward" />
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                {[1, 2, 3].map((n) => (
+                  <div key={n} style={{ flex: '1 1 150px', minWidth: 140 }}>
+                    <label style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginBottom: 4, display: 'block' }}>Image {n}</label>
+                    <input type="file" accept="image/*" onChange={(e) => handleSingleFile(`problemInwardImage${n}`, e)} />
+                    {uploadingFields.has(`problemInwardImage${n}`) && <span className="field-hint" style={{ marginTop: 2 }}>Uploading...</span>}
+                    {form[`problemInwardImage${n}`] && !uploadingFields.has(`problemInwardImage${n}`) && <FileViewer files={form[`problemInwardImage${n}`]} size={52} />}
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
             <>
               <div className="form-group form-group-full">
                 <label htmlFor="lead-device-check">Device Check / Internal Report</label>
-                <textarea
-                  id="lead-device-check"
-                  value={form.deviceCheckNote}
-                  onChange={(e) => updateForm('deviceCheckNote', e.target.value)}
-                  rows={3}
-                  placeholder="Internal report / problem inward"
-                />
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  style={{ marginTop: 8 }}
-                  onChange={(e) => handleFiles('deviceCheckImages', e)}
-                />
-                <span className="field-hint">{form.deviceCheckImages.length} device check image(s) selected</span>
+                <textarea id="lead-device-check" value={form.deviceCheckNote} onChange={(e) => updateForm('deviceCheckNote', e.target.value)} rows={3} placeholder="Internal report / problem inward" />
+                <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} style={{ flex: '1 1 150px', minWidth: 140 }}>
+                      <label style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginBottom: 4, display: 'block' }}>Image {i + 1}</label>
+                      <input type="file" accept="image/*" onChange={(e) => handleSlotFile('deviceCheckImages', i, e)} />
+                      {uploadingFields.has(`deviceCheckImages-${i}`) && <span className="field-hint" style={{ marginTop: 2 }}>Uploading...</span>}
+                      {form.deviceCheckImages?.[i] && !uploadingFields.has(`deviceCheckImages-${i}`) && <FileViewer files={form.deviceCheckImages[i]} size={52} />}
+                    </div>
+                  ))}
+                </div>
+                <span className="field-hint">{form.deviceCheckImages?.filter(Boolean).length || 0} image(s)</span>
               </div>
-
               <div className="form-group form-group-full">
-                <label htmlFor="lead-onsite-images">Images Upload</label>
-                <input
-                  id="lead-onsite-images"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => handleFiles('onsiteImages', e)}
-                />
-                <span className="field-hint">At least 3 images required. {form.onsiteImages.length} selected</span>
+                <label htmlFor="lead-onsite-images">Onsite Images</label>
+                <div style={{ display: 'flex', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} style={{ flex: '1 1 150px', minWidth: 140 }}>
+                      <label style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 600, marginBottom: 4, display: 'block' }}>Image {i + 1}</label>
+                      <input type="file" accept="image/*" onChange={(e) => handleSlotFile('onsiteImages', i, e)} />
+                      {uploadingFields.has(`onsiteImages-${i}`) && <span className="field-hint" style={{ marginTop: 2 }}>Uploading...</span>}
+                      {form.onsiteImages?.[i] && !uploadingFields.has(`onsiteImages-${i}`) && <FileViewer files={form.onsiteImages[i]} size={52} />}
+                    </div>
+                  ))}
+                </div>
+                <span className="field-hint">At least 3 images required. {form.onsiteImages?.filter(Boolean).length || 0} selected</span>
                 {errors.onsiteImages && <span className="form-error">{errors.onsiteImages}</span>}
               </div>
-
-              <label className="lead-check-row">
-                <input
-                  type="checkbox"
-                  checked={form.deviceReceiveConfirmed}
-                  onChange={(e) => updateForm('deviceReceiveConfirmed', e.target.checked)}
-                />
-                Device receive confirmation needed in Customer Portal
-              </label>
-
-              <label className="lead-check-row">
-                <input
-                  type="checkbox"
-                  checked={form.deviceDeliveryConfirmed}
-                  onChange={(e) => updateForm('deviceDeliveryConfirmed', e.target.checked)}
-                />
-                Device delivery confirmation needed in Customer Portal
-              </label>
             </>
           )}
         </div>

@@ -3,6 +3,8 @@ import { Edit, Eye, MapPin, MoreVertical, Plus, Search, Target, X } from 'lucide
 import { useLocation, useNavigate } from 'react-router-dom';
 import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { staffManagementService } from '../../services/staffManagementService';
+import { uploadFileToR2 } from '../../services/uploadService';
+import FileViewer from '../../components/common/FileViewer';
 import { getRoleLabel, normalizeRole, ROLE_OPTIONS } from '../../config/roles';
 import { useAuth } from '../../context/AuthContext';
 
@@ -27,13 +29,6 @@ const emptyForm = {
 
 const accountStatusOptions = ['Active', 'Passive', 'Resign', 'Abscond', 'Terminate'];
 const jobTypeOptions = ['Full time', 'Part time'];
-
-const fileToDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve({ name: file.name, type: file.type, dataUrl: reader.result });
-  reader.onerror = reject;
-  reader.readAsDataURL(file);
-});
 
 const formatAdminTime = (value) => {
   const date = value ? new Date(value) : null;
@@ -63,6 +58,7 @@ const StaffListingPage = () => {
   const [targetForm, setTargetForm] = useState({ staffId: '', month: '', targetAmount: '' });
   const [errors, setErrors] = useState({});
   const [notice, setNotice] = useState('');
+  const [uploading, setUploading] = useState(false);
 
   const currentMonthKey = useMemo(() => {
     const now = new Date();
@@ -214,10 +210,29 @@ const StaffListingPage = () => {
     setErrors((current) => ({ ...current, [field]: '' }));
   };
 
-  const handleDocumentsChange = async (event) => {
-    const files = Array.from(event.target.files || []).slice(0, 3);
-    const docs = await Promise.all(files.map(fileToDataUrl));
-    updateStaffForm('attachedDocuments', docs);
+  const handleSingleDoc = async (index, event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const doc = await uploadFileToR2(file);
+      setForm((prev) => {
+        const docs = [...(prev.attachedDocuments || [])];
+        docs[index] = doc;
+        return { ...prev, attachedDocuments: docs };
+      });
+    } catch {
+      // silently ignore
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeDoc = (index) => {
+    setForm((prev) => {
+      const docs = (prev.attachedDocuments || []).filter((_, i) => i !== index);
+      return { ...prev, attachedDocuments: docs };
+    });
   };
 
   const saveStaff = async () => {
@@ -419,10 +434,32 @@ const StaffListingPage = () => {
                 <div className="form-group"><label>Residence Address</label><textarea rows={2} placeholder="Enter residence address" value={form.address} onChange={(event) => updateStaffForm('address', event.target.value)} />{errors.address && <span className="form-error">{errors.address}</span>}</div>
                 <div className="form-group"><label>As per Aadhaar Card Address</label><textarea rows={2} placeholder="Enter Aadhaar address" value={form.aadhaarAddress} onChange={(event) => updateStaffForm('aadhaarAddress', event.target.value)} />{errors.aadhaarAddress && <span className="form-error">{errors.aadhaarAddress}</span>}</div>
                 <div className="form-group staff-form-half"><label>Internal Notes</label><textarea rows={2} placeholder="Enter internal notes" value={form.notes} onChange={(event) => updateStaffForm('notes', event.target.value)} /></div>
-                <div className="form-group staff-form-half">
-                  <label>Attached Documents 3 No</label>
-                  <input type="file" multiple onChange={handleDocumentsChange} />
-                  <span className="field-hint">{form.attachedDocuments.length} / 3 document(s) attached</span>
+                <div className="form-group staff-form-full">
+                  <label>Attached Documents (3 max — one per slot)</label>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 6 }}>
+                    {[0, 1, 2].map((i) => {
+                      const doc = form.attachedDocuments?.[i];
+                      return (
+                        <div key={i} style={{ flex: '1 1 180px', maxWidth: 220 }}>
+                          {doc ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.78rem' }}>
+                              <a href={doc.url || doc.dataUrl || (doc.key ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/upload/view?key=${encodeURIComponent(doc.key)}` : '#')} target="_blank" rel="noreferrer" style={{ flex: 1, color: '#6366f1', textDecoration: 'none', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || `Doc ${i + 1}`}</a>
+                              <label style={{ cursor: 'pointer', color: '#6366f1', fontSize: '0.7rem', fontWeight: 600 }}>Replace<input type="file" style={{ display: 'none' }} onChange={(e) => handleSingleDoc(i, e)} /></label>
+                              <button type="button" onClick={() => removeDoc(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 0, display: 'flex' }} title="Remove"><X size={12} /></button>
+                            </div>
+                          ) : (
+                            <div style={{ padding: '20px 10px', border: '2px dashed #e2e8f0', borderRadius: 8, textAlign: 'center', background: '#fafbfc' }}>
+                              <label style={{ cursor: 'pointer', color: '#64748b', fontSize: '0.78rem' }}>
+                                Doc {i + 1}
+                                <input type="file" style={{ display: 'none' }} accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={(e) => handleSingleDoc(i, e)} />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <span className="field-hint">{form.attachedDocuments?.filter(Boolean).length || 0} / 3 documents uploaded{uploading ? ' (uploading...)' : ''}</span>
                 </div>
               </div>
               <div className="modal-actions pt-6 border-t border-slate-100 mt-6">
@@ -458,6 +495,7 @@ const StaffListingPage = () => {
                 <div><span>Assigned Jobs</span><strong>{selectedStaff.assignedJobs}</strong></div>
                 <div><span>Last Seen</span><strong>{selectedStaff.lastSeen || '-'}</strong></div>
                 <div><span>Attached Documents</span><strong>{selectedStaff.attachedDocuments?.length || 0}</strong></div>
+                <FileViewer files={selectedStaff.attachedDocuments} />
                 <div className="staff-detail-full"><span>Residence Address</span><strong>{selectedStaff.address || '-'}</strong></div>
                 <div className="staff-detail-full"><span>Aadhaar Address</span><strong>{selectedStaff.aadhaarAddress || '-'}</strong></div>
                 <div className="staff-detail-full"><span>Notes</span><strong>{selectedStaff.notes || '-'}</strong></div>

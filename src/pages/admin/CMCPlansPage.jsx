@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, MoreVertical, Trash2, Edit, RefreshCw, Loader2 } from 'lucide-react';
 import { api } from '../../services/apiClient';
 import './PlansCustomers.css';
@@ -85,7 +85,7 @@ const CMCPlansPage = () => {
   const [editingItem, setEditingItem]     = useState(null);
   const [saving, setSaving]               = useState(false);
 
-  const fetchPlans = useCallback(async () => {
+  const fetchPlans = async () => {
     setLoading(true);
     setError('');
     try {
@@ -96,15 +96,37 @@ const CMCPlansPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => { fetchPlans(); }, [fetchPlans]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setLoading(true);
+        const data = await api.list(COLLECTION);
+        if (!cancelled) setPlans(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setError('Failed to load CMC plans. Is the backend running?');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   const filteredPlans = plans.filter(p =>
     p.name?.toLowerCase().includes(planSearch.toLowerCase())
   );
 
   const handleAddPlan = async (formData) => {
+    if (formData.isPublic) {
+      const publicCount = plans.filter(p => p.isPublic && (!editingItem || p.id !== editingItem.id)).length;
+      if (publicCount >= 3) {
+        setError('Only 3 plans can be shown on the user website. Please disable another plan first.');
+        return;
+      }
+    }
     setSaving(true);
     try {
       if (editingItem) {
@@ -248,19 +270,23 @@ const PlanModal = ({ onClose, onSubmit, editingItem, saving, type }) => {
     sla: editingItem.sla || '',
     duration: editingItem.duration || '12 Months',
     status: editingItem.status || 'Active',
+    per: editingItem.per || '/year',
+    features: editingItem.features || '',
+    isPublic: editingItem.isPublic || false,
   } : {
     name: '', type: '', price: '', cycle: 'Yearly', visits: '', sla: '', duration: '12 Months', status: 'Active',
+    per: '/year', features: '', isPublic: false,
   });
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card" style={{ width: 500 }}>
+      <div className="modal-card" style={{ width: 720 }}>
         <div className="modal-header">
           <h3>{editingItem ? `Edit ${type} Plan` : `Add ${type} Plan`}</h3>
           <button className="icon-button" onClick={onClose} style={{ border: 'none' }}>✕</button>
         </div>
         <div className="modal-body">
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
             <div className="form-group">
               <label>Plan Name</label>
               <input className="form-input" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g. Basic CMC" />
@@ -269,33 +295,81 @@ const PlanModal = ({ onClose, onSubmit, editingItem, saving, type }) => {
               <label>Plan Type</label>
               <input className="form-input" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} placeholder="e.g. Preventive" />
             </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div className="form-group">
-              <label>Price (Annual)</label>
+              <label>Price</label>
               <input className="form-input" value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} placeholder="e.g. ₹9,999" />
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div className="form-group">
+              <label>Per (suffix)</label>
+              <input className="form-input" value={formData.per} onChange={e => setFormData({ ...formData, per: e.target.value })} placeholder="/year" />
+            </div>
+            <div className="form-group">
+              <label>Visits per Year</label>
+              <input className="form-input" value={formData.visits} onChange={e => setFormData({ ...formData, visits: e.target.value })} placeholder="e.g. 4 / Unlimited" />
             </div>
             <div className="form-group">
               <label>SLA (Response Time)</label>
               <input className="form-input" value={formData.sla} onChange={e => setFormData({ ...formData, sla: e.target.value })} placeholder="e.g. 24 Hours" />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div className="form-group">
-              <label>Visits per Year</label>
-              <input className="form-input" value={formData.visits} onChange={e => setFormData({ ...formData, visits: e.target.value })} placeholder="e.g. 4 / Unlimited" />
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
             <div className="form-group">
               <label>Duration</label>
               <input className="form-input" value={formData.duration} onChange={e => setFormData({ ...formData, duration: e.target.value })} placeholder="e.g. 12 Months" />
             </div>
+            <div className="form-group">
+              <label>Status</label>
+              <select className="form-select" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
+                <option>Active</option>
+                <option>Inactive</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Show on Website</label>
+              <div
+                onClick={() => setFormData({ ...formData, isPublic: !formData.isPublic })}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 10,
+                  padding: '8px 14px', borderRadius: 10,
+                  background: formData.isPublic ? '#ecfdf5' : '#f8fafc',
+                  border: `1.5px solid ${formData.isPublic ? '#86efac' : '#e2e8f0'}`,
+                  cursor: 'pointer', userSelect: 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <div style={{
+                  width: 38, height: 22, borderRadius: 99,
+                  background: formData.isPublic ? '#16a34a' : '#cbd5e1',
+                  position: 'relative', transition: 'background 0.2s ease',
+                  flexShrink: 0,
+                }}>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: '50%',
+                    background: '#fff',
+                    position: 'absolute', top: 3,
+                    left: formData.isPublic ? 19 : 3,
+                    transition: 'left 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }} />
+                </div>
+                <span style={{
+                  fontSize: '0.82rem', fontWeight: 600,
+                  color: formData.isPublic ? '#16a34a' : '#94a3b8',
+                  transition: 'color 0.2s ease',
+                }}>
+                  {formData.isPublic ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            </div>
           </div>
           <div className="form-group">
-            <label>Status</label>
-            <select className="form-select" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
+            <label>Website Features (one per line)</label>
+            <textarea className="form-input" value={formData.features}
+              onChange={e => setFormData({ ...formData, features: e.target.value })}
+              placeholder={`Drum & roller coverage\nQuarterly maintenance\nNetwork printer support\nOn-site response`}
+              rows={6} style={{ resize: 'vertical', minHeight: 120 }} />
           </div>
         </div>
         <div className="modal-footer">

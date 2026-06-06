@@ -4,6 +4,8 @@ import AdminPageHeader from '../../components/common/AdminPageHeader';
 import { usePrivacy } from '../../context/PrivacyContext';
 import { useAuth } from '../../context/AuthContext';
 import { expenseManagementService } from '../../services/expenseManagementService';
+import { uploadFileToR2 } from '../../services/uploadService';
+import FileViewer from '../../components/common/FileViewer';
 import { api } from '../../services/apiClient';
 import { useExpenseSettings } from '../../hooks/useExpenseSettings';
 import { normalizeRole } from '../../config/roles';
@@ -81,6 +83,7 @@ const emptyForm = {
   referenceNumber: '',
   notes: '',
   receiptName: '',
+  receipt: null,
 };
 
 const PaymentsListPage = () => {
@@ -100,6 +103,7 @@ const PaymentsListPage = () => {
   const [modalMode, setModalMode] = useState('');
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [uploading, setUploading] = useState(false);
 
   const loadPayments = async () => {
     const rows = await expenseManagementService.getAllPayments();
@@ -190,6 +194,7 @@ const PaymentsListPage = () => {
       referenceNumber: row.referenceNumber || '',
       notes: row.notes || '',
       receiptName: row.receiptName || '',
+      receipt: row.receipt || (row.receiptPhoto && !String(row.receiptPhoto).startsWith('data:') ? { url: row.receiptPhoto, name: row.receiptName } : null),
     });
     setErrors({});
     setModalMode('edit');
@@ -205,6 +210,7 @@ const PaymentsListPage = () => {
     setSelectedPayment(null);
     setForm(emptyForm);
     setErrors({});
+    setUploading(false);
   };
 
   const validate = () => {
@@ -228,7 +234,8 @@ const PaymentsListPage = () => {
       vendorPayee: form.customerName.trim(),
       referenceNumber: form.referenceNumber.trim(),
       notes: form.notes.trim(),
-      receiptName: form.receiptName.trim(),
+      receiptName: form.receipt?.name || form.receiptName.trim(),
+      receipt: form.receipt || null,
       flowType: 'Income',
     };
     if (modalMode === 'edit' && selectedPayment?.id) {
@@ -400,22 +407,32 @@ const PaymentsListPage = () => {
                 <div className="form-group payment-form-wide payment-attachment-grid">
                   <div className="expense-attachment-field">
                     <label>Receipt Upload</label>
-                    <label className="file-upload-box expense-receipt-upload payment-receipt-upload">
+                    <label className={`file-upload-box expense-receipt-upload payment-receipt-upload${uploading ? ' uploading' : ''}`}>
                       <input
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png,.webp"
                         style={{ display: 'none' }}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files?.[0];
-                          setForm((f) => ({ ...f, receiptName: file ? file.name : '' }));
+                          if (!file) return;
+                          setUploading(true);
+                          try {
+                            const r2 = await uploadFileToR2(file);
+                            setForm((f) => ({ ...f, receipt: r2, receiptName: r2.name || file.name }));
+                          } catch {
+                            // silently ignore
+                          } finally {
+                            setUploading(false);
+                          }
                         }}
                       />
                       <UploadCloud size={24} />
                       <span className="expense-receipt-title">
-                        {form.receiptName || 'Click to upload receipt'}
+                        {uploading ? 'Uploading...' : (form.receipt?.name || form.receiptName || 'Click to upload receipt')}
                       </span>
-                      {!form.receiptName && <span className="expense-receipt-meta">PDF, JPG, PNG</span>}
+                      {!form.receipt?.name && !form.receiptName && !uploading && <span className="expense-receipt-meta">PDF, JPG, PNG</span>}
                     </label>
+                    <FileViewer files={form.receipt} />
                   </div>
                   <div className="expense-attachment-field">
                     <label>Notes <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: '0.8rem' }}>(optional)</span></label>
@@ -453,6 +470,7 @@ const PaymentsListPage = () => {
                 {selectedPayment.taskTitle && <div><span>Task</span><strong>{selectedPayment.taskTitle}</strong></div>}
                 <div><span>Reference</span><strong>{selectedPayment.referenceNumber || '-'}</strong></div>
                 <div><span>Receipt</span><strong>{selectedPayment.receiptName || '-'}</strong></div>
+                <FileViewer files={selectedPayment.receipt || (selectedPayment.receiptPhoto && !String(selectedPayment.receiptPhoto).startsWith('data:') ? { url: selectedPayment.receiptPhoto, name: selectedPayment.receiptName } : null)} />
                 <div><span>Notes</span><strong>{selectedPayment.notes || '-'}</strong></div>
               </div>
               <div className="modal-actions">
