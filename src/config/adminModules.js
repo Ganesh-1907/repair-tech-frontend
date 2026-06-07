@@ -44,6 +44,13 @@ const adminModules = [
         actions: ['Add', 'View List', 'Manage'],
       },
       {
+        id: 'staff-regularizations',
+        label: 'Regularizations',
+        path: '/admin/staff/regularizations',
+        description: 'Review and process attendance regularization requests from staff.',
+        actions: ['View List', 'Manage'],
+      },
+      {
         id: 'staff-live-tracking',
         label: 'Live Tracking',
         path: '/admin/staff/live-tracking',

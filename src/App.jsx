@@ -42,6 +42,7 @@ import ExpensesListPage from './pages/admin/ExpensesListPage';
 import PaymentsListPage from './pages/admin/PaymentsListPage';
 import StaffTechnicianManagementPage from './pages/admin/StaffTechnicianManagementPage';
 import StaffListingPage from './pages/admin/StaffListingPage';
+import StaffRegularizationPage from './pages/admin/StaffRegularizationPage';
 import StaffPortalTasksPage from './pages/admin/StaffPortalTasksPage';
 import StaffProfilePage from './pages/admin/StaffProfilePage';
 import LiveTrackingPage from './pages/admin/LiveTrackingPage';
@@ -120,6 +121,7 @@ const existingAdminRouteComponents = {
   '/admin/expenses/payments': PaymentsListPage,
   '/admin/staff/dashboard': StaffTechnicianManagementPage,
   '/admin/staff/list': StaffListingPage,
+  '/admin/staff/regularizations': StaffRegularizationPage,
   '/admin/staff/live-tracking': LiveTrackingPage,
   '/admin/staff-management': StaffTechnicianManagementPage,
   '/admin/inventory/dashboard': InventoryDashboardPage,

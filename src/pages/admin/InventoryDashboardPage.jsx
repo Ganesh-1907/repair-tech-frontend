@@ -71,7 +71,7 @@ const InventoryDashboardPage = () => {
           <button className="inventory-secondary-button" onClick={() => navigate('/inventory')}>
             <Package size={17} /> Inventory Listing
           </button>
-          <button className="inventory-primary-button" onClick={() => navigate('/admin/inventory/asset-management')}>
+          <button className="inventory-primary-button" onClick={() => navigate('/admin/inventory/assets/new')}>
             <Plus size={17} /> Add Asset
           </button>
         </div>

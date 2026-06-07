@@ -130,7 +130,6 @@ const CreateLeadPage = () => {
     if (submitting) return;
 
     const nextErrors = {};
-    if (!form.company.trim()) nextErrors.company = 'Company is required.';
     if (!form.customerName.trim()) nextErrors.customerName = 'Customer name is required.';
     if (!form.mobileNumber.trim()) {
       nextErrors.mobileNumber = 'Mobile number is required.';
@@ -279,6 +278,7 @@ const CreateLeadPage = () => {
               onChange={(e) => updateForm('serviceType', e.target.value)}
               aria-invalid={Boolean(errors.serviceType)}
             >
+              <option value="">Select Service Type</option>
               {serviceTypeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
             {errors.serviceType && <span className="form-error">{errors.serviceType}</span>}
@@ -292,6 +292,7 @@ const CreateLeadPage = () => {
               onChange={(e) => updateForm('source', e.target.value)}
               aria-invalid={Boolean(errors.source)}
             >
+              <option value="">Select Source</option>
               {sourceOptions.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
             {errors.source && <span className="form-error">{errors.source}</span>}
@@ -320,6 +321,7 @@ const CreateLeadPage = () => {
               value={form.device}
               onChange={(e) => updateForm('device', e.target.value)}
             >
+              <option value="">Select Device</option>
               {deviceOptions.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </div>

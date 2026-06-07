@@ -3,7 +3,7 @@ import { apiClient } from '../services/apiClient';
 
 const DEFAULTS = {
   serviceTypes: ['Walk-in', 'Onsite service'],
-  sources: ['Google', 'FB', 'Insta', 'Walkin'],
+  sources: ['Google', 'FB', 'Insta', 'Website', 'Walkin'],
   devices: ['Laptop', 'Desktop', 'CCTV'],
 };
 
@@ -30,7 +30,7 @@ export const useLeadSettings = () => {
         if (record) {
           const merged = {
             serviceTypes: record.serviceTypes?.length ? record.serviceTypes : DEFAULTS.serviceTypes,
-            sources: record.sources?.length ? record.sources : DEFAULTS.sources,
+            sources: Array.from(new Set([...(record.sources?.length ? record.sources : DEFAULTS.sources), 'Website'])),
             devices: record.devices?.length ? record.devices : DEFAULTS.devices,
           };
           cache = merged;

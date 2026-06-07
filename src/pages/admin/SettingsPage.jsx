@@ -10,7 +10,7 @@ const BUILT_IN_DEVICE_TYPES = ['Laptop', 'Desktop', 'Server', 'Printer', 'CCTV',
 
 const DEFAULTS = {
   serviceTypes: ['Walk-in', 'Onsite service'],
-  sources: ['Google', 'FB', 'Insta', 'Walkin'],
+  sources: ['Google', 'FB', 'Insta', 'Website', 'Walkin'],
   devices: ['Laptop', 'Desktop', 'Server', 'Printer', 'CCTV', 'VPS'],
 };
 
@@ -166,7 +166,8 @@ const SettingsPage = () => {
           recordIdRef.current = record.id;
           setRecordId(record.id);
           setServiceTypes(record.serviceTypes?.length ? record.serviceTypes : [...DEFAULTS.serviceTypes]);
-          setSources(record.sources?.length ? record.sources : [...DEFAULTS.sources]);
+          const savedSources = record.sources?.length ? record.sources : [...DEFAULTS.sources];
+          setSources(Array.from(new Set([...savedSources, 'Website'])));
           const saved = record.devices?.length ? record.devices : [];
           const merged = Array.from(new Set([...BUILT_IN_DEVICE_TYPES, ...saved.filter(d => !BUILT_IN_DEVICE_TYPES.includes(d))]));
           setDevices(merged);
@@ -220,7 +221,7 @@ const SettingsPage = () => {
     setSaving(true);
     setSaved(false);
     setError('');
-    const payload = { settingsId: SETTINGS_ID, serviceTypes: newServiceTypes, sources: newSources, devices: newDevices };
+    const payload = { settingsId: SETTINGS_ID, serviceTypes: newServiceTypes, sources: Array.from(new Set([...newSources, 'Website'])), devices: newDevices };
     try {
       const currentId = recordIdRef.current;
       if (currentId) {

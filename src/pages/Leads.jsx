@@ -181,7 +181,6 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
     if (submitting || uploading) return;
 
     const nextErrors = {};
-    if (!form.company.trim()) nextErrors.company = 'Company is required.';
     if (!form.customerName.trim()) nextErrors.customerName = 'Customer name is required.';
     if (!form.mobileNumber.trim()) {
       nextErrors.mobileNumber = 'Mobile number is required.';
@@ -307,6 +306,7 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
                 onChange={(event) => updateForm('serviceType', event.target.value)}
                 aria-invalid={Boolean(errors.serviceType)}
               >
+                <option value="">Select Service Type</option>
                 {serviceTypeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
               {errors.serviceType && <span className="form-error">{errors.serviceType}</span>}
@@ -320,6 +320,7 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
                 onChange={(event) => updateForm('source', event.target.value)}
                 aria-invalid={Boolean(errors.source)}
               >
+                <option value="">Select Source</option>
                 {sourceOptions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
               {errors.source && <span className="form-error">{errors.source}</span>}
@@ -346,6 +347,7 @@ const LeadFormModal = ({ technicians, submitting, onClose, onCreate, serviceType
                 value={form.device}
                 onChange={(event) => updateForm('device', event.target.value)}
               >
+                <option value="">Select Device</option>
                 {deviceOptions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </div>
@@ -721,7 +723,6 @@ const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate, servi
     if (submitting) return;
 
     const nextErrors = {};
-    if (!form.company.trim()) nextErrors.company = 'Company is required.';
     if (!form.customerName.trim()) nextErrors.customerName = 'Customer name is required.';
     if (!form.mobileNumber.trim()) {
       nextErrors.mobileNumber = 'Mobile number is required.';
@@ -801,6 +802,7 @@ const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate, servi
             <div className="form-group">
               <label htmlFor="edit-lead-service-type">Service Type</label>
               <select id="edit-lead-service-type" value={form.serviceType} onChange={(e) => updateForm('serviceType', e.target.value)}>
+                <option value="">Select Service Type</option>
                 {serviceTypeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </div>
@@ -808,6 +810,7 @@ const EditLeadModal = ({ lead, technicians, submitting, onClose, onUpdate, servi
             <div className="form-group">
               <label htmlFor="edit-lead-source">Source</label>
               <select id="edit-lead-source" value={form.source} onChange={(e) => updateForm('source', e.target.value)}>
+                <option value="">Select Source</option>
                 {sourceOptions.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </div>
