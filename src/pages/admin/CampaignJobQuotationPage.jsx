@@ -13,8 +13,7 @@ const generatePdfBase64 = async (el, filename) => {
   const css = `<style>
     *{box-sizing:border-box;-webkit-print-color-adjust:exact}
     body{margin:0;padding:0;background:#fff;font-family:"Times New Roman",Times,serif;color:#0f172a}
-    .lq-header{display:flex;justify-content:space-between;align-items:flex-start;
-      border-bottom:2px solid #1e293b;padding-bottom:18px;margin-bottom:24px}
+    .lq-header{margin-bottom:24px}
     .lq-section{margin-bottom:20px}
     .lq-section h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
       color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:5px;margin:0 0 10px}
@@ -247,7 +246,7 @@ const CampaignJobQuotationPage = () => {
       @page{margin:0;size:A4 portrait}
       *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       body{margin:0;padding:28px 36px;font-family:"Times New Roman",Times,serif;color:#0f172a;background:#fff}
-      .lq-header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1e293b;padding-bottom:18px;margin-bottom:24px}
+      .lq-header{margin-bottom:24px}
       .lq-section{margin-bottom:20px}.lq-section h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#475569;border-bottom:1px solid #e2e8f0;padding-bottom:5px;margin:0 0 10px}
       .lq-kv{display:flex;font-size:11.5px;margin-bottom:4px}.lq-kv-k{min-width:120px;font-weight:600;color:#64748b;flex-shrink:0}.lq-kv-sep{color:#cbd5e1;margin-right:6px}.lq-kv-v{color:#0f172a}
       table{width:100%;border-collapse:collapse;font-size:11.5px}th,td{padding:7px 8px;border:1px solid #dde3ed;text-align:left;vertical-align:top}th{background:#f1f5f9;font-weight:700;color:#334155}
@@ -440,8 +439,8 @@ const CampaignJobQuotationPage = () => {
               fontFamily: '"Times New Roman", Times, serif', color: '#0f172a', fontSize: 13, lineHeight: 1.6,
             }}>
               {/* Header */}
-              <div className="lq-header" style={{ borderBottom: '2px solid #1e293b', paddingBottom: 18, marginBottom: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+              <div className="lq-header" style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 14 }}>
                   <div>
                     <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a' }}>REPAIR BOY</h2>
                     <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>42-292/3 ANJAIAH NAGAR, SHIRIDI HILLS, JAGADGIRI GUTTA</p>
@@ -451,12 +450,11 @@ const CampaignJobQuotationPage = () => {
                     <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>GSTIN : 36BNWPR8968L1ZH</p>
                     <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>State: 36-Telangana</p>
                   </div>
-                  <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0 }} />
+                  <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 120, height: 120, objectFit: 'contain', flexShrink: 0 }} />
                 </div>
-                <div>
+                <div style={{ textAlign: 'center' }}>
                   <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 800, letterSpacing: 1 }}>QUOTATION</h1>
-                  <p style={{ margin: 0, fontSize: 11.5, color: '#64748b' }}>No: {quote.quoteNo}</p>
-                  <p style={{ margin: 0, fontSize: 11.5, color: '#64748b' }}>Date: {fmtDate(quote.date)} &nbsp;|&nbsp; Valid: {quote.validity}</p>
+                  <p style={{ margin: 0, fontSize: 11.5, color: '#64748b' }}>No: {quote.quoteNo} &nbsp;|&nbsp; Date: {fmtDate(quote.date)} &nbsp;|&nbsp; Valid: {quote.validity}</p>
                 </div>
               </div>
 

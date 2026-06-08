@@ -77,7 +77,7 @@ const RentalIndividualAgreementPage = () => {
                 <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>GSTIN : 36BNWPR8968L1ZH</p>
                 <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>State: 36-Telangana</p>
               </div>
-              <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0 }} />
+              <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 120, height: 120, objectFit: 'contain', flexShrink: 0 }} />
             </div>
             <div className="doc-type" style={{ textAlign: 'right' }}>
               <h1 style={{ margin: 0, fontSize: '28px' }}>INDIVIDUAL AGREEMENT</h1>

@@ -9,19 +9,6 @@ import '../InventoryPremiumStyles.css';
 
 const ASSET_STATUSES = ['Active', 'In repair', 'Replaced', 'Idle', 'Sold'];
 
-const generateSerialNumber = (existingAssets) => {
-  const prefix = 'SN-RB-';
-  let max = 0;
-  for (const asset of existingAssets) {
-    const sn = asset.serialNumber || '';
-    if (sn.startsWith(prefix)) {
-      const num = parseInt(sn.slice(prefix.length), 10);
-      if (!isNaN(num) && num > max) max = num;
-    }
-  }
-  return `${prefix}${String(max + 1).padStart(5, '0')}`;
-};
-
 const normalizeAssetStatus = (status) => {
   if (status === 'Available' || status === 'Rented' || status === 'Sold') return 'Active';
   if (status === 'Under Repair') return 'In repair';
@@ -728,14 +715,7 @@ const InventoryAssetFormPage = () => {
         .catch((error) => addToast(error.response?.data?.message || error.message || 'Asset failed to load.', 'error'))
         .finally(() => setLoading(false));
     } else {
-      assetManagementService.getAssets()
-        .then((all) => {
-          const serial = generateSerialNumber(Array.isArray(all) ? all : []);
-          setForm((f) => ({ ...f, serialNumber: serial }));
-        })
-        .catch(() => {
-          setForm((f) => ({ ...f, serialNumber: 'SN-RB-00001' }));
-        });
+      // No auto-generated serial number - user enters manually
     }
   }, [assetId, isEdit, addToast]);
 
@@ -775,7 +755,7 @@ const InventoryAssetFormPage = () => {
         await assetManagementService.addAsset(payload);
         addToast('Asset added successfully.');
       }
-      navigate('/admin/inventory');
+      navigate('/inventory');
     } catch (error) {
       setErrors({ save: error.response?.data?.message || error.message || 'Failed to save asset.' });
     } finally {
@@ -796,7 +776,7 @@ const InventoryAssetFormPage = () => {
   return (
     <div className="amc-new-page">
       <div className="amc-new-page-header">
-        <button className="back-button" onClick={() => navigate('/admin/inventory')}>
+        <button className="back-button" onClick={() => navigate('/inventory')}>
           <ArrowLeft size={18} /> Back to Inventory
         </button>
         <div className="amc-new-page-title">
@@ -804,7 +784,7 @@ const InventoryAssetFormPage = () => {
           <p>Register device ID, serial number, and device-specific configuration before it can be selected for rental tracking.</p>
         </div>
         <div className="amc-new-page-actions">
-          <button className="secondary-button" onClick={() => navigate('/admin/inventory')}>Cancel</button>
+          <button className="secondary-button" onClick={() => navigate('/inventory')}>Cancel</button>
           <button className="primary-button" onClick={handleSave} disabled={saving}>
             <Save size={16} /> {saving ? 'Saving...' : 'Save Asset'}
           </button>
@@ -832,8 +812,8 @@ const InventoryAssetFormPage = () => {
                 {errors.assetTag && <span className="field-error">{errors.assetTag}</span>}
               </div>
               <div className="form-group">
-                <label>Serial Number <span style={{ fontSize: '0.75rem', color: '#6366f1', fontWeight: 600 }}>(Auto-generated)</span></label>
-                <input className="form-input" value={form.serialNumber} readOnly style={{ background: '#f8fafc', color: '#334155', cursor: 'default' }} />
+                <label>Serial Number</label>
+                <input className="form-input" value={form.serialNumber} onChange={(e) => updateForm('serialNumber', e.target.value)} placeholder="Enter serial number" />
               </div>
               <div className="form-group">
                 <label>Status</label>
@@ -925,7 +905,7 @@ const InventoryAssetFormPage = () => {
         </div>
 
         <div className="amc-form-footer">
-          <button className="secondary-button" onClick={() => navigate('/admin/inventory')}>Cancel</button>
+          <button className="secondary-button" onClick={() => navigate('/inventory')}>Cancel</button>
           <button className="primary-button" onClick={handleSave} disabled={saving}>
             <Save size={16} /> {saving ? 'Saving...' : 'Save Asset'}
           </button>

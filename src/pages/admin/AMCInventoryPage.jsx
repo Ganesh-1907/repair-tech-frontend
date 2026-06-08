@@ -589,7 +589,7 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
                   <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>GSTIN : 36BNWPR8968L1ZH</p>
                   <p style={{ margin: 0, fontSize: 11, color: '#374151', textAlign: 'left' }}>State: 36-Telangana</p>
                 </div>
-                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 110, height: 110, objectFit: 'contain', flexShrink: 0 }} />
+                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 120, height: 120, objectFit: 'contain', flexShrink: 0 }} />
               </div>
               <div style={{ textAlign: 'center' }}>
                 <h1 style={{ fontSize: 22, margin: '0 0 4px' }}>AMC QUOTATION</h1>
@@ -763,22 +763,18 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
 
   if (!customer) {
     return (
-      <div className="plans-page">
-        <header className="plans-header">
-          <div className="plans-header-left">
-            <button className="secondary-button" onClick={onBack} style={{ marginBottom: 12 }}>
-              <ArrowLeft size={16} /> Back to Inventory
-            </button>
-            <h1>AMC Agreement</h1>
-            <p>Select an AMC record to generate the agreement.</p>
-          </div>
-        </header>
+      <div className="plans-page" style={{ padding: '28px 32px' }}>
+        <button className="secondary-button" onClick={onBack} style={{ marginBottom: 12 }}>
+          <ArrowLeft size={16} /> Back to Inventory
+        </button>
+        <h1>AMC Agreement</h1>
+        <p style={{ marginTop: 8, color: '#64748b' }}>Select an AMC record from the inventory to generate the agreement.</p>
       </div>
     );
   }
   return (
-    <div className="plans-page">
-      <header className="plans-header">
+    <div className="plans-page" style={{ padding: '28px 32px' }}>
+      <header className="plans-header" style={{ marginBottom: 24 }}>
         <div className="plans-header-left">
           <button className="secondary-button" onClick={onBack} style={{ marginBottom: 12 }}>
             <ArrowLeft size={16} /> Back to Inventory
@@ -793,7 +789,6 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
           <button className="secondary-button" onClick={downloadAgreement} disabled={downloading}>
             <Download size={18} /> {downloading ? 'Downloading...' : 'Download'}
           </button>
-          <button className="secondary-button" onClick={handleDownload} disabled={downloading}><Download size={18} /> {downloading ? 'Downloading...' : 'Download'}</button>
           <button className="secondary-button" onClick={printAgreement}><Printer size={18} /> Print Agreement</button>
           <button className="primary-button" onClick={saveAgreement} disabled={saving}><CheckCircle size={18} /> {saving ? 'Saving...' : 'Save Agreement'}</button>
         </div>
@@ -848,7 +843,7 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
                   <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151', textAlign: 'left' }}>GSTIN : 36BNWPR8968L1ZH</p>
                   <p style={{ margin: 0, fontSize: 11, color: '#374151', textAlign: 'left' }}>State: 36-Telangana</p>
                 </div>
-                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 110, height: 110, objectFit: 'contain', flexShrink: 0 }} />
+                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 120, height: 120, objectFit: 'contain', flexShrink: 0 }} />
               </div>
               <div style={{ textAlign: 'center' }}>
                 <h1 style={{ fontSize: 22, margin: '0 0 8px', textTransform: 'uppercase' }}>AMC Agreement</h1>

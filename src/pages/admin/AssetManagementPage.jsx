@@ -5,11 +5,8 @@ import {
   Clock,
   Eye,
   HardDrive,
-  Monitor,
   Pencil,
   Plus,
-  Printer,
-  QrCode,
   Search,
   Settings2,
   Trash2,
@@ -43,6 +40,7 @@ const AssetManagementPage = () => {
   const [assets, setAssets] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [filterType, setFilterType] = useState('All');
 
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -78,14 +76,17 @@ const AssetManagementPage = () => {
   }, [loadData]);
 
   const counts = useMemo(() => {
-    const next = { Active: 0, 'In repair': 0, Replaced: 0, Idle: 0, Printer: 0, Laptop: 0 };
+    const next = { Active: 0, 'In repair': 0, Replaced: 0, Idle: 0 };
     assets.forEach((asset) => {
       const status = normalizeAssetStatus(asset.status);
       if (next[status] !== undefined) next[status] += 1;
-      if (String(asset.type).toLowerCase() === 'printer') next.Printer += 1;
-      if (String(asset.type).toLowerCase() === 'laptop') next.Laptop += 1;
     });
     return next;
+  }, [assets]);
+
+  const deviceTypes = useMemo(() => {
+    const types = new Set(assets.map(a => a.type).filter(Boolean));
+    return ['All', ...Array.from(types)];
   }, [assets]);
 
   const filteredAssets = useMemo(() => {
@@ -103,22 +104,19 @@ const AssetManagementPage = () => {
       ].join(' ').toLowerCase();
       const matchesSearch = !query || haystack.includes(query);
       const matchesStatus = filterStatus === 'All' || normalizeAssetStatus(asset.status) === filterStatus;
-      return matchesSearch && matchesStatus;
+      const matchesType = filterType === 'All' || asset.type === filterType;
+      return matchesSearch && matchesStatus && matchesType;
     });
-  }, [assets, searchTerm, filterStatus]);
+  }, [assets, searchTerm, filterStatus, filterType]);
 
   return (
     <div className="inventory-page">
       <section className="inventory-hero">
         <div>
-          <span className="inventory-eyebrow">Asset Management</span>
-          <h1>Printer and laptop lifecycle</h1>
-          <p>Each device is tracked individually with Device ID, serial number, model, configurations, add-on parts, and lifecycle status.</p>
+          <span className="inventory-eyebrow">Inventory & Assets</span>
+          <h1>Asset Management</h1>
         </div>
         <div className="inventory-hero-actions">
-          <button className="inventory-secondary-button" type="button">
-            <QrCode size={17} /> Bulk QR Print
-          </button>
           <button className="inventory-primary-button" type="button" onClick={() => navigate('/admin/inventory/assets/new')}>
             <Plus size={17} /> Add Asset
           </button>
@@ -146,8 +144,6 @@ const AssetManagementPage = () => {
         <MetricCard icon={<Wrench />} label="In Repair" value={counts['In repair']} tone="amber" />
         <MetricCard icon={<Settings2 />} label="Replaced" value={counts.Replaced} tone="red" />
         <MetricCard icon={<Clock />} label="Idle" value={counts.Idle} tone="slate" />
-        <MetricCard icon={<Printer />} label="Printers" value={counts.Printer} tone="blue" />
-        <MetricCard icon={<Monitor />} label="Laptops" value={counts.Laptop} tone="indigo" />
       </section>
 
       <section className="inventory-panel">
@@ -165,12 +161,15 @@ const AssetManagementPage = () => {
           </div>
         </div>
 
-        <div className="inventory-filter-row">
-          {['All', ...ASSET_STATUSES].map((status) => (
-            <button key={status} className={filterStatus === status ? 'active' : ''} onClick={() => setFilterStatus(status)}>
-              {status}
-            </button>
-          ))}
+        <div className="inventory-filter-row" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <select className="form-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ width: 160 }}>
+            <option value="All">All Status</option>
+            {ASSET_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select className="form-select" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ width: 160 }}>
+            <option value="All">All Devices</option>
+            {deviceTypes.filter(t => t !== 'All').map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
 
         <AssetTable assets={filteredAssets} onView={(id) => navigate(`/admin/inventory/assets/view/${id}`)} onEdit={(id) => navigate(`/admin/inventory/assets/${id}`)} onDelete={handleDelete} />
@@ -188,13 +187,6 @@ const MetricCard = ({ icon, label, value, tone }) => (
     </div>
   </div>
 );
-
-const DeviceIcon = ({ type }) => {
-  const normalized = String(type || '').toLowerCase();
-  if (normalized === 'printer') return <Printer size={20} />;
-  if (normalized === 'laptop') return <Monitor size={20} />;
-  return <HardDrive size={20} />;
-};
 
 const AssetTable = ({ assets, onEdit, onDelete, onView }) => (
   <div className="inventory-table-wrap">
@@ -215,7 +207,7 @@ const AssetTable = ({ assets, onEdit, onDelete, onView }) => (
           <tr key={asset.id}>
             <td>
               <div className="inventory-device-cell">
-                <div className="inventory-device-icon"><DeviceIcon type={asset.type} /></div>
+                <div className="inventory-device-icon"><HardDrive size={20} /></div>
                 <div>
                   <strong>{asset.assetTag || asset.id}</strong>
                   <span>S/N: {asset.serialNumber || '-'}</span>

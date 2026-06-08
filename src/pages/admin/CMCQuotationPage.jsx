@@ -238,7 +238,7 @@ const CMCQuotationPage = () => {
                     <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>GSTIN : 36BNWPR8968L1ZH</p>
                     <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>State: 36-Telangana</p>
                   </div>
-                  <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 110, height: 110, objectFit: 'contain', flexShrink: 0 }} />
+                  <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 120, height: 120, objectFit: 'contain', flexShrink: 0 }} />
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <h1>CMC QUOTATION</h1>
