@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, FileText, Mail, Plus, Printer, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Mail, Plus, Printer, Save, Trash2, Wrench } from 'lucide-react';
 import { api, apiClient } from '../../services/apiClient';
 import { leadManagementService } from '../../services/leadManagementService';
+import { inventoryService } from '../../services/inventoryService';
 import rbLogo from '../../assets/Screenshot from 2026-05-29 11-40-17.png';
 
 const fmt = (value) => Number(value || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -31,6 +32,8 @@ const newItem = () => ({
   quantity: 1,
   unit: '-',
   pricePerUnit: 0,
+  usedParts: [],
+  showParts: false,
 });
 
 const units = ['-', 'Nos', 'Mtr', 'Pcs', 'Box', 'Set', 'Roll', 'Sqft'];
@@ -258,14 +261,14 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
         const record = (Array.isArray(res.data) ? res.data : []).find((r) => r.settingsId === 'company-profile');
         if (record) setCompanyProfile((prev) => ({ ...prev, ...record }));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
     if (sourceRecord || !id) return;
     loadSourceRecord(sourceModule, id)
       .then((record) => setSourceRecord(record))
-      .catch(() => {});
+      .catch(() => { });
   }, [id, sourceModule, sourceRecord]);
 
   useEffect(() => {
@@ -274,13 +277,13 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
         const all = Array.isArray(res.data) ? res.data : [];
         const existing = id
           ? all.find((entry) => (
-              String(entry.sourceModule || 'leads') === sourceModule
-              && String(entry.sourceId || entry.leadId) === String(id)
-            ))
+            String(entry.sourceModule || 'leads') === sourceModule
+            && String(entry.sourceId || entry.leadId) === String(id)
+          ))
           : null;
         if (existing) {
           setSavedId(existing.id);
-          setItems(existing.items?.length ? existing.items.map((item) => ({ ...newItem(), ...item, id: item.id || newItem().id })) : [newItem()]);
+          setItems(existing.items?.length ? existing.items.map((item) => ({ ...newItem(), ...item, id: item.id || newItem().id, usedParts: item.usedParts || [], showParts: false })) : [newItem()]);
           setEstimate((current) => ({
             ...current,
             estimateNo: existing.estimateNo || current.estimateNo,
@@ -300,8 +303,78 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
         const next = nums.length ? Math.max(...nums) + 1 : 100001;
         setEstimate((current) => ({ ...current, estimateNo: `RPB${next}` }));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [id, sourceModule]);
+
+  const [inventoryList, setInventoryList] = useState([]);
+
+  useEffect(() => {
+    inventoryService.getItems()
+      .then((data) => {
+        setInventoryList(Array.isArray(data) ? data.filter(i => i.status === 'Active') : []);
+      })
+      .catch(() => {});
+  }, []);
+
+  const addUsedPartToItem = (itemId) => {
+    setItems((current) => current.map((item) => {
+      if (item.id === itemId) {
+        const parts = item.usedParts || [];
+        const newPart = {
+          id: `part-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          inventoryId: '',
+          name: '',
+          qty: 1,
+          rate: 0,
+          deduct: true,
+          showInInvoice: true,
+        };
+        return { ...item, usedParts: [...parts, newPart] };
+      }
+      return item;
+    }));
+  };
+
+  const removeUsedPartFromItem = (itemId, partId) => {
+    setItems((current) => current.map((item) => {
+      if (item.id === itemId) {
+        return { ...item, usedParts: (item.usedParts || []).filter((p) => p.id !== partId) };
+      }
+      return item;
+    }));
+  };
+
+  const updateUsedPartInItem = (itemId, partId, field, value) => {
+    setItems((current) => current.map((item) => {
+      if (item.id === itemId) {
+        const updatedParts = (item.usedParts || []).map((part) => {
+          if (part.id === partId) {
+            const updated = { ...part, [field]: value };
+            if (field === 'inventoryId') {
+              const matched = inventoryList.find((i) => String(i.id) === String(value));
+              if (matched) {
+                updated.name = matched.name;
+                updated.rate = Number(matched.sellingPrice || matched.rate || 0);
+              }
+            }
+            return updated;
+          }
+          return part;
+        });
+        return { ...item, usedParts: updatedParts };
+      }
+      return item;
+    }));
+  };
+
+  const toggleShowParts = (itemId) => {
+    setItems((current) => current.map((item) => {
+      if (item.id === itemId) {
+        return { ...item, showParts: !item.showParts };
+      }
+      return item;
+    }));
+  };
 
   const showNotice = (message, ok = true) => {
     setNotice(message);
@@ -324,7 +397,17 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
   });
 
   const lineBase = (item) => (Number(item.quantity) || 0) * (Number(item.pricePerUnit) || 0);
-  const subTotal = useMemo(() => items.reduce((sum, item) => sum + lineBase(item), 0), [items]);
+  const itemTotal = (item) => {
+    const base = lineBase(item);
+    const partsTotal = (item.usedParts || []).reduce((sum, part) => {
+      if (part.showInInvoice) {
+        return sum + (Number(part.qty || 0) * Number(part.rate || 0));
+      }
+      return sum;
+    }, 0);
+    return base + partsTotal;
+  };
+  const subTotal = useMemo(() => items.reduce((sum, item) => sum + itemTotal(item), 0), [items]);
   const gstAmount = estimate.applyGst ? subTotal * 0.18 : 0;
   const sgst = gstAmount / 2;
   const cgst = gstAmount / 2;
@@ -358,6 +441,56 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
     if (saving) return;
     setSaving(true);
     try {
+      let previousRecord = null;
+      if (savedId) {
+        try {
+          const res = await api.get('leadBillings', savedId);
+          previousRecord = res;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      const prevDeductions = [];
+      if (previousRecord && Array.isArray(previousRecord.items)) {
+        previousRecord.items.forEach(item => {
+          if (Array.isArray(item.usedParts)) {
+            item.usedParts.forEach(part => {
+              if (part.deduct && part.inventoryId) {
+                prevDeductions.push(part);
+              }
+            });
+          }
+        });
+      }
+
+      const newDeductions = [];
+      items.forEach(item => {
+        if (Array.isArray(item.usedParts)) {
+          item.usedParts.forEach(part => {
+            if (part.deduct && part.inventoryId) {
+              newDeductions.push(part);
+            }
+          });
+        }
+      });
+
+      for (const part of prevDeductions) {
+        try {
+          await inventoryService.updateStock(part.inventoryId, Number(part.qty || 0), `Reversal of billing estimate: ${estimate.estimateNo}`);
+        } catch (e) {
+          console.error(`Failed to reverse stock for ${part.name}:`, e);
+        }
+      }
+
+      for (const part of newDeductions) {
+        try {
+          await inventoryService.updateStock(part.inventoryId, -Number(part.qty || 0), `Stock deduction for billing estimate: ${estimate.estimateNo}`);
+        } catch (e) {
+          console.error(`Failed to deduct stock for ${part.name}:`, e);
+        }
+      }
+
       if (savedId) {
         await apiClient.put(`/records/leadBillings/${savedId}`, payload());
       } else {
@@ -459,7 +592,7 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(520px, 0.95fr) minmax(560px, 1.05fr)', gap: 20, padding: 20, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20, padding: 20, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 16 }}>
           <section style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ padding: '13px 16px', borderBottom: '1px solid #edf2f7', background: '#f8fafc', fontWeight: 900, color: '#0f172a' }}>Estimate Details</div>
@@ -494,31 +627,149 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
               <button type="button" className="icon-btn" onClick={addItem} aria-label="Add row" title="Add row">
                 <Plus size={16} />
               </button>
-            </div>
-            <div>
+            </div>            <div>
               <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr) 58px 68px 88px 84px 60px', gap: 6, padding: '10px 12px', background: '#f8fafc', color: '#64748b', fontSize: '0.64rem', fontWeight: 900, textTransform: 'uppercase', alignItems: 'center' }}>
-                  <span>#</span><span>Item Name</span><span>Qty</span><span>Unit</span><span>Price/Unit</span><span>Amount</span><span />
+                <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr) 58px 68px 88px 84px 180px', gap: 6, padding: '10px 12px', background: '#f8fafc', color: '#64748b', fontSize: '0.64rem', fontWeight: 900, textTransform: 'uppercase', alignItems: 'center' }}>
+                  <span>#</span><span>Item Name</span><span>Qty</span><span>Unit</span><span>Price/Unit</span><span>Amount</span><span style={{ textAlign: 'center' }}>Actions</span>
                 </div>
                 {items.map((item, index) => (
-                  <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr) 58px 68px 88px 84px 60px', gap: 6, alignItems: 'center', padding: '8px 12px', borderTop: '1px solid #f1f5f9' }}>
-                    <strong style={{ color: '#64748b', fontSize: '0.8rem' }}>{index + 1}</strong>
-                    <input style={inputStyle} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="Item name" />
-                    <input type="number" min="0" style={{ ...inputStyle, textAlign: 'center' }} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', e.target.value === '' ? '' : Number(e.target.value))} />
-                    <select style={inputStyle} value={item.unit} onChange={(e) => updateItem(item.id, 'unit', e.target.value)}>
-                      {units.map((unit) => <option key={unit}>{unit}</option>)}
-                    </select>
-                    <input type="number" min="0" style={{ ...inputStyle, textAlign: 'right' }} value={item.pricePerUnit} onChange={(e) => updateItem(item.id, 'pricePerUnit', e.target.value === '' ? '' : Number(e.target.value))} />
-                    <div style={{ textAlign: 'right', fontWeight: 900, color: '#0f172a', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>Rs {fmt(lineBase(item))}</div>
-                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                      <button type="button" className="icon-btn" onClick={() => addItemAfter(item.id)} style={{ width: 28, height: 28 }} aria-label="Add row below" title="Add row below">
-                        <Plus size={13} />
-                      </button>
-                      <button type="button" className="icon-btn" onClick={() => removeItem(item.id)} style={{ width: 28, height: 28, color: '#ef4444' }} aria-label="Remove item" title="Remove item">
-                        <Trash2 size={13} />
-                      </button>
+                  <React.Fragment key={item.id}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr) 58px 68px 88px 84px 180px', gap: 6, alignItems: 'center', padding: '8px 12px', borderTop: '1px solid #f1f5f9' }}>
+                      <strong style={{ color: '#64748b', fontSize: '0.8rem' }}>{index + 1}</strong>
+                      <input style={inputStyle} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="Item name" />
+                      <input type="number" min="0" style={{ ...inputStyle, textAlign: 'center' }} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', e.target.value === '' ? '' : Number(e.target.value))} />
+                      <select style={inputStyle} value={item.unit} onChange={(e) => updateItem(item.id, 'unit', e.target.value)}>
+                        {units.map((unit) => <option key={unit}>{unit}</option>)}
+                      </select>
+                      <input type="number" min="0" style={{ ...inputStyle, textAlign: 'right' }} value={item.pricePerUnit} onChange={(e) => updateItem(item.id, 'pricePerUnit', e.target.value === '' ? '' : Number(e.target.value))} />
+                      <div style={{ textAlign: 'right', fontWeight: 900, color: '#0f172a', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>Rs {fmt(lineBase(item))}</div>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => toggleShowParts(item.id)}
+                          style={{
+                            height: 28,
+                            padding: '0 8px',
+                            fontSize: '11px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            background: item.showParts ? '#ede9fe' : '#f1f5f9',
+                            color: item.showParts ? '#4f46e5' : '#475569',
+                            border: item.showParts ? '1px solid #c084fc' : '1px solid #e2e8f0',
+                          }}
+                        >
+                          <Wrench size={11} />
+                          Parts ({(item.usedParts || []).length})
+                        </button>
+                        <button type="button" className="icon-btn" onClick={() => addItemAfter(item.id)} style={{ width: 28, height: 28 }} aria-label="Add row below" title="Add row below">
+                          <Plus size={13} />
+                        </button>
+                        <button type="button" className="icon-btn" onClick={() => removeItem(item.id)} style={{ width: 28, height: 28, color: '#ef4444' }} aria-label="Remove item" title="Remove item">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                    {item.showParts && (
+                      <div style={{ padding: '12px 16px 16px 36px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                          <span style={{ fontSize: '11px', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            🔧 Used Parts (Inventory Stock) for: {item.name || 'this item'}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => addUsedPartToItem(item.id)}
+                            style={{ height: 26, padding: '0 8px', fontSize: '11px', background: '#fff', border: '1px solid #cbd5e1' }}
+                          >
+                            <Plus size={12} style={{ marginRight: 4 }} /> Add Used Part
+                          </button>
+                        </div>
+                        
+                        {(item.usedParts || []).length === 0 ? (
+                          <div style={{ padding: '8px 0', fontSize: '12px', color: '#64748b', fontStyle: 'italic' }}>
+                            No spare parts added to this item yet. Click "Add Used Part" above.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '70px minmax(0, 2fr) 60px 80px 80px 100px 50px', gap: 6, fontSize: '10px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', paddingBottom: 4 }}>
+                              <span>Deduct</span>
+                              <span>Part Name</span>
+                              <span style={{ textAlign: 'center' }}>Qty</span>
+                              <span style={{ textAlign: 'right' }}>Rate (₹)</span>
+                              <span style={{ textAlign: 'right' }}>Amount (₹)</span>
+                              <span style={{ textAlign: 'center' }}>Show in Billing</span>
+                              <span style={{ textAlign: 'center' }}>Action</span>
+                            </div>
+                            
+                            {(item.usedParts || []).map((part) => (
+                              <div key={part.id} style={{ display: 'grid', gridTemplateColumns: '70px minmax(0, 2fr) 60px 80px 80px 100px 50px', gap: 6, alignItems: 'center' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={part.deduct}
+                                    onChange={(e) => updateUsedPartInItem(item.id, part.id, 'deduct', e.target.checked)}
+                                    style={{ width: 14, height: 14, cursor: 'pointer' }}
+                                  />
+                                  <span style={{ fontSize: '8px', color: part.deduct ? '#16a34a' : '#ef4444', fontWeight: 700, marginTop: 2 }}>
+                                    {part.deduct ? 'Deducted' : 'Skip'}
+                                  </span>
+                                </div>
+                                <select
+                                  style={inputStyle}
+                                  value={part.inventoryId}
+                                  onChange={(e) => updateUsedPartInItem(item.id, part.id, 'inventoryId', e.target.value)}
+                                >
+                                  <option value="">-- Select Spare Part --</option>
+                                  {inventoryList.map((inv) => (
+                                    <option key={inv.id} value={inv.id}>
+                                      {inv.name} - [Stock: {inv.currentStock || 0}]
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  style={{ ...inputStyle, textAlign: 'center' }}
+                                  value={part.qty}
+                                  onChange={(e) => updateUsedPartInItem(item.id, part.id, 'qty', Number(e.target.value) || 1)}
+                                />
+                                <input
+                                  type="number"
+                                  min="0"
+                                  style={{ ...inputStyle, textAlign: 'right' }}
+                                  value={part.rate}
+                                  onChange={(e) => updateUsedPartInItem(item.id, part.id, 'rate', Number(e.target.value) || 0)}
+                                />
+                                <div style={{ textAlign: 'right', fontSize: '12px', fontWeight: 700, color: '#1e293b' }}>
+                                  ₹{fmt(part.qty * part.rate)}
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={part.showInInvoice}
+                                    onChange={(e) => updateUsedPartInItem(item.id, part.id, 'showInInvoice', e.target.checked)}
+                                    style={{ width: 14, height: 14, cursor: 'pointer' }}
+                                  />
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                  <button
+                                    type="button"
+                                    className="icon-btn"
+                                    onClick={() => removeUsedPartFromItem(item.id, part.id)}
+                                    style={{ width: 24, height: 24, color: '#ef4444' }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </React.Fragment>
                 ))}
               </div>
             </div>
@@ -532,7 +783,7 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
           </section>
         </div>
 
-        <div style={{ position: 'sticky', top: 82 }}>
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
           <div style={{ background: '#e8eaf0', borderRadius: 16, padding: 24 }}>
             <div
               ref={printRef}
@@ -558,15 +809,14 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
                   {companyProfile.gstin && <p style={{ margin: '0 0 2px', fontSize: 11, color: '#374151' }}>GSTIN : {companyProfile.gstin}</p>}
                   {companyProfile.state && <p style={{ margin: 0, fontSize: 11, color: '#374151' }}>State: {companyProfile.state}</p>}
                 </div>
-                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 80, height: 80, objectFit: 'contain', flexShrink: 0 }} />
+                <img src={rbLogo} alt="Repair Boy Logo" style={{ width: 120, height: 120, objectFit: 'contain', flexShrink: 0 }} />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid #e2e8f0' }}>
-                <div>
-                  <h2 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, letterSpacing: 0.5, color: '#0f172a' }}>QUOTATION</h2>
-                  <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>No: {estimate.estimateNo}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>Date: {fmtDate(estimate.date)} &nbsp;|&nbsp; Valid: {estimate.validity}</p>
-                </div>
+              <div style={{ textAlign: 'center', marginBottom: 20, paddingBottom: 12 }}>
+                <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 900, letterSpacing: 0.5, color: '#0f172a' }}>QUOTATION</h2>
+                <p style={{ margin: 0, fontSize: 11, color: '#64748b' }}>
+                  No: {estimate.estimateNo} &nbsp;|&nbsp; Date: {fmtDate(estimate.date)} &nbsp;|&nbsp; Valid: {estimate.validity}
+                </p>
               </div>
 
               <div className="lq-section" style={{ marginBottom: 18 }}>
@@ -612,19 +862,40 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
                       const base = lineBase(item);
                       const rowGst = estimate.applyGst ? base * 0.18 : 0;
                       return (
-                        <tr key={item.id}>
-                          <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'center', color: '#64748b' }}>{index + 1}</td>
-                          <td style={{ padding: '6px 8px', border: '1px solid #dde3ed' }}>
-                            <strong>{item.name || '—'}</strong>
-                          </td>
-                          <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'center' }}>{item.quantity || 0}</td>
-                          <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'center', color: '#64748b' }}>{item.unit || '-'}</td>
-                          <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'right' }}>₹{fmt(item.pricePerUnit)}</td>
-                          <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'right', color: '#64748b', whiteSpace: 'nowrap' }}>
-                            ₹{fmt(rowGst)}<br /><span style={{ fontSize: 10 }}>({estimate.applyGst ? '18%' : '0%'})</span>
-                          </td>
-                          <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'right', fontWeight: 700 }}>₹{fmt(base + rowGst)}</td>
-                        </tr>
+                        <React.Fragment key={item.id}>
+                          <tr>
+                            <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'center', color: '#64748b' }}>{index + 1}</td>
+                            <td style={{ padding: '6px 8px', border: '1px solid #dde3ed' }}>
+                              <strong>{item.name || '—'}</strong>
+                            </td>
+                            <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'center' }}>{item.quantity || 0}</td>
+                            <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'center', color: '#64748b' }}>{item.unit || '-'}</td>
+                            <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'right' }}>₹{fmt(item.pricePerUnit)}</td>
+                            <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'right', color: '#64748b', whiteSpace: 'nowrap' }}>
+                              ₹{fmt(rowGst)}<br /><span style={{ fontSize: 10 }}>({estimate.applyGst ? '18%' : '0%'})</span>
+                            </td>
+                            <td style={{ padding: '6px 8px', border: '1px solid #dde3ed', textAlign: 'right', fontWeight: 700 }}>₹{fmt(base + rowGst)}</td>
+                          </tr>
+                          {(item.usedParts || []).filter(p => p.showInInvoice).map((part) => {
+                            const partBase = (Number(part.qty) || 0) * (Number(part.rate) || 0);
+                            const partGst = estimate.applyGst ? partBase * 0.18 : 0;
+                            return (
+                              <tr key={part.id} style={{ background: '#fafafb', color: '#475569' }}>
+                                <td style={{ padding: '4px 8px', border: '1px solid #dde3ed', textAlign: 'center' }} />
+                                <td style={{ padding: '4px 8px', border: '1px solid #dde3ed', paddingLeft: 20 }}>
+                                  ↳ {part.name}
+                                </td>
+                                <td style={{ padding: '4px 8px', border: '1px solid #dde3ed', textAlign: 'center' }}>{part.qty}</td>
+                                <td style={{ padding: '4px 8px', border: '1px solid #dde3ed', textAlign: 'center' }}>Pcs</td>
+                                <td style={{ padding: '4px 8px', border: '1px solid #dde3ed', textAlign: 'right' }}>₹{fmt(part.rate)}</td>
+                                <td style={{ padding: '4px 8px', border: '1px solid #dde3ed', textAlign: 'right', color: '#64748b' }}>
+                                  ₹{fmt(partGst)}
+                                </td>
+                                <td style={{ padding: '4px 8px', border: '1px solid #dde3ed', textAlign: 'right', fontWeight: 700 }}>₹{fmt(partBase + partGst)}</td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
                       );
                     })}
                     <tr className="tr-total" style={{ background: '#f8fafc', borderTop: '2px solid #1e293b' }}>

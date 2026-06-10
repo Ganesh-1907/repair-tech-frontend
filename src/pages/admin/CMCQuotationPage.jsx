@@ -121,7 +121,7 @@ const CMCQuotationPage = () => {
           </div>
         )}
 
-        <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <div className="main-grid" style={{ gridTemplateColumns: '1fr' }}>
           {/* EDITOR */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div className="table-card">
@@ -134,20 +134,20 @@ const CMCQuotationPage = () => {
                 <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div className="form-group">
                     <label>Customer Name</label>
-                    <input className="form-input" value={quoteData.customerName} onChange={e => setQuoteData({...quoteData, customerName: e.target.value})} placeholder="Company or Individual" />
+                    <input className="form-input" value={quoteData.customerName} onChange={e => setQuoteData({ ...quoteData, customerName: e.target.value })} placeholder="Company or Individual" />
                   </div>
                   <div className="form-group">
                     <label>Contact Person</label>
-                    <input className="form-input" value={quoteData.contactPerson} onChange={e => setQuoteData({...quoteData, contactPerson: e.target.value})} placeholder="Full Name" />
+                    <input className="form-input" value={quoteData.contactPerson} onChange={e => setQuoteData({ ...quoteData, contactPerson: e.target.value })} placeholder="Full Name" />
                   </div>
                 </div>
                 <div className="form-group">
                   <label>Customer Email</label>
-                  <input type="email" className="form-input" value={quoteData.customerEmail} onChange={e => setQuoteData({...quoteData, customerEmail: e.target.value})} placeholder="customer@company.com" />
+                  <input type="email" className="form-input" value={quoteData.customerEmail} onChange={e => setQuoteData({ ...quoteData, customerEmail: e.target.value })} placeholder="customer@company.com" />
                 </div>
                 <div className="form-group">
                   <label>Address</label>
-                  <input className="form-input" value={quoteData.customerAddress} onChange={e => setQuoteData({...quoteData, customerAddress: e.target.value})} placeholder="Billing Address" />
+                  <input className="form-input" value={quoteData.customerAddress} onChange={e => setQuoteData({ ...quoteData, customerAddress: e.target.value })} placeholder="Billing Address" />
                 </div>
                 <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div className="form-group">
@@ -156,7 +156,7 @@ const CMCQuotationPage = () => {
                   </div>
                   <div className="form-group">
                     <label>Validity</label>
-                    <select className="form-select" value={quoteData.validity} onChange={e => setQuoteData({...quoteData, validity: e.target.value})}>
+                    <select className="form-select" value={quoteData.validity} onChange={e => setQuoteData({ ...quoteData, validity: e.target.value })}>
                       <option>15 Days</option>
                       <option>30 Days</option>
                       <option>60 Days</option>
@@ -188,7 +188,7 @@ const CMCQuotationPage = () => {
                     {assets.map(asset => (
                       <tr key={asset.id}>
                         <td>
-                          <select className="form-select" style={{height:'36px'}} value={asset.type} onChange={e => updateAsset(asset.id, 'type', e.target.value)}>
+                          <select className="form-select" style={{ height: '36px' }} value={asset.type} onChange={e => updateAsset(asset.id, 'type', e.target.value)}>
                             <option>Desktop</option>
                             <option>Laptop</option>
                             <option>Printer</option>
@@ -196,10 +196,10 @@ const CMCQuotationPage = () => {
                             <option>Server</option>
                           </select>
                         </td>
-                        <td><input type="number" className="form-input" style={{height:'36px', width:'60px'}} value={asset.count} onChange={e => updateAsset(asset.id, 'count', parseInt(e.target.value))} /></td>
-                        <td><input type="number" className="form-input" style={{height:'36px', width:'100px'}} value={asset.price} onChange={e => updateAsset(asset.id, 'price', parseInt(e.target.value))} /></td>
+                        <td><input type="number" className="form-input" style={{ height: '36px', width: '60px' }} value={asset.count} onChange={e => updateAsset(asset.id, 'count', parseInt(e.target.value))} /></td>
+                        <td><input type="number" className="form-input" style={{ height: '36px', width: '100px' }} value={asset.price} onChange={e => updateAsset(asset.id, 'price', parseInt(e.target.value))} /></td>
                         <td><strong>₹{asset.count * asset.price}</strong></td>
-                        <td><button className="icon-button" style={{width:'32px', height:'32px', color:'red'}} onClick={() => removeAsset(asset.id)}><Trash2 size={14} /></button></td>
+                        <td><button className="icon-button" style={{ width: '32px', height: '32px', color: 'red' }} onClick={() => removeAsset(asset.id)}><Trash2 size={14} /></button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -215,17 +215,16 @@ const CMCQuotationPage = () => {
               </div>
               <div className="form-group">
                 <label>Scope of Work</label>
-                <textarea className="form-input" style={{height:'60px'}} value={quoteData.scope} onChange={e => setQuoteData({...quoteData, scope: e.target.value})} />
+                <textarea className="form-input" style={{ height: '60px' }} value={quoteData.scope} onChange={e => setQuoteData({ ...quoteData, scope: e.target.value })} />
               </div>
               <div className="form-group">
                 <label>Exclusions</label>
-                <textarea className="form-input" style={{height:'60px'}} value={quoteData.exclusions} onChange={e => setQuoteData({...quoteData, exclusions: e.target.value})} />
+                <textarea className="form-input" style={{ height: '60px' }} value={quoteData.exclusions} onChange={e => setQuoteData({ ...quoteData, exclusions: e.target.value })} />
               </div>
             </div>
           </div>
 
-          {/* PREVIEW */}
-          <div className="agreement-preview-container">
+          <div className="agreement-preview-container" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
             <div className="agreement-document" ref={printRef}>
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>

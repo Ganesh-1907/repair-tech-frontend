@@ -825,6 +825,7 @@
   margin-bottom: 12px;
   border-bottom: 1px solid #eee;
   padding-bottom: 4px;
+  text-align: left;
 }
 
 .agreement-grid {
@@ -1254,7 +1255,7 @@
     visibility: visible !important;
   }
 
-  .rental-quotation-print-page .main-grid > div:first-child,
+  .rental-quotation-print-page .main-grid>div:first-child,
   .rental-quotation-print-page .plans-header,
   .rental-quotation-print-page .plans-header * {
     display: none !important;
@@ -1805,6 +1806,7 @@
   gap: 12px;
   padding-top: 8px;
 }
+
 /* Plan summary card — shown after plan selection in Add Customer */
 .plan-summary-card {
   margin-top: 16px;

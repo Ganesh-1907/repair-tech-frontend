@@ -538,7 +538,7 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
         </div>
       )}
 
-      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr', gap: 24 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="table-card">
             <div className="card-header"><div className="card-title-area"><h2>Devices &amp; Pricing</h2><p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>Device details come from AMC enrollment — enter pricing only.</p></div></div>
@@ -575,8 +575,7 @@ const AMCQuotationView = ({ customer, onBack, onSaved }) => {
             </div>
           </div>
         </div>
-
-        <div className="agreement-preview-container">
+        <div className="agreement-preview-container" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
           <div className="agreement-document" ref={printRef}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>
@@ -800,7 +799,7 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
         </div>
       )}
 
-      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr', gap: 24 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="table-card">
             <div className="card-header"><div className="card-title-area"><h2>Agreement Details</h2><p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>Only agreement-specific terms are editable here.</p></div></div>
@@ -830,7 +829,7 @@ const AMCAgreementView = ({ customer, onBack, onSaved }) => {
           </div>
         </div>
 
-        <div className="agreement-preview-container">
+        <div className="agreement-preview-container" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
           <div className="agreement-document" ref={agreeRef} style={{ fontFamily: '"Times New Roman", Times, serif', padding: 28, color: '#0f172a', lineHeight: 1.55 }}>
             <div style={{ marginBottom: 28 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>

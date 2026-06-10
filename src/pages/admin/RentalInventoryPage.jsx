@@ -198,9 +198,6 @@ const RentalInventoryPage = () => {
             <button className="secondary-button" onClick={() => navigate('/admin/rental/maintenance-alerts')}>
               <Wrench size={16} /> Maintenance
             </button>
-            <button className="secondary-button" onClick={() => navigate('/admin/rental/billing-invoices')}>
-              <IndianRupee size={16} /> Billing
-            </button>
         </div>
       </header>
 
@@ -263,12 +260,6 @@ const RentalInventoryPage = () => {
                         <button className="menu-item" onClick={() => { navigate(`/admin/rental/repair/${c.contractId || c.id}`); setActiveMenu({type:null, id:null}); }}><Wrench size={14} /> Manage Repair</button>
                         <button className="menu-item" onClick={() => { navigate('/admin/rental/maintenance-alerts'); setActiveMenu({type:null, id:null}); }}>
                           <Wrench size={14} /> Maintenance
-                        </button>
-                        <button className="menu-item" onClick={() => { navigate('/admin/rental/billing-invoices'); setActiveMenu({type:null, id:null}); }}>
-                          <IndianRupee size={14} /> Billing
-                        </button>
-                        <button className="menu-item" onClick={() => { navigate('/admin/rental/billing-generate'); setActiveMenu({type:null, id:null}); }}>
-                          <FileText size={14} /> Invoice Generation
                         </button>
                         <button className="menu-item" onClick={() => { navigate('/admin/rental/customers'); setActiveMenu({type:null, id:null}); }}>
                           <Users size={14} /> Payment Details

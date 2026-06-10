@@ -150,7 +150,7 @@ const AMCAgreementsPage = () => {
           </div>
         )}
 
-        <div className="main-grid" style={{ gridTemplateColumns: '1fr 1.2fr', alignItems: 'start' }}>
+        <div className="main-grid" style={{ gridTemplateColumns: '1fr', alignItems: 'start' }}>
           {/* FORM PANEL */}
           <div className="table-card" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 140px)', position: 'sticky', top: '24px' }}>
             <div className="card-header">
@@ -270,8 +270,7 @@ const AMCAgreementsPage = () => {
             </div>
           </div>
 
-          {/* PREVIEW PANEL */}
-          <div className="agreement-preview-container" style={{ position: 'sticky', top: '24px', maxHeight: 'calc(100vh - 140px)', overflowY: 'auto' }}>
+          <div className="agreement-preview-container" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
             <div className="agreement-document" ref={printRef}>
               <div className="agreement-header">
                 <h1>{agreementType} AMC Agreement</h1>

@@ -187,15 +187,7 @@ const adminModules = [
         roles: ['admin', 'caAdmin'],
         description: 'Manage rental customers, agreements, quotation follow-up, and payment visibility.',
         actions: ['Add', 'View List', 'Manage'],
-      },
-      {
-        id: 'rental-billing-invoices',
-        label: 'Billing & Invoices',
-        path: '/admin/rental/billing-invoices',
-        roles: ['admin'],
-        description: 'Monthly rental invoices with meter billing and payment collections.',
-        actions: ['View List', 'Manage'],
-      },
+      }
     ],
   },
   {

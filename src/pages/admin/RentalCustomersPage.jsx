@@ -299,14 +299,13 @@ const RentalCustomersPage = () => {
             return (
               <>
                 <button className="menu-item" onClick={() => openCustomerProcess(c.id)}><Eye size={14} /> View Customer</button>
-                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/billing/${c.id}`, { state: { customer: c } }); }}><IndianRupee size={14} /> Billing</button>
                 {!isCaAdmin && <button className="menu-item" onClick={() => openQuotation(c)}><FileText size={14} /> Create Quotation</button>}
                 {!isCaAdmin && <button className="menu-item" onClick={() => openAgreement(c)}><ClipboardCheck size={14} /> Create Agreement</button>}
                 {!isCaAdmin && <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/repair/${c.id}`); }}><Wrench size={14} /> Manage Repair</button>}
                 {!isCaAdmin && <button className="menu-item" style={{ color: '#4f46e5' }} onClick={() => { setCredentialsTarget(c); setActiveMenu(prev => ({ ...prev, open: false, id: null })); }}><CheckCircle2 size={14} /> Send Portal Access</button>}
                 {!isCaAdmin && <><div className="h-px bg-slate-100 my-1"></div>
-                <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/new?id=${c.id}`); }}><Edit2 size={14} /> Edit Customer</button>
-                <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button></>}
+                  <button className="menu-item" onClick={() => { setActiveMenu(prev => ({ ...prev, open: false, id: null })); navigate(`/admin/rental/new?id=${c.id}`); }}><Edit2 size={14} /> Edit Customer</button>
+                  <button className="menu-item danger" onClick={() => handleDelete(c.id)}><Trash2 size={14} /> Delete</button></>}
               </>
             );
           })()}
@@ -447,7 +446,7 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
           .agreement-document { width: 100% !important; max-width: none !important; max-height: none !important; height: auto !important; overflow: visible !important; padding: 0 !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; background: #fff !important; line-height: 1.6; }
           .agreement-header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
           .agreement-section { margin-bottom: 18px; }
-          .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 16px; line-height: 1.3; }
+          .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; text-transform: uppercase; font-size: 16px; line-height: 1.3; }
           table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
           th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
           th { background: #f1f5f9; font-weight: 700; }
@@ -498,7 +497,7 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
             .agreement-document { width: 100%; max-width: none; min-height: auto; max-height: none; overflow: visible; padding: 0; margin: 0; border: 0; box-shadow: none; background: #ffffff; color: #0f172a; font-family: "Times New Roman", Times, serif; line-height: 1.6; }
             .agreement-header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
             .agreement-section { margin-bottom: 18px; }
-            .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 16px; line-height: 1.3; }
+            .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; text-transform: uppercase; font-size: 16px; line-height: 1.3; }
             table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; }
             th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
             th { background: #f1f5f9; font-weight: 700; }
@@ -550,7 +549,7 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
         </div>
       </header>
 
-      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr', gap: 24 }}>
         {/* ── LEFT: EDITOR ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Devices & Pricing */}
@@ -635,8 +634,7 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
           </div>
         </div>
 
-        {/* ── RIGHT: LIVE PREVIEW ── */}
-        <div className="agreement-preview-container no-print-hide">
+        <div className="agreement-preview-container no-print-hide" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
           <div className="agreement-document" ref={printRef}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>
@@ -653,8 +651,9 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
               </div>
               <div style={{ textAlign: 'center' }}>
                 <h1 style={{ fontSize: 22, margin: '0 0 4px' }}>QUOTATION</h1>
-                <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>No: {quote.quoteNo}</p>
-                <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>Date: {quote.date} &nbsp;|&nbsp; Valid: {quote.validity}</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
+                  No: {quote.quoteNo} &nbsp;|&nbsp; Date: {quote.date} &nbsp;|&nbsp; Valid: {quote.validity}
+                </p>
               </div>
             </div>
 
@@ -704,13 +703,15 @@ const RentalQuotationView = ({ customer, onBack, onSaved }) => {
                       <td>₹{fmt(Number(d.qty) * Number(d.monthlyRent))}</td>
                     </tr>
                   ))}
-                  {(() => { const cols = devices.some((d) => d.pageWiseBilling) ? 6 : 4; return (<>
-                    <tr><td colSpan={cols} style={{ textAlign: 'right' }}><strong>Device Subtotal</strong></td><td><strong>₹{fmt(deviceTotal())}</strong></td></tr>
-                    {Number(quote.installationCharges) > 0 && <tr><td colSpan={cols} style={{ textAlign: 'right' }}>Installation</td><td>₹{fmt(quote.installationCharges)}</td></tr>}
-                    {Number(quote.deliveryCharges) > 0 && <tr><td colSpan={cols} style={{ textAlign: 'right' }}>Delivery</td><td>₹{fmt(quote.deliveryCharges)}</td></tr>}
-                    {Number(quote.gstPercent) > 0 && <tr><td colSpan={cols} style={{ textAlign: 'right' }}>GST ({quote.gstPercent}%)</td><td>₹{fmt(gstAmount())}</td></tr>}
-                    <tr style={{ background: '#f0fdf4' }}><td colSpan={cols} style={{ textAlign: 'right' }}><strong>Grand Total / Month</strong></td><td><strong>₹{fmt(grandTotal())}</strong></td></tr>
-                  </>); })()}
+                  {(() => {
+                    const cols = devices.some((d) => d.pageWiseBilling) ? 6 : 4; return (<>
+                      <tr><td colSpan={cols} style={{ textAlign: 'right' }}><strong>Device Subtotal</strong></td><td><strong>₹{fmt(deviceTotal())}</strong></td></tr>
+                      {Number(quote.installationCharges) > 0 && <tr><td colSpan={cols} style={{ textAlign: 'right' }}>Installation</td><td>₹{fmt(quote.installationCharges)}</td></tr>}
+                      {Number(quote.deliveryCharges) > 0 && <tr><td colSpan={cols} style={{ textAlign: 'right' }}>Delivery</td><td>₹{fmt(quote.deliveryCharges)}</td></tr>}
+                      {Number(quote.gstPercent) > 0 && <tr><td colSpan={cols} style={{ textAlign: 'right' }}>GST ({quote.gstPercent}%)</td><td>₹{fmt(gstAmount())}</td></tr>}
+                      <tr style={{ background: '#f0fdf4' }}><td colSpan={cols} style={{ textAlign: 'right' }}><strong>Grand Total / Month</strong></td><td><strong>₹{fmt(grandTotal())}</strong></td></tr>
+                    </>);
+                  })()}
                   {Number(quote.securityDeposit) > 0 && <tr><td colSpan={4} style={{ textAlign: 'right' }}>Security Deposit (one-time)</td><td>₹{fmt(quote.securityDeposit)}</td></tr>}
                 </tbody>
               </table>
@@ -865,7 +866,7 @@ const RentalAgreementView = ({ customer, onBack }) => {
           .agreement-document { width: 100% !important; max-width: none !important; max-height: none !important; height: auto !important; overflow: visible !important; padding: 0 !important; margin: 0 !important; border: 0 !important; box-shadow: none !important; background: #fff !important; line-height: 1.6; }
           .agreement-header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
           .agreement-section { margin-bottom: 18px; }
-          .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 16px; line-height: 1.3; }
+          .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; text-transform: uppercase; font-size: 16px; line-height: 1.3; }
           table { width: 100%; border-collapse: collapse; font-size: 12px; }
           th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; }
           th { background: #f1f5f9; font-weight: 700; }
@@ -907,7 +908,7 @@ const RentalAgreementView = ({ customer, onBack }) => {
           .agreement-document { width: 100%; max-width: none; overflow: visible; padding: 0; margin: 0; border: 0; box-shadow: none; background: #ffffff; line-height: 1.6; }
           .agreement-header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }
           .agreement-section { margin-bottom: 18px; }
-          .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 16px; }
+          .agreement-section h2 { margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; text-align: left; text-transform: uppercase; font-size: 16px; }
           table { width: 100%; border-collapse: collapse; font-size: 12px; }
           th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; }
           th { background: #f1f5f9; font-weight: 700; }
@@ -947,7 +948,7 @@ const RentalAgreementView = ({ customer, onBack }) => {
         </div>
       </header>
 
-      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1.2fr', gap: 24 }}>
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr', gap: 24 }}>
         {/* ── LEFT: AGREEMENT INPUTS ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="table-card">
@@ -993,8 +994,7 @@ const RentalAgreementView = ({ customer, onBack }) => {
           </div>
         </div>
 
-        {/* ── RIGHT: LIVE PREVIEW ── */}
-        <div className="agreement-preview-container">
+        <div className="agreement-preview-container" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
           <div className="agreement-document" ref={agreementRef}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>

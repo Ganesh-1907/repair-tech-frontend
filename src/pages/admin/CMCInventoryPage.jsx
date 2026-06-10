@@ -178,23 +178,23 @@ const createDefaultAgreement = (customer = {}, quotation = null) => {
     supportPolicy: 'Support available within SLA.',
     devices: qDevices.length > 0
       ? qDevices.map((d) => ({
-          deviceType: d.device || d.deviceType || '',
-          model: d.model || '',
-          specs: '',
-          serialNo: d.serial || d.serialNo || '',
-          quantity: d.qty || d.quantity || 1,
-          monthlyRent: d.monthlyRent || '',
-          securityDeposit: '',
-        }))
+        deviceType: d.device || d.deviceType || '',
+        model: d.model || '',
+        specs: '',
+        serialNo: d.serial || d.serialNo || '',
+        quantity: d.qty || d.quantity || 1,
+        monthlyRent: d.monthlyRent || '',
+        securityDeposit: '',
+      }))
       : (customer.devices || []).map((d) => ({
-          deviceType: d.type || '',
-          model: d.brand || '',
-          specs: '',
-          serialNo: d.sn || '',
-          quantity: 1,
-          monthlyRent: '',
-          securityDeposit: '',
-        })),
+        deviceType: d.type || '',
+        model: d.brand || '',
+        specs: '',
+        serialNo: d.sn || '',
+        quantity: 1,
+        monthlyRent: '',
+        securityDeposit: '',
+      })),
   };
 };
 
@@ -220,7 +220,7 @@ const CMCInventoryPage = () => {
   const { user } = useAuth();
   const isCaAdmin = normalizeRole(user?.role) === 'caAdmin';
   const [customers, setCustomers] = useState([]);
-  const [cmcPlans, setCmcPlans]   = useState([]);
+  const [cmcPlans, setCmcPlans] = useState([]);
   const [viewMode, setViewMode] = useState('list');
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -660,7 +660,7 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
           .agreement-document { width: 100%; overflow: visible; padding: 0; margin: 0; border: 0; box-shadow: none; background: #fff; line-height: 1.6; }
           .agreement-header { border-bottom: 2px solid #333; padding-bottom: 16px; margin-bottom: 32px; }
           .agreement-section { margin-bottom: 18px; }
-          .agreement-section h2 { margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; text-align: center; text-transform: uppercase; font-size: 14px; }
+          .agreement-section h2 { margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid #e2e8f0; text-align: left; text-transform: uppercase; font-size: 14px; }
           table { width: 100%; border-collapse: collapse; font-size: 12px; }
           th, td { padding: 8px; border: 1px solid #dbe3ef; text-align: left; vertical-align: top; }
           th { background: #f1f5f9; font-weight: 700; }
@@ -701,7 +701,7 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
         </div>
       )}
 
-      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr', gap: 24 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <div className="table-card">
             <div className="card-header"><div className="card-title-area"><h2>Devices &amp; Pricing</h2><p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '2px 0 0' }}>Device details come from CMC enrollment — enter pricing only.</p></div></div>
@@ -755,7 +755,7 @@ const CMCQuotationView = ({ customer, onSaved, onBack }) => {
           </div>
         </div>
 
-        <div className="agreement-preview-container">
+        <div className="agreement-preview-container" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
           <div className="agreement-document" ref={printRef}>
 
             {/* ── HEADER ── */}
@@ -972,7 +972,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
         </div>
       )}
 
-      <div className="main-grid" style={{ gridTemplateColumns: '1fr 1.2fr', gap: 24 }}>
+      <div className="main-grid" style={{ gridTemplateColumns: '1fr', gap: 24 }}>
         {/* ── LEFT: EDIT FORM ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
@@ -1045,8 +1045,7 @@ const CMCAgreementView = ({ customer, initialData, onSave, onBack }) => {
 
         </div>
 
-        {/* ── RIGHT: LIVE PREVIEW ── */}
-        <div className="agreement-preview-container">
+        <div className="agreement-preview-container" style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
           <div className="agreement-document" ref={agreeRef}>
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #1e293b', paddingBottom: 14, marginBottom: 16 }}>
