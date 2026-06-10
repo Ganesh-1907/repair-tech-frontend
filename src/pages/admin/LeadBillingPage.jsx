@@ -629,12 +629,12 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
               </button>
             </div>            <div>
               <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr) 58px 68px 88px 84px 180px', gap: 6, padding: '10px 12px', background: '#f8fafc', color: '#64748b', fontSize: '0.64rem', fontWeight: 900, textTransform: 'uppercase', alignItems: 'center' }}>
-                  <span>#</span><span>Item Name</span><span>Qty</span><span>Unit</span><span>Price/Unit</span><span>Amount</span><span style={{ textAlign: 'center' }}>Actions</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 3.5fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, 1.5fr) 200px', gap: 6, padding: '10px 12px', background: '#f8fafc', color: '#64748b', fontSize: '0.64rem', fontWeight: 900, textTransform: 'uppercase', alignItems: 'center' }}>
+                  <span>#</span><span>Item Name</span><span style={{ textAlign: 'center' }}>Qty</span><span>Unit</span><span style={{ textAlign: 'right' }}>Price/Unit</span><span style={{ textAlign: 'right' }}>Amount</span><span style={{ textAlign: 'center' }}>Actions</span>
                 </div>
                 {items.map((item, index) => (
                   <React.Fragment key={item.id}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr) 58px 68px 88px 84px 180px', gap: 6, alignItems: 'center', padding: '8px 12px', borderTop: '1px solid #f1f5f9' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 3.5fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, 1.5fr) 200px', gap: 6, alignItems: 'center', padding: '8px 12px', borderTop: '1px solid #f1f5f9' }}>
                       <strong style={{ color: '#64748b', fontSize: '0.8rem' }}>{index + 1}</strong>
                       <input style={inputStyle} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} placeholder="Item name" />
                       <input type="number" min="0" style={{ ...inputStyle, textAlign: 'center' }} value={item.quantity} onChange={(e) => updateItem(item.id, 'quantity', e.target.value === '' ? '' : Number(e.target.value))} />
@@ -671,6 +671,36 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
                         </button>
                       </div>
                     </div>
+                    {!item.showParts && (item.usedParts || []).filter(p => p.showInInvoice).map((part) => {
+                      const partBase = (Number(part.qty) || 0) * (Number(part.rate) || 0);
+                      return (
+                        <div
+                          key={part.id}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: '24px minmax(0, 3.5fr) minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.5fr) minmax(0, 1.5fr) 200px',
+                            gap: 6,
+                            alignItems: 'center',
+                            padding: '6px 12px',
+                            background: '#fafafb',
+                            borderTop: '1px solid #f1f5f9',
+                            fontSize: '0.8rem',
+                            color: '#475569',
+                          }}
+                        >
+                          <span />
+                          <div style={{ paddingLeft: 16, display: 'flex', alignItems: 'center', gap: 6, color: '#4f46e5' }}>
+                            <span style={{ color: '#94a3b8' }}>↳</span>
+                            <span>{part.name || '—'}</span>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>{part.qty || 0}</div>
+                          <div style={{ paddingLeft: 6 }}>Pcs</div>
+                          <div style={{ textAlign: 'right' }}>Rs {fmt(part.rate)}</div>
+                          <div style={{ textAlign: 'right', fontWeight: 700, color: '#334155' }}>Rs {fmt(partBase)}</div>
+                          <span />
+                        </div>
+                      );
+                    })}
                     {item.showParts && (
                       <div style={{ padding: '12px 16px 16px 36px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
