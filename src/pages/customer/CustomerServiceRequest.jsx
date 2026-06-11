@@ -118,8 +118,6 @@ const CustomerServiceRequest = () => {
               <div className="cp-form-group">
                 <label>Contact Phone (optional)</label>
                 <input
-                  className="cp-form-group input"
-                  style={{ padding: '11px 14px', border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: '0.9rem', outline: 'none' }}
                   value={form.contactPhone}
                   onChange={(e) => setForm((f) => ({ ...f, contactPhone: e.target.value }))}
                   placeholder="+91 98765 43210"

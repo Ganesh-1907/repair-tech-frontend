@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, FileText } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { customerPortalService } from '../../services/customerPortalService';
 
@@ -25,17 +26,30 @@ const getDevices = (c) =>
 
 const CustomerContracts = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
+  const [activeTab, setActiveTab] = useState('');
 
   useEffect(() => {
     const ids = user?.contractIds || [];
     if (!ids.length) { setLoading(false); return; }
     customerPortalService.getContractsByIds(ids)
-      .then(setContracts)
+      .then((data) => {
+        setContracts(data);
+        const types = [...new Set((data || []).map((c) => c._contractType || ''))].filter(Boolean);
+        if (types.length > 1) {
+          setActiveTab(types[0]);
+        }
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [user]);
+
+  const uniqueTypes = [...new Set(contracts.map((c) => c._contractType || ''))].filter(Boolean);
+  const displayedContracts = uniqueTypes.length > 1
+    ? contracts.filter((c) => c._contractType === activeTab)
+    : contracts;
 
   if (loading) return <div style={{ padding: 32, color: '#64748b' }}>Loading contracts...</div>;
 
@@ -44,8 +58,36 @@ const CustomerContracts = () => {
       <h1 className="cp-page-title">My Contracts</h1>
       <p className="cp-page-sub">All AMC, CMC, Rental and Lead contracts linked to your account.</p>
 
+      {uniqueTypes.length > 1 && (
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', background: '#f1f5f9', padding: '4px', borderRadius: '10px', width: 'fit-content' }}>
+          {uniqueTypes.map((type) => (
+            <button
+              key={type}
+              onClick={() => {
+                setActiveTab(type);
+                setExpanded(null);
+              }}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: activeTab === type ? '#ffffff' : 'transparent',
+                color: activeTab === type ? '#4f46e5' : '#64748b',
+                boxShadow: activeTab === type ? '0 2px 4px rgba(79, 70, 229, 0.08)' : 'none',
+                fontWeight: 600,
+                fontSize: '0.88rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease-in-out',
+              }}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="cp-card">
-        {contracts.length === 0 ? (
+        {displayedContracts.length === 0 ? (
           <div className="cp-empty"><FileText size={40} /><p>No contracts found for your account.</p></div>
         ) : (
           <table className="cp-table">
@@ -57,11 +99,11 @@ const CustomerContracts = () => {
                 <th>Start Date</th>
                 <th>Expiry</th>
                 <th>Status</th>
-                <th></th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {contracts.map((c) => {
+              {displayedContracts.map((c) => {
                 const st = statusOf(c);
                 const isOpen = expanded === c.id;
                 const devices = getDevices(c);
@@ -77,12 +119,22 @@ const CustomerContracts = () => {
                         <span className={`cp-badge ${st === 'active' ? 'cp-badge-green' : st === 'expiring' ? 'cp-badge-amber' : 'cp-badge-red'}`}>{st}</span>
                       </td>
                       <td>
-                        <button onClick={() => setExpanded(isOpen ? null : c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.82rem', fontWeight: 600 }}>
-                          Details {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        </button>
+                        {['AMC', 'CMC'].includes(c._contractType) ? (
+                          <button 
+                            onClick={() => navigate(`/customer/contracts/${c._contractType.toLowerCase()}/view/${c.id}`)} 
+                            className="primary-button" 
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', height: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}
+                          >
+                            <FileText size={14} /> View Details
+                          </button>
+                        ) : (
+                          <button onClick={() => setExpanded(isOpen ? null : c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f46e5', display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.82rem', fontWeight: 600 }}>
+                            {isOpen ? 'Hide Details' : 'Show Details'} {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </button>
+                        )}
                       </td>
                     </tr>
-                    {isOpen && (
+                    {isOpen && !['AMC', 'CMC'].includes(c._contractType) && (
                       <tr className="cp-expand-row">
                         <td colSpan={7}>
                           <div className="cp-expand-inner">

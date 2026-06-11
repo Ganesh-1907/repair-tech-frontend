@@ -72,4 +72,22 @@ export const customerPortalService = {
       .filter((r) => contractIds.includes(r.contractId))
       .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
   },
+
+  // Admin: list all customer portal accounts
+  getCustomerAccounts: async () => {
+    const { data } = await apiClient.get('/auth/customer/accounts');
+    return data;
+  },
+
+  // Admin: link a contract to an existing customer portal account
+  addContract: async (payload) => {
+    const { data } = await apiClient.patch('/auth/customer/add-contract', payload);
+    return data;
+  },
+
+  // Customer portal: update profile
+  updateProfile: async (payload) => {
+    const { data } = await apiClient.put('/auth/customer/profile', payload);
+    return data;
+  },
 };

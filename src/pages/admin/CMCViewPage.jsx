@@ -39,18 +39,20 @@ const CMCViewPage = () => {
   return (
     <div className="amc-new-page">
       <div className="amc-new-page-header">
-        <button className="back-button" onClick={() => navigate('/admin/cmc/inventory')}>
-          <ArrowLeft size={18} /> Back to CMC Inventory
+        <button className="back-button" onClick={() => navigate(window.location.pathname.includes('/customer/') ? '/customer/contracts' : '/admin/cmc/inventory')}>
+          <ArrowLeft size={18} /> {window.location.pathname.includes('/customer/') ? 'Back to My Contracts' : 'Back to CMC Inventory'}
         </button>
         <div className="amc-new-page-title">
           <h1>CMC Enrollment Details</h1>
           <p>Detailed view of customer profile, contract terms, and registered devices.</p>
         </div>
-        <div className="amc-new-page-actions">
-          <button className="primary-button" onClick={() => navigate(`/admin/cmc/new?id=${id}`)}>
-            <Edit size={16} /> Edit Enrollment
-          </button>
-        </div>
+        {!window.location.pathname.includes('/customer/') && (
+          <div className="amc-new-page-actions">
+            <button className="primary-button" onClick={() => navigate(`/admin/cmc/new?id=${id}`)}>
+              <Edit size={16} /> Edit Enrollment
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="amc-new-page-body">

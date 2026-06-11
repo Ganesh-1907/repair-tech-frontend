@@ -492,6 +492,7 @@ const CMCInventoryPage = () => {
           contractId={credentialsTarget.contractId || credentialsTarget.id}
           customerName={credentialsTarget.name || credentialsTarget.customerName || ''}
           email={credentialsTarget.email || credentialsTarget.primaryEmail || ''}
+          emailLocked={true}
           onClose={() => setCredentialsTarget(null)}
         />
       )}

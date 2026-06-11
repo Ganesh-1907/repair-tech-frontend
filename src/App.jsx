@@ -193,6 +193,8 @@ function App() {
                 <Route path="repairs" element={<CustomerRepairs />} />
                 <Route path="payments" element={<CustomerPayments />} />
                 <Route path="service-request" element={<CustomerServiceRequest />} />
+                <Route path="contracts/amc/view/:id" element={<AMCViewPage />} />
+                <Route path="contracts/cmc/view/:id" element={<CMCViewPage />} />
               </Route>
               
               {/* Admin Redirects */}

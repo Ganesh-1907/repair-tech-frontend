@@ -266,11 +266,19 @@
   border: 1.5px solid #e2e8f0;
   border-radius: 10px;
   font-size: 0.9rem;
+  background-color: #ffffff;
   color: #0f172a;
-  transition: border-color .15s;
   outline: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.cp-form-group input:focus { border-color: #4f46e5; }
+.cp-form-group input:hover {
+  border-color: #cbd5e1;
+}
+.cp-form-group input:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
 .cp-login-btn {
   width: 100%;
   padding: 13px;
@@ -303,13 +311,27 @@
   border: 1.5px solid #e2e8f0;
   border-radius: 10px;
   font-size: 0.9rem;
+  background-color: #ffffff;
   color: #0f172a;
   outline: none;
   font-family: inherit;
   resize: vertical;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.cp-form-group select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+.cp-form-group select:hover,
+.cp-form-group textarea:hover {
+  border-color: #cbd5e1;
 }
 .cp-form-group select:focus,
-.cp-form-group textarea:focus { border-color: #4f46e5; }
+.cp-form-group textarea:focus {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
 .cp-submit-btn {
   align-self: flex-start;
   padding: 11px 24px;

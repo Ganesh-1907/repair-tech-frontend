@@ -159,8 +159,8 @@ const AMCViewPage = () => {
   return (
     <div className="amc-new-page">
       <div className="amc-new-page-header">
-        <button className="back-button" onClick={() => navigate('/admin/amc/inventory')}>
-          <ArrowLeft size={18} /> Back to AMC Inventory
+        <button className="back-button" onClick={() => navigate(window.location.pathname.includes('/customer/') ? '/customer/contracts' : '/admin/amc/inventory')}>
+          <ArrowLeft size={18} /> {window.location.pathname.includes('/customer/') ? 'Back to My Contracts' : 'Back to AMC Inventory'}
         </button>
         <div className="amc-new-page-title">
           <h1>View AMC Enrollment</h1>

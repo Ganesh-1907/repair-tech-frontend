@@ -102,6 +102,8 @@ const Billing = () => {
   const [customerFilter, setCustomerFilter] = useState('All');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [monthFilter, setMonthFilter] = useState('All');
+  const [yearFilter, setYearFilter] = useState('All');
 
   const subtotal = items.reduce((acc, item) => acc + (item.qty * item.rate), 0);
   const gstRate = 0.18;
@@ -159,9 +161,14 @@ const Billing = () => {
       const matchesToDate = !dateTo || invoiceDate <= new Date(`${dateTo}T23:59:59`);
       const matchesDateRange = isDateRangeInvalid ? true : (matchesFromDate && matchesToDate);
 
-      return matchesSearch && matchesStatus && matchesPayment && matchesCustomer && matchesDateRange;
+      const monthVal = invoice.billingMonth || (invoice.issueDate || invoice.date ? new Date(invoice.issueDate || invoice.date).getMonth() + 1 : 0);
+      const yearVal = invoice.billingYear || (invoice.issueDate || invoice.date ? new Date(invoice.issueDate || invoice.date).getFullYear() : 0);
+      const matchesMonth = monthFilter === 'All' || Number(monthVal) === Number(monthFilter);
+      const matchesYear = yearFilter === 'All' || Number(yearVal) === Number(yearFilter);
+
+      return matchesSearch && matchesStatus && matchesPayment && matchesCustomer && matchesDateRange && matchesMonth && matchesYear;
     });
-  }, [customerFilter, dateFrom, dateTo, visibleInvoices, isDateRangeInvalid, paymentFilter, searchQuery, statusFilter]);
+  }, [customerFilter, dateFrom, dateTo, visibleInvoices, isDateRangeInvalid, paymentFilter, searchQuery, statusFilter, monthFilter, yearFilter]);
 
   const invoiceSummary = useMemo(() => {
     const collected = visibleInvoices
@@ -422,6 +429,8 @@ const Billing = () => {
     setCustomerFilter('All');
     setDateFrom('');
     setDateTo('');
+    setMonthFilter('All');
+    setYearFilter('All');
   };
 
   return (
@@ -523,6 +532,32 @@ const Billing = () => {
             <option value="All">Customer: All</option>
             {customerOptions.map((option) => (
               <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+
+          <label className="sr-only" htmlFor="billing-month-filter">Month filter</label>
+          <select
+            id="billing-month-filter"
+            className="form-select sm"
+            value={monthFilter}
+            onChange={(event) => setMonthFilter(event.target.value)}
+          >
+            <option value="All">Month: All</option>
+            {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((mName, idx) => (
+              <option key={mName} value={idx + 1}>{mName}</option>
+            ))}
+          </select>
+
+          <label className="sr-only" htmlFor="billing-year-filter">Year filter</label>
+          <select
+            id="billing-year-filter"
+            className="form-select sm"
+            value={yearFilter}
+            onChange={(event) => setYearFilter(event.target.value)}
+          >
+            <option value="All">Year: All</option>
+            {[2024, 2025, 2026, 2027, 2028].map((year) => (
+              <option key={year} value={year}>{year}</option>
             ))}
           </select>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, FileText, Mail, Plus, Printer, Save, Trash2, Wrench } from 'lucide-react';
+import { ArrowLeft, Clock, Download, FileText, Mail, Plus, Printer, Save, Trash2, Wrench } from 'lucide-react';
 import { api, apiClient } from '../../services/apiClient';
 import { leadManagementService } from '../../services/leadManagementService';
 import { inventoryService } from '../../services/inventoryService';
@@ -244,6 +244,9 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
   const [noticeOk, setNoticeOk] = useState(true);
+  const [billingMonth, setBillingMonth] = useState(() => new Date().getMonth() + 1);
+  const [billingYear, setBillingYear] = useState(() => new Date().getFullYear());
+  const [allBillings, setAllBillings] = useState([]);
   const [estimate, setEstimate] = useState({
     estimateNo: 'RPB100001',
     date: new Date().toISOString().slice(0, 10),
@@ -254,6 +257,13 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
 
   const customer = useMemo(() => normalizeBillingCustomer(sourceRecord || {}, sourceModule), [sourceRecord, sourceModule]);
   const customerEmail = customer.email || customer.customerEmail || customer.emailAddress || '';
+
+  const customerBillings = useMemo(() => {
+    return allBillings.filter(entry => 
+      String(entry.sourceModule || 'leads') === sourceModule
+      && String(entry.sourceId || entry.leadId) === String(id)
+    ).sort((a, b) => (Number(b.billingYear) || 0) - (Number(a.billingYear) || 0) || (Number(b.billingMonth) || 0) - (Number(a.billingMonth) || 0));
+  }, [allBillings, sourceModule, id]);
 
   useEffect(() => {
     apiClient.get('/records/appSettings')
@@ -271,40 +281,55 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
       .catch(() => { });
   }, [id, sourceModule, sourceRecord]);
 
-  useEffect(() => {
+  const fetchBillings = () => {
     apiClient.get('/records/leadBillings')
       .then((res) => {
         const all = Array.isArray(res.data) ? res.data : [];
-        const existing = id
-          ? all.find((entry) => (
-            String(entry.sourceModule || 'leads') === sourceModule
-            && String(entry.sourceId || entry.leadId) === String(id)
-          ))
-          : null;
-        if (existing) {
-          setSavedId(existing.id);
-          setItems(existing.items?.length ? existing.items.map((item) => ({ ...newItem(), ...item, id: item.id || newItem().id, usedParts: item.usedParts || [], showParts: false })) : [newItem()]);
-          setEstimate((current) => ({
-            ...current,
-            estimateNo: existing.estimateNo || current.estimateNo,
-            date: existing.date || current.date,
-            validity: existing.validity || current.validity,
-            applyGst: Boolean(existing.applyGst),
-            terms: existing.terms || current.terms,
-          }));
-          return;
-        }
-        const nums = all
-          .map((entry) => {
-            const match = String(entry.estimateNo || '').match(/^RPB(\d+)$/);
-            return match ? Number(match[1]) : 0;
-          })
-          .filter((num) => num >= 100001);
-        const next = nums.length ? Math.max(...nums) + 1 : 100001;
-        setEstimate((current) => ({ ...current, estimateNo: `RPB${next}` }));
+        setAllBillings(all);
       })
       .catch(() => { });
+  };
+
+  useEffect(() => {
+    fetchBillings();
   }, [id, sourceModule]);
+
+  useEffect(() => {
+    if (!id) return;
+    const existing = allBillings.find((entry) => (
+      String(entry.sourceModule || 'leads') === sourceModule
+      && String(entry.sourceId || entry.leadId) === String(id)
+      && Number(entry.billingMonth || (entry.date ? new Date(entry.date).getMonth() + 1 : 0)) === Number(billingMonth)
+      && Number(entry.billingYear || (entry.date ? new Date(entry.date).getFullYear() : 0)) === Number(billingYear)
+    ));
+    if (existing) {
+      setSavedId(existing.id);
+      setItems(existing.items?.length ? existing.items.map((item) => ({ ...newItem(), ...item, id: item.id || newItem().id, usedParts: item.usedParts || [], showParts: false })) : [newItem()]);
+      setEstimate((current) => ({
+        ...current,
+        estimateNo: existing.estimateNo || current.estimateNo,
+        date: existing.date || current.date,
+        validity: existing.validity || current.validity,
+        applyGst: Boolean(existing.applyGst),
+        terms: existing.terms || current.terms,
+      }));
+    } else {
+      setSavedId(null);
+      setItems([newItem()]);
+      const nums = allBillings
+        .map((entry) => {
+          const match = String(entry.estimateNo || '').match(/^RPB(\d+)$/);
+          return match ? Number(match[1]) : 0;
+        })
+        .filter((num) => num >= 100001);
+      const next = nums.length ? Math.max(...nums) + 1 : 100001;
+      setEstimate((current) => ({
+        ...current,
+        estimateNo: `RPB${next}`,
+        date: new Date(billingYear, billingMonth - 1, 15).toISOString().slice(0, 10),
+      }));
+    }
+  }, [id, sourceModule, billingMonth, billingYear, allBillings]);
 
   const [inventoryList, setInventoryList] = useState([]);
 
@@ -344,17 +369,51 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
     }));
   };
 
+  const getAvailableStockForPart = (inventoryId) => {
+    const matched = inventoryList.find((i) => String(i.id) === String(inventoryId));
+    if (!matched) return 0;
+    let baseStock = Number(matched.currentStock || 0);
+    if (savedId) {
+      const currentEstimate = allBillings.find(b => String(b.id) === String(savedId));
+      if (currentEstimate && Array.isArray(currentEstimate.items)) {
+        for (const item of currentEstimate.items) {
+          if (Array.isArray(item.usedParts)) {
+            const savedPart = item.usedParts.find(p => String(p.inventoryId) === String(inventoryId));
+            if (savedPart) {
+              baseStock += Number(savedPart.qty || 0);
+            }
+          }
+        }
+      }
+    }
+    return baseStock;
+  };
+
   const updateUsedPartInItem = (itemId, partId, field, value) => {
     setItems((current) => current.map((item) => {
       if (item.id === itemId) {
         const updatedParts = (item.usedParts || []).map((part) => {
           if (part.id === partId) {
-            const updated = { ...part, [field]: value };
+            let updated = { ...part, [field]: value };
             if (field === 'inventoryId') {
               const matched = inventoryList.find((i) => String(i.id) === String(value));
               if (matched) {
                 updated.name = matched.name;
                 updated.rate = Number(matched.sellingPrice || matched.rate || 0);
+                const stock = getAvailableStockForPart(value);
+                if (Number(updated.qty) > stock) {
+                  updated.qty = stock > 0 ? stock : 1;
+                }
+              }
+            }
+            if (field === 'qty') {
+              const matched = inventoryList.find((i) => String(i.id) === String(part.inventoryId));
+              if (matched) {
+                const stock = getAvailableStockForPart(part.inventoryId);
+                if (Number(value) > stock) {
+                  showNotice(`Cannot exceed available stock (${stock}) for ${matched.name}.`, false);
+                  updated.qty = stock > 0 ? stock : 1;
+                }
               }
             }
             return updated;
@@ -424,6 +483,8 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
     customerAddress: customer.company || customer.address || '',
     estimateNo: estimate.estimateNo,
     date: estimate.date,
+    billingMonth: Number(billingMonth),
+    billingYear: Number(billingYear),
     validity: estimate.validity,
     applyGst: estimate.applyGst,
     gstPercent: estimate.applyGst ? 18 : 0,
@@ -497,6 +558,7 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
         const res = await apiClient.post('/records/leadBillings', { ...payload(), createdAt: new Date().toISOString() });
         setSavedId(res.data?.id || null);
       }
+      fetchBillings();
       showNotice('Billing estimate saved.');
     } catch (error) {
       showNotice(error?.response?.data?.message || 'Failed to save billing estimate.', false);
@@ -592,18 +654,69 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 20, padding: 20, alignItems: 'start' }}>
+      <style>{`
+        @media (max-width: 1024px) {
+          .lead-billing-layout-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
+
+      <div className="lead-billing-layout-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 3fr) minmax(0, 1fr)', gap: 20, padding: 20, alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 16 }}>
           <section style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ padding: '13px 16px', borderBottom: '1px solid #edf2f7', background: '#f8fafc', fontWeight: 900, color: '#0f172a' }}>Estimate Details</div>
-            <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14 }}>
+            <div style={{ padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 14 }}>
               <div>
                 <label style={labelStyle}>Estimate No.</label>
                 <input style={{ ...inputStyle, background: '#f8fafc' }} value={estimate.estimateNo} onChange={(e) => setEstimateField('estimateNo', e.target.value)} />
               </div>
               <div>
+                <label style={labelStyle}>Billing Month</label>
+                <select 
+                  style={inputStyle} 
+                  value={billingMonth} 
+                  onChange={(e) => {
+                    const m = Number(e.target.value);
+                    setBillingMonth(m);
+                    const currentDate = new Date(estimate.date);
+                    const newDate = new Date(billingYear, m - 1, isNaN(currentDate.getDate()) ? 15 : currentDate.getDate());
+                    setEstimateField('date', newDate.toISOString().slice(0, 10));
+                  }}
+                >
+                  {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((mName, idx) => (
+                    <option key={mName} value={idx + 1}>{mName}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Billing Year</label>
+                <select 
+                  style={inputStyle} 
+                  value={billingYear} 
+                  onChange={(e) => {
+                    const y = Number(e.target.value);
+                    setBillingYear(y);
+                    const currentDate = new Date(estimate.date);
+                    const newDate = new Date(y, billingMonth - 1, isNaN(currentDate.getDate()) ? 15 : currentDate.getDate());
+                    setEstimateField('date', newDate.toISOString().slice(0, 10));
+                  }}
+                >
+                  {[2024, 2025, 2026, 2027, 2028].map((yVal) => (
+                    <option key={yVal} value={yVal}>{yVal}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label style={labelStyle}>Date</label>
-                <input type="date" style={inputStyle} value={estimate.date} onChange={(e) => setEstimateField('date', e.target.value)} />
+                <input type="date" style={inputStyle} value={estimate.date} onChange={(e) => {
+                  setEstimateField('date', e.target.value);
+                  const d = new Date(e.target.value);
+                  if (!isNaN(d.getTime())) {
+                    setBillingMonth(d.getMonth() + 1);
+                    setBillingYear(d.getFullYear());
+                  }
+                }} />
               </div>
               <div>
                 <label style={labelStyle}>Validity</label>
@@ -752,15 +865,22 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
                                   onChange={(e) => updateUsedPartInItem(item.id, part.id, 'inventoryId', e.target.value)}
                                 >
                                   <option value="">-- Select Spare Part --</option>
-                                  {inventoryList.map((inv) => (
-                                    <option key={inv.id} value={inv.id}>
-                                      {inv.name} - [Stock: {inv.currentStock || 0}]
-                                    </option>
-                                  ))}
+                                  {inventoryList.filter((inv) => {
+                                    const stock = getAvailableStockForPart(inv.id);
+                                    return stock > 0 || String(inv.id) === String(part.inventoryId);
+                                  }).map((inv) => {
+                                    const stock = getAvailableStockForPart(inv.id);
+                                    return (
+                                      <option key={inv.id} value={inv.id}>
+                                        {inv.name} - [Stock: {stock}]
+                                      </option>
+                                    );
+                                  })}
                                 </select>
                                 <input
                                   type="number"
                                   min="1"
+                                  max={part.inventoryId ? getAvailableStockForPart(part.inventoryId) : undefined}
                                   style={{ ...inputStyle, textAlign: 'center' }}
                                   value={part.qty}
                                   onChange={(e) => updateUsedPartInItem(item.id, part.id, 'qty', Number(e.target.value) || 1)}
@@ -813,7 +933,79 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
           </section>
         </div>
 
-        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
+        <section style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ padding: '13px 16px', borderBottom: '1px solid #edf2f7', background: '#f8fafc', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Clock size={16} style={{ color: '#4f46e5' }} />
+            <span>Billing History</span>
+          </div>
+          <div style={{ padding: 16 }}>
+            {customerBillings.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#64748b', fontSize: '0.8rem', padding: '24px 0' }}>
+                No saved billing history found.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 10 }}>
+                {customerBillings.map((bill) => {
+                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                  const monthStr = months[(Number(bill.billingMonth) || 1) - 1] || 'Jan';
+                  const isCurrent = Number(bill.billingMonth) === Number(billingMonth) && Number(bill.billingYear) === Number(billingYear);
+                  return (
+                    <div 
+                      key={bill.id} 
+                      style={{ 
+                        padding: '10px 12px', 
+                        borderRadius: 8, 
+                        border: isCurrent ? '1px solid #c084fc' : '1px solid #e2e8f0', 
+                        background: isCurrent ? '#fdfafe' : '#ffffff',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 12
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: '0.85rem', color: isCurrent ? '#7c3aed' : '#1e293b' }}>
+                          {monthStr} {bill.billingYear || '—'}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>
+                          {bill.estimateNo} · {bill.date ? new Date(bill.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 900, fontSize: '0.8rem', color: '#0f172a' }}>
+                          Rs {fmt(bill.grandTotal)}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => {
+                            setBillingMonth(Number(bill.billingMonth) || 1);
+                            setBillingYear(Number(bill.billingYear) || 2026);
+                          }}
+                          disabled={isCurrent}
+                          style={{
+                            height: 22,
+                            padding: '0 8px',
+                            fontSize: '10px',
+                            marginTop: 4,
+                            background: isCurrent ? '#f1f5f9' : undefined,
+                            border: isCurrent ? 'none' : undefined,
+                            color: isCurrent ? '#94a3b8' : undefined
+                          }}
+                        >
+                          {isCurrent ? 'Active' : 'Load'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', opacity: 0, pointerEvents: 'none' }}>
           <div style={{ background: '#e8eaf0', borderRadius: 16, padding: 24 }}>
             <div
               ref={printRef}
@@ -994,7 +1186,6 @@ const LeadBillingPage = ({ moduleType = 'leads' }) => {
           </div>
         </div>
       </div>
-    </div>
   );
 };
 

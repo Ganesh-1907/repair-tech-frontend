@@ -326,6 +326,7 @@ const RentalCustomersPage = () => {
           contractId={credentialsTarget.id}
           customerName={credentialsTarget.name || credentialsTarget.customerName || ''}
           email={credentialsTarget.email || ''}
+          emailLocked={true}
           onClose={() => setCredentialsTarget(null)}
         />
       )}

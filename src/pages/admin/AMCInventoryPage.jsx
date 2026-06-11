@@ -387,6 +387,7 @@ const AMCInventoryPage = () => {
           contractId={credentialsTarget.contractId || credentialsTarget.id}
           customerName={credentialsTarget.customerName || credentialsTarget.name || ''}
           email={credentialsTarget.primaryEmail || credentialsTarget.email || ''}
+          emailLocked={true}
           onClose={() => setCredentialsTarget(null)}
         />
       )}
